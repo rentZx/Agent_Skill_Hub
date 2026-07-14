@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 224 46% 5%;
+  --foreground: 190 28% 94%;
+  --card: 222 34% 8%;
+  --card-foreground: 190 28% 94%;
+  --muted: 216 18% 16%;
+  --muted-foreground: 196 12% 67%;
+  --border: 196 20% 18%;
+  --input: 196 20% 18%;
+  --ring: 176 72% 62%;
+  --primary: 176 72% 62%;
+  --primary-foreground: 210 34% 7%;
+  --accent: 218 76% 66%;
+  --accent-foreground: 190 28% 94%;
+  --destructive: 3 78% 62%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(7, 12, 28, 0.96), rgba(4, 7, 16, 1)),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  letter-spacing: 0;
+}
+
+::selection {
+  background: rgba(109, 232, 219, 0.28);
+}
+
+.glass-panel {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.76), rgba(8, 13, 23, 0.62)),
+    linear-gradient(120deg, rgba(34, 211, 238, 0.08), rgba(99, 102, 241, 0.06));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(22px);
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(109, 232, 219, 0.38) rgba(15, 23, 42, 0.4);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
