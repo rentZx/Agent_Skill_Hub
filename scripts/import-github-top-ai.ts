@@ -3,7 +3,7 @@ dotenv.config({ path: ".env.local" });
 
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { discoverTopAiResources } from "../lib/github-discovery";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 
@@ -12,9 +12,11 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required.");
 
 const client = postgres(databaseUrl);
 const db = drizzle(client);
-const discovered = await discoverTopAiResources(30);
 
-for (const resource of discovered) {
+async function main() {
+  const discovered = await discoverTopAiResources(30);
+
+  for (const resource of discovered) {
   const [saved] = await db.insert(resources).values({
     slug: resource.slug,
     name: resource.name,
@@ -54,16 +56,23 @@ for (const resource of discovered) {
     }
   }).returning({ id: resources.id });
 
-  if (!saved) continue;
-  for (const tag of resource.tags) {
-    const [savedTag] = await db.insert(tags).values({ slug: slugify(tag), name: tag, category: "github_ai" }).onConflictDoUpdate({ target: tags.slug, set: { name: tag, category: "github_ai" } }).returning({ id: tags.id });
-    if (!savedTag) continue;
-    await db.insert(resourceTags).values({ resourceId: saved.id, tagId: savedTag.id }).onConflictDoNothing();
+    if (!saved) continue;
+    for (const tag of resource.tags) {
+      const [savedTag] = await db.insert(tags).values({ slug: slugify(tag), name: tag, category: "github_ai" }).onConflictDoUpdate({ target: tags.slug, set: { name: tag, category: "github_ai" } }).returning({ id: tags.id });
+      if (!savedTag) continue;
+      await db.insert(resourceTags).values({ resourceId: saved.id, tagId: savedTag.id }).onConflictDoNothing();
+    }
   }
+
+  await client.end();
+  console.log(`Imported ${discovered.length} top AI GitHub resources.`);
 }
 
-await client.end();
-console.log(`Imported ${discovered.length} top AI GitHub resources.`);
+void main().catch(async (error) => {
+  console.error(error);
+  await client.end();
+  process.exitCode = 1;
+});
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-+|-+$/g, "") || value;
