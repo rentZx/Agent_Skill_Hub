@@ -66,6 +66,7 @@ async function searchRepositories(query: string, perPage = 8): Promise<GitHubSea
     return [];
   }
   const payload = (await response.json()) as { items?: GitHubSearchItem[] };
+  console.warn(`GitHub discovery query status=${response.status} items=${payload.items?.length ?? 0}`);
   return payload.items ?? [];
 }
 
