@@ -4,7 +4,7 @@ dotenv.config({ path: ".env.local" });
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
-import { discoverTopAiResources } from "../lib/github-discovery";
+import { discoverTopAiResources } from "../lib/github-discovery-core";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 
 const databaseUrl = process.env.DATABASE_URL;
