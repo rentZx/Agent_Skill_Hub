@@ -37,6 +37,18 @@ npm run build
 
 Current status: the V1.0 local MVP is runnable. It supports the home page, resource library, resource details, search filters, project recommendations, local favorites, and a local admin intake page. If port `3000` is already occupied, Next.js will choose the next available local port.
 
+The V1.1 Project Analyzer is available at `/analyze`. It runs locally without an LLM and separates project analysis, tag extraction, resource recommendation, and presentation.
+
+## Server Deployment
+
+The production service uses `/opt/apps/agent-skill-hub`, PM2, and port `3003`. The GitHub Actions workflow deploys pushes to `main` after these repository secrets are configured:
+
+- `SERVER_HOST`: server IP or hostname.
+- `SERVER_USER`: SSH user, normally `ubuntu`.
+- `DEPLOY_KEY`: the private SSH key whose public key is authorized on the server.
+
+PostgreSQL is optional for the seed-backed MVP. When `DATABASE_URL` is configured on the server, resource reads use PostgreSQL and fall back to the local seed data if the database is unavailable.
+
 ## Environment Variables
 
 Create a `.env.local` file when Supabase-backed reads are needed. Without these variables, the app falls back to the curated local seed data.
