@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clipboard, GitBranch, Layers3, Radar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { analyzeProject } from "@/lib/project-analyzer";
@@ -15,14 +15,14 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function runAnalysis() {
+  async function requestAnalysis(value: string) {
     setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input })
+        body: JSON.stringify({ input: value })
       });
       const payload = (await response.json()) as { ok: boolean; result?: typeof result & { source: "deepseek" | "rules"; discoveredCount: number }; error?: string };
       if (!response.ok || !payload.ok || !payload.result) throw new Error(payload.error ?? "分析失败");
@@ -35,6 +35,19 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
       setLoading(false);
     }
   }
+
+  function runAnalysis() {
+    return requestAnalysis(input);
+  }
+
+  useEffect(() => {
+    const prompt = new URLSearchParams(window.location.search).get("prompt")?.trim();
+    if (!prompt) return;
+    setInput(prompt);
+    void requestAnalysis(prompt);
+    // The query string is the one-time handoff from the home page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function copyPrompt() {
     await navigator.clipboard.writeText(result.recommendation.codexPrompt);

@@ -17,6 +17,7 @@ import type { ResourceType } from "@/lib/types";
 import { typeLabels } from "@/lib/resource-types";
 import { getResources } from "@/lib/resources";
 import { Button } from "@/components/ui/button";
+import { HomeAnalyzerForm } from "@/components/home-analyzer-form";
 
 const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   agent_skill: BrainCircuit,
@@ -59,7 +60,8 @@ export default async function HomePage() {
             </div>
 
             <div className="rounded-lg border border-cyan-300/25 bg-slate-950/68 p-2 shadow-[0_0_48px_rgba(34,211,238,0.18)] backdrop-blur-xl">
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <HomeAnalyzerForm />
+              <div className="hidden">
                 <Link
                   href="/analyze"
                   className="group flex min-h-20 items-start gap-3 rounded-md border border-white/10 bg-white/[0.055] p-4 transition hover:border-cyan-300/35 hover:bg-white/[0.075]"
@@ -80,7 +82,7 @@ export default async function HomePage() {
                   </Link>
                 </Button>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 px-1 text-xs text-slate-400">
+              <div className="hidden">
                 <span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">需求理解</span>
                 <span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">资源组合</span>
                 <span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">风险说明</span>

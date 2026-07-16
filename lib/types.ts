@@ -32,6 +32,11 @@ export type SeedResource = {
   difficulty?: string;
   priority?: number;
   ai_recommendation_weight?: number;
+  github_stars?: number;
+  github_forks?: number;
+  license?: string | null;
+  latest_commit_at?: string | null;
+  readme_summary?: string;
 };
 
 export type Resource = SeedResource & {
