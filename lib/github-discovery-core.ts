@@ -58,7 +58,8 @@ function buildQueries(input: string, tags: string[]) {
 }
 
 async function searchRepositories(query: string, perPage = 8): Promise<GitHubSearchItem[]> {
-  const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", Authorization: `Bearer ${process.env.GITHUB_TOKEN}` };
+  const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, { headers, cache: "no-store" });
   if (!response.ok) {
     console.warn(`GitHub discovery failed for query ${query}: ${response.status}`);
