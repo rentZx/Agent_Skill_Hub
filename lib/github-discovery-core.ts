@@ -45,7 +45,10 @@ export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
 }
 
 function buildQueries(input: string, tags: string[]) {
-  const cleanTags = tags.map((tag) => tag.toLowerCase().replace(/[^a-z0-9-]/g, "")).filter((tag) => tag.length > 2).slice(0, 5);
+  const cleanTags = tags
+    .map((tag) => tag.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim())
+    .filter((tag) => tag.length > 2)
+    .slice(0, 5);
   const queryText = cleanTags.join(" ");
   return Array.from(new Set([
     `${queryText} ${input.match(/[a-z0-9-]{3,}/gi)?.slice(0, 2).join(" ") ?? ""}`.trim(),
