@@ -11,6 +11,7 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
   const [copied, setCopied] = useState(false);
   const [result, setResult] = useState(() => analyzeProject(input, resources));
   const [source, setSource] = useState<"deepseek" | "rules">("rules");
+  const [discoveredCount, setDiscoveredCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,10 +24,11 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input })
       });
-      const payload = (await response.json()) as { ok: boolean; result?: typeof result & { source: "deepseek" | "rules" }; error?: string };
+      const payload = (await response.json()) as { ok: boolean; result?: typeof result & { source: "deepseek" | "rules"; discoveredCount: number }; error?: string };
       if (!response.ok || !payload.ok || !payload.result) throw new Error(payload.error ?? "分析失败");
       setResult(payload.result);
       setSource(payload.result.source);
+      setDiscoveredCount(payload.result.discoveredCount ?? 0);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "分析失败");
     } finally {
@@ -55,7 +57,7 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
             <Button onClick={copyPrompt} variant={copied ? "secondary" : "default"} className="w-full lg:w-auto"><Clipboard className="h-4 w-4" />{copied ? "已复制" : "复制 Codex Prompt"}</Button>
           </div>
           <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={4} className="min-h-28 w-full resize-none rounded-md border border-white/10 bg-white/[0.05] p-4 text-base leading-7 text-slate-100 outline-none focus:border-cyan-300/40 lg:col-span-2" placeholder="例如：我要开发一个跨境获客平台" />
-          <div className="text-xs text-muted-foreground lg:col-span-2">{error ? error : source === "deepseek" ? "DeepSeek 智能分析已启用" : "当前使用规则引擎"}</div>
+          <div className="text-xs text-muted-foreground lg:col-span-2">{error ? error : source === "deepseek" ? `DeepSeek 智能分析已启用，本次联网发现 ${discoveredCount} 个 GitHub 候选` : "当前使用规则引擎"}</div>
         </div>
       </section>
 

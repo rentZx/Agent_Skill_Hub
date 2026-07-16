@@ -1,21 +1,38 @@
 import "server-only";
 
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
+import { discoverGitHubResources } from "@/lib/github-discovery";
 import { analyzeProject } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import type { Resource } from "@/lib/types";
 
-export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules" }> {
-  const fallback = analyzeProject(input, resources);
+export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules"; discoveredCount: number }> {
+  const initial = analyzeProject(input, resources);
+  let ai: Awaited<ReturnType<typeof analyzeWithDeepSeek>> = null;
+  try {
+    ai = await analyzeWithDeepSeek(input);
+  } catch (error) {
+    console.warn("DeepSeek analysis failed, using rules tags.", error);
+  }
+
+  let discovered: Resource[] = [];
+  try {
+    discovered = await discoverGitHubResources(input, ai?.tags?.length ? ai.tags : initial.analysis.tags, resources);
+  } catch (error) {
+    console.warn("GitHub discovery failed, keeping database resources.", error);
+  }
+
+  const candidateResources = mergeResources(resources, discovered);
+  const fallback = analyzeProject(input, candidateResources);
 
   try {
-    const ai = await analyzeWithDeepSeek(input);
-    if (!ai) return { ...fallback, source: "rules" };
-    const enriched = analyzeProject(`${input} ${(ai.tags ?? []).join(" ")}`, resources);
+    if (!ai) return { ...fallback, source: "rules", discoveredCount: discovered.length };
+    const enriched = analyzeProject(`${input} ${(ai.tags ?? []).join(" ")}`, candidateResources);
     const reranked = await rerankRecommendation(input, enriched.recommendation);
     return {
       ...enriched,
       source: "deepseek",
+      discoveredCount: discovered.length,
       recommendation: reranked,
       analysis: {
         ...enriched.analysis,
@@ -35,8 +52,14 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     };
   } catch (error) {
     console.warn("DeepSeek analysis failed, using rules fallback.", error);
-    return { ...fallback, source: "rules" };
+    return { ...fallback, source: "rules", discoveredCount: discovered.length };
   }
+}
+
+function mergeResources(catalog: Resource[], discovered: Resource[]) {
+  const merged = new Map(catalog.map((resource) => [resource.repo_url || resource.id, resource]));
+  discovered.forEach((resource) => merged.set(resource.repo_url || resource.id, resource));
+  return Array.from(merged.values());
 }
 
 async function rerankRecommendation(input: string, recommendation: AnalyzerResult["recommendation"]) {
