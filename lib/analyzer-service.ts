@@ -1,7 +1,7 @@
 import "server-only";
 
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
-import { discoverGitHubResources } from "@/lib/github-discovery";
+import { discoverGitHubResources } from "@/lib/github-discovery-core";
 import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
