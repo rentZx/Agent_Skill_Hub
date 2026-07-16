@@ -49,7 +49,7 @@ function buildQueries(input: string, tags: string[]) {
     .map((tag) => tag.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim())
     .filter((tag) => tag.length > 2)
     .slice(0, 5);
-  const queryText = cleanTags.join(" ");
+  const queryText = cleanTags.flatMap((tag) => tag.split(" ")).slice(0, 5).join(" ");
   return Array.from(new Set([
     `${queryText} ${input.match(/[a-z0-9-]{3,}/gi)?.slice(0, 2).join(" ") ?? ""}`.trim(),
     `${queryText} dashboard`.trim(),
