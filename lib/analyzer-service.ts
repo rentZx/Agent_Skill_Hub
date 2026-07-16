@@ -19,6 +19,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
   let discovered: Resource[] = [];
   try {
     discovered = await discoverGitHubResources(input, ai?.tags?.length ? ai.tags : initial.analysis.tags, []);
+    console.warn(`GitHub discovery runtime: token=${Boolean(process.env.GITHUB_TOKEN)} candidates=${discovered.length}`);
   } catch (error) {
     console.warn("GitHub discovery failed, keeping database resources.", error);
   }
