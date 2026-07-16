@@ -2,8 +2,9 @@ import "server-only";
 
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
 import { discoverGitHubResources } from "@/lib/github-discovery";
-import { analyzeProject } from "@/lib/project-analyzer";
+import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
+import { rebuildCodexPrompt } from "@/lib/recommendation";
 import type { Resource } from "@/lib/types";
 
 export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules"; discoveredCount: number }> {
@@ -27,28 +28,49 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
 
   try {
     if (!ai) return { ...fallback, source: "rules", discoveredCount: discovered.length };
-    const enriched = analyzeProject(`${input} ${(ai.tags ?? []).join(" ")}`, candidateResources);
+    const enriched = analyzeProject(`${input} ${(ai.tags ?? []).join(" ")}`, candidateResources, {
+      industry: ai.industry,
+      projectType: ai.projectType,
+      platform: ai.platform,
+      targetUsers: ai.targetUsers,
+      coreFeatures: ai.coreFeatures,
+      frontend: ai.frontend,
+      backend: ai.backend,
+      database: ai.database,
+      orm: ai.orm,
+      deploy: ai.deploy,
+      difficulty: ai.difficulty,
+      tags: ai.tags
+    });
     const reranked = await rerankRecommendation(input, enriched.recommendation);
+    const analysis = {
+      ...enriched.analysis,
+      ...(ai.industry ? { industry: ai.industry } : {}),
+      ...(ai.projectType ? { projectType: ai.projectType } : {}),
+      ...(ai.platform ? { platform: ai.platform } : {}),
+      ...(ai.targetUsers ? { targetUsers: ai.targetUsers } : {}),
+      ...(ai.coreFeatures?.length ? { coreFeatures: ai.coreFeatures } : {}),
+      ...(ai.frontend ? { frontend: ai.frontend } : {}),
+      ...(ai.backend ? { backend: ai.backend } : {}),
+      ...(ai.database ? { database: ai.database } : {}),
+      ...(ai.orm ? { orm: ai.orm } : {}),
+      ...(ai.deploy ? { deploy: ai.deploy } : {}),
+      ...(ai.difficulty ? { difficulty: ai.difficulty } : {}),
+      tags: Array.from(new Set([...enriched.analysis.tags, ...(ai.tags ?? [])]))
+    };
+    const recommendation = {
+      ...reranked,
+      codexPrompt: rebuildCodexPrompt(input, reranked)
+    };
     return {
       ...enriched,
       source: "deepseek",
       discoveredCount: discovered.length,
-      recommendation: reranked,
-      analysis: {
-        ...enriched.analysis,
-        ...(ai.industry ? { industry: ai.industry } : {}),
-        ...(ai.projectType ? { projectType: ai.projectType } : {}),
-        ...(ai.platform ? { platform: ai.platform } : {}),
-        ...(ai.targetUsers ? { targetUsers: ai.targetUsers } : {}),
-        ...(ai.coreFeatures?.length ? { coreFeatures: ai.coreFeatures } : {}),
-        ...(ai.frontend ? { frontend: ai.frontend } : {}),
-        ...(ai.backend ? { backend: ai.backend } : {}),
-        ...(ai.database ? { database: ai.database } : {}),
-        ...(ai.orm ? { orm: ai.orm } : {}),
-        ...(ai.deploy ? { deploy: ai.deploy } : {}),
-        ...(ai.difficulty ? { difficulty: ai.difficulty } : {}),
-        tags: Array.from(new Set([...enriched.analysis.tags, ...(ai.tags ?? [])]))
-      }
+      recommendation: {
+        ...recommendation,
+        codexPrompt: buildAnalyzerPrompt(input, analysis, recommendation.codexPrompt)
+      },
+      analysis
     };
   } catch (error) {
     console.warn("DeepSeek analysis failed, using rules fallback.", error);
@@ -80,13 +102,21 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     const scoreMap = new Map(scores.map((item) => [item.id, item]));
     return {
       ...recommendation,
-      groups: recommendation.groups.map((group) => ({
-        ...group,
-        items: [...group.items].map((item) => {
+      groups: recommendation.groups.map((group) => {
+        const items = [...group.items].map((item) => {
           const rerank = scoreMap.get(item.resource.id);
           return rerank ? { ...item, score: rerank.score, why: rerank.reason } : item;
-        }).sort((a, b) => b.score - a.score)
-      }))
+        }).filter((item) => item.score >= 35).sort((a, b) => b.score - a.score);
+        return {
+          ...group,
+          items,
+          gap: items.length > 0 ? group.gap : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
+        };
+      }),
+      gaps: Array.from(new Set([
+        ...recommendation.gaps,
+        ...recommendation.groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
+      ]))
     };
   } catch (error) {
     console.warn("DeepSeek rerank failed, keeping rule scores.", error);

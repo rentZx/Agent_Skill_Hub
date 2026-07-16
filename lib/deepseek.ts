@@ -40,7 +40,7 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
       messages: [
         {
           role: "system",
-          content: "你是软件架构分析器。只输出合法 JSON，不编造外部资源事实。根据用户需求提取行业、项目类型、平台、目标用户、核心功能、推荐技术栈、复杂度和 8-20 个英文 slug 标签。JSON 字段必须是 industry, projectType, platform, targetUsers, coreFeatures, frontend, backend, database, orm, deploy, difficulty, tags。"
+          content: "你是软件架构分析器。只输出合法 JSON，不编造外部资源事实。根据用户需求提取行业、项目类型、平台、目标用户、核心功能、推荐技术栈、复杂度和 8-20 个英文 slug 标签。coreFeatures 必须是来自用户原始需求的 4-8 个具体业务功能，不能使用‘用户输入、业务数据管理、后台管理、结果导出’这类通用平台词，除非用户明确提出。JSON 字段必须是 industry, projectType, platform, targetUsers, coreFeatures, frontend, backend, database, orm, deploy, difficulty, tags。"
         },
         { role: "user", content: `请分析以下项目需求，并输出 JSON：${input}` }
       ]

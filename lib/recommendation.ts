@@ -46,6 +46,13 @@ export type ProjectRecommendation = {
   codexPrompt: string;
 };
 
+export type RecommendationContext = {
+  projectType?: string;
+  targetUsers?: string;
+  coreFeatures?: string[];
+  techStack?: string[];
+};
+
 const capabilityModules: CapabilityModule[] = [
   {
     id: "data-collection",
@@ -190,11 +197,17 @@ export function extractProjectKeywords(input: string) {
     .slice(0, 18);
 }
 
-export function detectCapabilityModules(input: string, keywords = extractProjectKeywords(input)) {
+export function detectCapabilityModules(input: string, keywords = extractProjectKeywords(input), includeFallback = true) {
   const searchable = `${input} ${keywords.join(" ")}`.toLowerCase();
+  const searchableTokens: string[] = searchable.match(/[a-z0-9-]+/g) ?? [];
   const matched = capabilityModules
     .map((module) => {
-      const hits = module.keywords.filter((keyword) => searchable.includes(keyword.toLowerCase()));
+      const hits = module.keywords.filter((keyword) => {
+        const normalizedKeyword = keyword.toLowerCase();
+        return /^[a-z0-9-]+$/.test(normalizedKeyword)
+          ? searchableTokens.includes(normalizedKeyword)
+          : searchable.includes(normalizedKeyword);
+      });
       return { module, hits };
     })
     .filter(({ hits }) => hits.length > 0)
@@ -204,14 +217,14 @@ export function detectCapabilityModules(input: string, keywords = extractProject
   const defaultIds = ["agent-workflow", "ui-components", "database-storage", "automated-testing"];
   const fallback = capabilityModules.filter((module) => defaultIds.includes(module.id));
 
-  return dedupeModules([...matched, ...fallback]).slice(0, 7);
+  return dedupeModules(includeFallback ? [...matched, ...fallback] : matched).slice(0, 7);
 }
 
-export function buildProjectRecommendation(input: string, resources: Resource[]): ProjectRecommendation {
+export function buildProjectRecommendation(input: string, resources: Resource[], context: RecommendationContext = {}): ProjectRecommendation {
   const keywords = extractProjectKeywords(input);
   const modules = detectCapabilityModules(input, keywords);
-  const understanding = buildProjectUnderstanding(input, keywords, modules);
-  const scored = scoreResources(resources, keywords, modules);
+  const understanding = buildProjectUnderstanding(input, keywords, modules, context);
+  const scored = scoreResources(resources, [...keywords, ...(context.coreFeatures ?? [])], modules);
   const selectedIds = new Set<string>();
 
   const groups = groupDefinitions.map((group) => {
@@ -253,20 +266,20 @@ export function buildProjectRecommendation(input: string, resources: Resource[])
   };
 }
 
-function buildProjectUnderstanding(input: string, keywords: string[], modules: CapabilityModule[]): ProjectUnderstanding {
+function buildProjectUnderstanding(input: string, keywords: string[], modules: CapabilityModule[], context: RecommendationContext): ProjectUnderstanding {
   const text = input.toLowerCase();
   const has = (values: string[]) => values.some((value) => text.includes(value.toLowerCase()) || input.includes(value));
 
-  const projectType = has(["外贸", "客户", "线索", "获客", "lead"]) ? "获客/线索发现系统" :
+  const projectType = context.projectType ?? (has(["外贸", "客户", "线索", "获客", "lead"]) ? "获客/线索发现系统" :
     has(["知识库", "搜索", "文档", "问答"]) ? "知识库与搜索推荐系统" :
     has(["后台", "管理", "dashboard", "saas"]) ? "SaaS 工作台/管理后台" :
-    "AI 辅助 Web 应用";
+    "AI 辅助 Web 应用");
 
-  const targetUsers = has(["销售", "外贸", "客户", "运营"]) ? "销售、运营或业务拓展团队" :
+  const targetUsers = context.targetUsers ?? (has(["销售", "外贸", "客户", "运营"]) ? "销售、运营或业务拓展团队" :
     has(["开发者", "agent", "codex"]) ? "开发者与 AI Agent 使用者" :
-    "需要把业务需求转成可执行工作流的产品/运营用户";
+    "需要把业务需求转成可执行工作流的产品/运营用户");
 
-  const featureSet = [
+  const featureSet = context.coreFeatures?.length ? context.coreFeatures : [
     has(["输入", "描述", "需求", "prompt"]) ? "项目需求输入与结构化理解" : "需求录入与参数配置",
     ...modules.slice(0, 5).map((module) => module.label),
     has(["导出", "excel", "csv", "报告"]) ? "结果导出与报告生成" : "结果保存与复用"
@@ -278,7 +291,7 @@ function buildProjectUnderstanding(input: string, keywords: string[], modules: C
     has(["文档", "pdf", "word", "excel"]) ? "上传文档、表格或报告" : "资源标签、评分和风险元数据"
   ];
 
-  const techStack = [
+  const techStack = context.techStack?.length ? context.techStack : [
     "Next.js + TypeScript",
     "Tailwind CSS + shadcn/ui",
     has(["数据库", "保存", "用户", "搜索", "推荐", "supabase"]) ? "Supabase/Postgres" : "本地数据层，后续可接 Supabase",
@@ -296,9 +309,19 @@ function buildProjectUnderstanding(input: string, keywords: string[], modules: C
 }
 
 function scoreResources(resources: Resource[], keywords: string[], modules: CapabilityModule[]) {
+  const genericKeywords = new Set([
+    "web", "web-app", "web application", "saas", "dashboard", "postgresql", "postgres", "next", "nextjs", "next.js",
+    "react", "node", "nodejs", "js", "typescript", "javascript", "express", "mongodb", "mongoose", "vercel", "docker",
+    "responsive", "user-friendly", "dynamic-content", "api", "fullstack", "frontend", "backend"
+  ]);
+  const meaningfulKeywords = keywords.filter((keyword) =>
+    /[a-z0-9]/i.test(keyword) && keyword.length <= 18 && !genericKeywords.has(keyword.toLowerCase())
+  );
   const moduleTags = modules.flatMap((module) => module.preferredTags);
-  const moduleTypes = modules.flatMap((module) => module.preferredTypes);
-  const moduleKeywords = modules.flatMap((module) => module.keywords);
+  const scoringInput = meaningfulKeywords.join(" ");
+  const scoringModules = detectCapabilityModules(scoringInput, meaningfulKeywords, false);
+  const scoringModuleKeywords = scoringModules.flatMap((module) => module.keywords);
+  const scoringModuleTypes = scoringModules.flatMap((module) => module.preferredTypes);
 
   return resources
     .map((resource) => {
@@ -312,11 +335,13 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
         ...resource.use_cases
       ].join(" ").toLowerCase();
 
-      const keywordHits = keywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
-      const moduleKeywordHits = moduleKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
-      const tagHits = resource.tags.filter((tag) => moduleTags.includes(tag)).length;
-      const typeBoost = moduleTypes.includes(resource.type) ? 14 : 0;
+      const keywordHits = meaningfulKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
+      const moduleKeywordHits = scoringModuleKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
+      const tagHits = resource.tags.filter((tag) => moduleTags.includes(tag) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
+      const typeBoost = scoringModuleTypes.includes(resource.type) ? 14 : 0;
       const riskPenalty = resource.risk_level === "high" ? 22 : resource.risk_level === "medium" ? 6 : 0;
+      const universalUiSignal = resource.type === "ui_component" && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
+      const hasProjectSignal = keywordHits > 0 || moduleKeywordHits > 0 || tagHits > 0 || universalUiSignal;
       const score =
         keywordHits * 11 +
         moduleKeywordHits * 4 +
@@ -326,9 +351,9 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
         resource.trust_score * 0.38 -
         riskPenalty;
 
-      return { resource, score };
+      return { resource, score, hasProjectSignal };
     })
-    .filter((item) => item.score >= 52)
+    .filter((item) => item.score >= 52 && item.hasProjectSignal)
     .sort((a, b) => b.score - a.score);
 }
 
@@ -412,6 +437,10 @@ function buildCodexPrompt(
   const gapText = gaps.length > 0 ? gaps.map((gap) => `- ${gap}`).join("\n") : "- 暂无关键缺口，先按推荐组合实现 MVP。";
 
   return `请作为 Codex 帮我开发以下项目，并按“项目开发能力组合方案”执行。\n\n项目原始描述：\n${input}\n\n1. 项目需求理解\n- 项目类型：${understanding.projectType}\n- 目标用户：${understanding.targetUsers}\n- 核心功能：\n${featureText}\n- 可能的数据来源：\n${sourceText}\n- 推荐技术栈：\n${stackText}\n\n2. 所需能力模块\n${moduleText}\n\n3. 推荐资源组合\n${groupText}\n\n4. 当前缺口\n${gapText}\n\n5. 开发要求\n- 先实现可运行 MVP，再逐步接入外部服务。\n- 优先使用低风险、高可信、适配度高的资源；高风险资源必须说明权限和数据边界。\n- 不要只堆资源列表，要把每个资源绑定到具体开发环节。\n- 使用 Next.js、TypeScript、Tailwind CSS、shadcn/ui；需要持久化时优先 Supabase/Postgres。\n- 每次修改后运行相关构建、lint 或页面验证，并报告失败原因。`;
+}
+
+export function rebuildCodexPrompt(input: string, recommendation: ProjectRecommendation) {
+  return buildCodexPrompt(input, recommendation.understanding, recommendation.modules, recommendation.groups, recommendation.gaps);
 }
 
 function dedupeModules(modules: CapabilityModule[]) {
