@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Clipboard, GitBranch, Layers3, Radar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { analyzeProject } from "@/lib/project-analyzer";
@@ -9,7 +9,30 @@ import type { Resource } from "@/lib/types";
 export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
   const [input, setInput] = useState("我要开发一个画室管理系统");
   const [copied, setCopied] = useState(false);
-  const result = useMemo(() => analyzeProject(input, resources), [input, resources]);
+  const [result, setResult] = useState(() => analyzeProject(input, resources));
+  const [source, setSource] = useState<"deepseek" | "rules">("rules");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function runAnalysis() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input })
+      });
+      const payload = (await response.json()) as { ok: boolean; result?: typeof result & { source: "deepseek" | "rules" }; error?: string };
+      if (!response.ok || !payload.ok || !payload.result) throw new Error(payload.error ?? "分析失败");
+      setResult(payload.result);
+      setSource(payload.result.source);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "分析失败");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function copyPrompt() {
     await navigator.clipboard.writeText(result.recommendation.codexPrompt);
@@ -27,8 +50,12 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
             <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">把一句需求变成可执行架构</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">规则引擎会分析项目行业、类型、用户和技术约束，并从本地资源库生成开发路线与 Codex Prompt。</p>
           </div>
-          <Button onClick={copyPrompt} variant={copied ? "secondary" : "default"} className="w-full lg:w-auto"><Clipboard className="h-4 w-4" />{copied ? "已复制" : "复制 Codex Prompt"}</Button>
+          <div className="flex flex-col gap-2 sm:flex-row lg:w-auto">
+            <Button onClick={runAnalysis} disabled={loading} className="w-full lg:w-auto"><Sparkles className="h-4 w-4" />{loading ? "分析中..." : "开始分析"}</Button>
+            <Button onClick={copyPrompt} variant={copied ? "secondary" : "default"} className="w-full lg:w-auto"><Clipboard className="h-4 w-4" />{copied ? "已复制" : "复制 Codex Prompt"}</Button>
+          </div>
           <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={4} className="min-h-28 w-full resize-none rounded-md border border-white/10 bg-white/[0.05] p-4 text-base leading-7 text-slate-100 outline-none focus:border-cyan-300/40 lg:col-span-2" placeholder="例如：我要开发一个跨境获客平台" />
+          <div className="text-xs text-muted-foreground lg:col-span-2">{error ? error : source === "deepseek" ? "DeepSeek 智能分析已启用" : "当前使用规则引擎"}</div>
         </div>
       </section>
 

@@ -61,6 +61,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 GITHUB_TOKEN=
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
 Variable usage:
@@ -70,6 +72,8 @@ Variable usage:
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-only key for admin jobs, imports, and trusted writes.
 - `OPENAI_API_KEY`: Optional server-side key for embeddings and recommendation generation.
 - `GITHUB_TOKEN`: Optional server-side GitHub token for higher API rate limits during single-repository imports.
+- `DEEPSEEK_API_KEY`: Optional server-only key for AI project analysis and tag expansion. When absent, the rules engine remains available.
+- `DEEPSEEK_MODEL`: Optional DeepSeek model name; defaults to `deepseek-chat`.
 
 Do not expose server-only keys to client components.
 
