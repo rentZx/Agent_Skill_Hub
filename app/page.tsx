@@ -61,7 +61,7 @@ export default async function HomePage() {
             <div className="rounded-lg border border-cyan-300/25 bg-slate-950/68 p-2 shadow-[0_0_48px_rgba(34,211,238,0.18)] backdrop-blur-xl">
               <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                 <Link
-                  href="/recommend"
+                  href="/analyze"
                   className="group flex min-h-20 items-start gap-3 rounded-md border border-white/10 bg-white/[0.055] p-4 transition hover:border-cyan-300/35 hover:bg-white/[0.075]"
                 >
                   <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
@@ -75,7 +75,7 @@ export default async function HomePage() {
                   </span>
                 </Link>
                 <Button asChild size="lg" className="h-full min-h-14 shrink-0 px-5">
-                  <Link href="/recommend">
+                  <Link href="/analyze">
                     生成方案 <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>

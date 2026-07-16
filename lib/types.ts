@@ -21,6 +21,17 @@ export type SeedResource = {
   repo_url: string;
   source: string;
   last_updated: string;
+  industry?: string;
+  project_type?: string;
+  frontend?: string;
+  backend?: string;
+  database?: string;
+  orm?: string;
+  deploy?: string;
+  stack?: string[];
+  difficulty?: string;
+  priority?: number;
+  ai_recommendation_weight?: number;
 };
 
 export type Resource = SeedResource & {

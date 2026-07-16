@@ -61,6 +61,17 @@ export const resources = pgTable(
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+    ,industry: text("industry")
+    ,projectType: text("project_type")
+    ,frontend: text("frontend")
+    ,backend: text("backend")
+    ,databaseName: text("database_name")
+    ,orm: text("orm")
+    ,deploy: text("deploy")
+    ,stack: text("stack").array().notNull().default(sql`'{}'::text[]`)
+    ,difficulty: text("difficulty")
+    ,priority: integer("priority").notNull().default(0)
+    ,aiRecommendationWeight: integer("ai_recommendation_weight").notNull().default(0)
   },
   (table) => ({
     slugIdx: uniqueIndex("resources_slug_idx").on(table.slug),

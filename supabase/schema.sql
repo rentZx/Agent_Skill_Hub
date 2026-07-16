@@ -48,6 +48,18 @@ create table if not exists public.resources (
   updated_at timestamptz not null default now()
 );
 
+alter table public.resources add column if not exists industry text;
+alter table public.resources add column if not exists project_type text;
+alter table public.resources add column if not exists frontend text;
+alter table public.resources add column if not exists backend text;
+alter table public.resources add column if not exists database_name text;
+alter table public.resources add column if not exists orm text;
+alter table public.resources add column if not exists deploy text;
+alter table public.resources add column if not exists stack text[] not null default '{}';
+alter table public.resources add column if not exists difficulty text;
+alter table public.resources add column if not exists priority integer not null default 0;
+alter table public.resources add column if not exists ai_recommendation_weight integer not null default 0;
+
 alter table public.resources add column if not exists github_stars integer not null default 0;
 alter table public.resources add column if not exists github_forks integer not null default 0;
 alter table public.resources add column if not exists license text;
