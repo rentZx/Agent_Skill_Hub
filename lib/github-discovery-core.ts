@@ -16,8 +16,6 @@ type GitHubSearchItem = {
 };
 
 export async function discoverGitHubResources(input: string, tags: string[], existing: Resource[]): Promise<Resource[]> {
-  if (!process.env.GITHUB_TOKEN) return [];
-
   const queries = buildQueries(input, tags);
   const results = await Promise.all(queries.map((query) => searchRepositories(query)));
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
@@ -31,7 +29,6 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
 }
 
 export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
-  if (!process.env.GITHUB_TOKEN) return [];
   const queries = [
     "AI plugin in:name,description,readme archived:false fork:false",
     "MCP AI in:name,description,readme archived:false fork:false",
