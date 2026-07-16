@@ -75,7 +75,7 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
         {result.recommendation.groups.filter((group) => group.items.length > 0).map((group) => (
           <Panel key={group.id} title={presentationTitle(group.id)} icon={Layers3}>
             <div className="grid gap-2">
-              {group.items.map((item) => <div key={item.resource.id} className="rounded-md border border-white/10 bg-slate-950/45 p-3"><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-slate-100">{item.resource.name}</span><span className="text-xs text-cyan-200">{Math.round(item.score)} 分</span></div><div className="mt-1 text-xs leading-5 text-muted-foreground">{item.why}</div></div>)}
+              {group.items.map((item) => <div key={item.resource.id} className="rounded-md border border-white/10 bg-slate-950/45 p-3"><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-slate-100">{item.resource.name}</span><span className="text-xs text-cyan-200">适配度 {Math.round(item.score)}</span></div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><span className="rounded border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">可信度 {item.resource.trust_score}</span><span className={`rounded border px-2 py-1 ${riskClassName[item.resource.risk_level]}`}>风险 {item.resource.risk_level}</span><span className="rounded border border-white/10 px-2 py-1 text-slate-400">基础适配 {item.resource.fit_score}</span></div><div className="mt-2 text-xs leading-5 text-muted-foreground">{item.why}</div></div>)}
             </div>
           </Panel>
         ))}
@@ -89,6 +89,12 @@ function presentationTitle(id: string) {
   const titles: Record<string, string> = { "required-skills": "推荐 Skills", "mcp-servers": "推荐 MCP", "github-plugins": "推荐 GitHub", "ui-libraries": "推荐 UI", "template-repos": "推荐 Template", "optional-enhancements": "可选增强" };
   return titles[id] ?? "推荐资源";
 }
+
+const riskClassName = {
+  low: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
+  medium: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+  high: "border-rose-300/25 bg-rose-300/10 text-rose-100"
+};
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Radar; children: React.ReactNode }) {
   return <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5"><div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-100"><Icon className="h-4 w-4 text-cyan-200" />{title}</div><div className="grid gap-3 text-sm leading-6">{children}</div></section>;
