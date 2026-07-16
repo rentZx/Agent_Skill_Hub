@@ -17,7 +17,13 @@ type GitHubSearchItem = {
 
 export async function discoverGitHubResources(input: string, tags: string[], existing: Resource[]): Promise<Resource[]> {
   const queries = buildQueries(input, tags);
-  const results = await Promise.all(queries.map((query) => searchRepositories(query)));
+  let results = await Promise.all(queries.map((query) => searchRepositories(query)));
+  if (results.flat().length === 0) {
+    const fallbackQuery = buildFallbackQuery(input, tags);
+    if (fallbackQuery && !queries.includes(fallbackQuery)) {
+      results = [...results, await searchRepositories(fallbackQuery, 12)];
+    }
+  }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
   const unique = new Map<string, GitHubSearchItem>();
 
@@ -55,6 +61,14 @@ function buildQueries(input: string, tags: string[]) {
     `${queryText} dashboard`.trim(),
     `${queryText} template OR starter OR mcp`.trim()
   ])).filter(Boolean).slice(0, 3);
+}
+
+function buildFallbackQuery(input: string, tags: string[]) {
+  const tagWords = tags
+    .flatMap((tag) => tag.toLowerCase().match(/[a-z0-9-]{3,}/g) ?? [])
+    .filter((word) => !["web", "saas", "dashboard", "nextjs", "react", "nodejs"].includes(word));
+  const inputWords = input.match(/[a-z0-9-]{3,}/gi)?.map((word) => word.toLowerCase()) ?? [];
+  return Array.from(new Set([...tagWords, ...inputWords])).slice(0, 3).join(" ");
 }
 
 async function searchRepositories(query: string, perPage = 8): Promise<GitHubSearchItem[]> {
