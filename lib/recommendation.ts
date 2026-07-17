@@ -227,10 +227,10 @@ const groupDefinitions: Array<{
 ];
 
 const baselineTagsByGroup: Record<string, string[]> = {
-  "required-skills": ["codex", "browser", "testing", "docs", "skills"],
-  "mcp-servers": ["mcp", "playwright", "context7", "github", "filesystem"],
-  "github-plugins": ["github", "actions", "review", "copilot", "connector"],
-  "template-repos": ["template", "nextjs", "fullstack", "database", "ai-sdk", "vercel"],
+  "required-skills": ["codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai"],
+  "mcp-servers": ["mcp", "mcp-server", "registry", "playwright", "context7", "github", "filesystem", "browser", "database", "ai"],
+  "github-plugins": ["github", "actions", "review", "copilot", "connector", "github-plugin", "github-app", "code-review", "automation"],
+  "template-repos": ["template", "starter", "boilerplate", "example", "nextjs", "react", "fullstack", "database", "ai-sdk", "vercel"],
   "optional-enhancements": ["automation", "memory", "animation", "ai-sdk", "review", "v0"]
 };
 
@@ -284,7 +284,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
   const groups = groupDefinitions.map((group) => {
     const matching = scored
       .filter((item) => group.types.includes(item.resource.type))
-      .filter((item) => !group.requiredTags || item.resource.tags.some((tag) => group.requiredTags?.includes(tag)))
+      .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => group.riskOnly ? item.resource.risk_level === "high" : item.resource.risk_level !== "high")
       .filter((item) => !selectedIds.has(item.resource.id))
       .filter((item) => group.riskOnly || item.hasProjectSignal);
@@ -292,8 +292,8 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => !group.riskOnly && !item.hasProjectSignal)
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => item.resource.risk_level !== "high")
-      .filter((item) => !group.requiredTags || item.resource.tags.some((tag) => group.requiredTags?.includes(tag)))
-      .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => item.resource.tags.some((resourceTag) => resourceTag.toLowerCase() === tag)))
+      .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
+      .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => hasAnyTag(item.resource, [tag])))
       .filter((item) => !selectedIds.has(item.resource.id));
     const candidates = [...matching, ...baseline]
       .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index)
@@ -414,11 +414,17 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
 
       const keywordHits = meaningfulKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
       const moduleKeywordHits = scoringModuleKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
-      const tagHits = resource.tags.filter((tag) => moduleTags.includes(tag) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
+      const normalizedModuleTags = moduleTags.map((tag) => tag.toLowerCase());
+      const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 14 : 0;
       const riskPenalty = resource.risk_level === "high" ? 22 : resource.risk_level === "medium" ? 6 : 0;
       const universalUiSignal = resource.type === "ui_component" && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
-      const hasBaselineSignal = resource.tags.some((tag) => ["codex", "browser", "testing", "docs", "skills", "mcp", "playwright", "context7", "github", "filesystem", "actions", "review", "copilot", "connector", "template", "nextjs", "fullstack", "database", "ai-sdk", "vercel", "automation", "memory", "animation", "v0"].includes(tag.toLowerCase()));
+      const hasBaselineSignal = resource.tags.some((tag) => [
+        "codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai",
+        "mcp", "mcp-server", "registry", "playwright", "context7", "github", "filesystem", "database",
+        "actions", "review", "copilot", "connector", "github-plugin", "github-app", "code-review", "automation",
+        "template", "starter", "boilerplate", "example", "nextjs", "react", "fullstack", "ai-sdk", "vercel", "memory", "animation", "v0"
+      ].includes(tag.toLowerCase()));
       const hasProjectSignal = keywordHits > 0 || moduleKeywordHits > 0 || tagHits > 0 || universalUiSignal;
       const score =
         keywordHits * 11 +
@@ -433,6 +439,11 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
     })
     .filter((item) => item.score >= 52 && (item.hasProjectSignal || item.hasBaselineSignal))
     .sort((a, b) => b.score - a.score);
+}
+
+function hasAnyTag(resource: Resource, tags: string[]) {
+  const resourceTags = new Set(resource.tags.map((tag) => tag.toLowerCase()));
+  return tags.some((tag) => resourceTags.has(tag.toLowerCase()));
 }
 
 function buildReason(resource: Resource, modules: CapabilityModule[], keywords: string[]) {

@@ -105,8 +105,10 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       groups: recommendation.groups.map((group) => {
         const items = [...group.items].map((item) => {
           const rerank = scoreMap.get(item.resource.id);
-          return rerank ? { ...item, score: rerank.score, why: rerank.reason } : item;
-        }).filter((item) => item.score >= 35).sort((a, b) => b.score - a.score);
+          return rerank
+            ? { ...item, score: Math.round(item.score * 0.55 + rerank.score * 0.45), why: rerank.reason }
+            : item;
+        }).sort((a, b) => b.score - a.score);
         return {
           ...group,
           items,
