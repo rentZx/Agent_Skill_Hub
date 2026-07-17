@@ -295,7 +295,15 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => hasAnyTag(item.resource, [tag])))
       .filter((item) => !selectedIds.has(item.resource.id));
-    const candidates = [...matching, ...baseline]
+    // Keep the core recommendation contract complete when a source is weakly tagged
+    // or the model returns noisy project labels. Optional enhancements stay strict.
+    const typeFallback = !group.riskOnly && !group.requiredTags
+      ? scored
+        .filter((item) => group.types.includes(item.resource.type))
+        .filter((item) => item.resource.risk_level !== "high")
+        .filter((item) => !selectedIds.has(item.resource.id))
+      : [];
+    const candidates = [...matching, ...baseline, ...typeFallback]
       .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index)
       .slice(0, group.limit);
 
