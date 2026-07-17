@@ -71,9 +71,29 @@ Variable usage:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key used by the browser client.
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-only key for admin jobs, imports, and trusted writes.
 - `OPENAI_API_KEY`: Optional server-side key for embeddings and recommendation generation.
-- `GITHUB_TOKEN`: Optional server-side GitHub token for higher API rate limits during single-repository imports.
+- `GITHUB_TOKEN`: Server-side GitHub token. It is optional for single-repository imports, but strongly recommended for catalog sync to avoid GitHub search API rate limits.
 - `DEEPSEEK_API_KEY`: Optional server-only key for AI project analysis and tag expansion. When absent, the rules engine remains available.
 - `DEEPSEEK_MODEL`: Optional DeepSeek model name; defaults to `deepseek-chat`.
+
+### Resource catalog sync
+
+The catalog sync job imports real resources from the GitHub API, the official MCP Registry, and the npm registry. It normalizes, deduplicates, risk-labels, and upserts candidates into PostgreSQL; it does not delete curated seed resources.
+
+Run from a server or a trusted local environment with `DATABASE_URL` configured:
+
+```bash
+npm run sync:resources -- --source=all --limit=20 --mcp-limit=100
+```
+
+Useful targeted runs:
+
+```bash
+npm run sync:resources -- --source=github --limit=30
+npm run sync:resources -- --source=mcp --mcp-limit=200
+npm run sync:resources -- --source=npm --limit=30
+```
+
+The sync job is additive/updating only. It stores source metadata and risk reasons in `resources.metadata`, and high-risk candidates remain visible for review instead of being silently discarded.
 
 Do not expose server-only keys to client components.
 

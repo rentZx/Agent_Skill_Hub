@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Resource } from "@/lib/types";
 
 type ResourceQueryRow = Resource & {
+  metadata?: { risk_reason?: unknown };
   resource_tags?: Array<{
     tags: { name: string; slug: string } | null;
   }>;
@@ -59,6 +60,7 @@ export async function getResources(): Promise<Resource[]> {
       repo_url,
       source,
       last_updated,
+      metadata,
       resource_tags(tags(name, slug))
     `
     )
@@ -87,7 +89,8 @@ export async function getResources(): Promise<Resource[]> {
       fit_score: resource.fit_score,
       repo_url: resource.repo_url,
       source: resource.source,
-      last_updated: resource.last_updated
+      last_updated: resource.last_updated,
+      risk_reason: typeof resource.metadata?.risk_reason === "string" ? resource.metadata.risk_reason : undefined
     };
   });
 }

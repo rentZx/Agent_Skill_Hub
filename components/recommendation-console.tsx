@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Check, Clipboard, Database, FileText, Layers3, Lightbulb, Radar, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildProjectRecommendation } from "@/lib/recommendation";
+import { getRiskReason } from "@/lib/risk";
 import type { Resource } from "@/lib/types";
 
 const examplePrompt = "我要开发一个外贸获客系统，可以根据产品和国家筛选目标公司，自动采集官网信息，做背景调查，保存客户线索，并导出 Excel 报告。";
@@ -142,7 +143,7 @@ export function RecommendationConsole({ resources }: { resources: Resource[] }) 
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold">{item.resource.name}</div>
-                          <div className="mt-1 text-xs text-cyan-200">方案适配度 {Math.round(item.score)}</div>
+                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-cyan-200"><span>方案适配度 {Math.round(item.score)}</span><span className="rounded border border-white/10 px-2 py-0.5 text-slate-300">{matchKindLabels[item.matchKind]}</span></div>
                         </div>
                         <span className={`rounded-md border px-2 py-1 text-xs ${riskClassName[item.risk]}`}>
                           {item.risk}
@@ -150,6 +151,7 @@ export function RecommendationConsole({ resources }: { resources: Resource[] }) 
                       </div>
                       <div className="mt-4 grid gap-2 text-sm leading-6 text-muted-foreground">
                         <ResourceDetail label="为什么推荐" value={item.why} />
+                        <ResourceDetail label="风险依据" value={getRiskReason(item.resource)} />
                         <ResourceDetail label="使用环节" value={item.stage} />
                         <ResourceDetail label="安装方式" value={item.install} code />
                         <ResourceDetail label="替代方案" value={item.alternative} />
@@ -208,6 +210,8 @@ const riskClassName = {
   medium: "border-amber-300/25 bg-amber-300/10 text-amber-100",
   high: "border-rose-300/25 bg-rose-300/10 text-rose-100"
 };
+
+const matchKindLabels = { domain: "领域匹配", baseline: "基础能力", risk: "风险候选" };
 
 function UnderstandingRow({ label, value }: { label: string; value: string }) {
   return (

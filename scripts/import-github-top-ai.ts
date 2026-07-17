@@ -36,7 +36,7 @@ async function main() {
     readmeSummary: resource.readme_summary ?? resource.description,
     source: resource.source,
     lastUpdated: resource.last_updated,
-    metadata: { imported_by: "github_top_ai", imported_at: new Date().toISOString() }
+    metadata: { imported_by: "github_top_ai", risk_reason: resource.risk_reason, imported_at: new Date().toISOString() }
   }).onConflictDoUpdate({
     target: resources.slug,
     set: {
@@ -52,6 +52,7 @@ async function main() {
       latestCommitAt: resource.latest_commit_at ? new Date(resource.latest_commit_at) : null,
       source: resource.source,
       lastUpdated: resource.last_updated,
+      metadata: { imported_by: "github_top_ai", risk_reason: resource.risk_reason, imported_at: new Date().toISOString() },
       updatedAt: sql`now()`
     }
   }).returning({ id: resources.id });

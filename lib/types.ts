@@ -37,6 +37,7 @@ export type SeedResource = {
   license?: string | null;
   latest_commit_at?: string | null;
   readme_summary?: string;
+  risk_reason?: string;
 };
 
 export type Resource = SeedResource & {

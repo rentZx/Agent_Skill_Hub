@@ -70,6 +70,7 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
         lastUpdated: resource.last_updated,
         metadata: {
           github: resource.github,
+          risk_reason: resource.risk_reason,
           imported_at: new Date().toISOString()
         }
       })
@@ -98,6 +99,7 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
           lastUpdated: resource.last_updated,
           metadata: {
             github: resource.github,
+            risk_reason: resource.risk_reason,
             imported_at: new Date().toISOString()
           },
           updatedAt: sql`now()`
@@ -170,6 +172,7 @@ function mapJoinedResources(
         install_command: row.resource.installCommand,
         use_cases: row.resource.useCases,
         risk_level: row.resource.riskLevel as RiskLevel,
+        risk_reason: getMetadataRiskReason(row.resource.metadata),
         trust_score: row.resource.trustScore,
         fit_score: row.resource.fitScore,
         repo_url: row.resource.repoUrl,
@@ -199,6 +202,15 @@ function normalizeDate(value: string | Date) {
 
 function parseOptionalDate(value: string | null) {
   return value ? new Date(value) : null;
+}
+
+function getMetadataRiskReason(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || !("risk_reason" in metadata)) {
+    return undefined;
+  }
+
+  const reason = (metadata as { risk_reason?: unknown }).risk_reason;
+  return typeof reason === "string" && reason.length > 0 ? reason : undefined;
 }
 
 function slugifyResource(value: string) {

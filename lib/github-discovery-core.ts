@@ -1,4 +1,4 @@
-import { inferRiskLevel } from "./github-import";
+import { assessRiskLevel } from "./github-import";
 import type { Resource, ResourceType } from "./types";
 
 type GitHubSearchItem = {
@@ -93,7 +93,7 @@ function isAiPluginLike(item: GitHubSearchItem) {
 function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const type = inferDiscoveredType(text);
-  const risk = inferRiskLevel({ stars: item.stargazers_count, license: item.license?.spdx_id ?? null, latestCommitTime: item.pushed_at, archived: item.archived });
+  const risk = assessRiskLevel({ stars: item.stargazers_count, license: item.license?.spdx_id ?? null, latestCommitTime: item.pushed_at, archived: item.archived });
   const tags = Array.from(new Set([...(item.topics ?? []), ...projectTags.map((tag) => tag.toLowerCase()), type.replace("_", "-")])).slice(0, 18);
 
   return {
@@ -106,8 +106,9 @@ function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
     supported_agents: type === "mcp_server" ? ["Codex", "Claude", "Cursor"] : ["Codex"],
     install_command: `Review and integrate from ${item.html_url}`,
     use_cases: ["GitHub-discovered project resource", ...(item.language ? [`${item.language} project`] : [])],
-    risk_level: risk,
-    trust_score: calculateTrust(item.stargazers_count, item.license?.spdx_id ?? null, risk),
+    risk_level: risk.level,
+    risk_reason: risk.reason,
+    trust_score: calculateTrust(item.stargazers_count, item.license?.spdx_id ?? null, risk.level),
     fit_score: Math.min(92, 55 + Math.min(25, Math.floor(Math.log10(Math.max(item.stargazers_count, 1)) * 8)) + (item.topics?.length ? 8 : 0)),
     repo_url: item.html_url,
     github_stars: item.stargazers_count,
@@ -121,10 +122,11 @@ function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
 }
 
 function inferDiscoveredType(text: string): ResourceType {
-  if (text.includes("mcp") || text.includes("model-context-protocol")) return "mcp_server";
-  if (text.includes("skill.md") || text.includes("agent skill") || text.includes("codex skill")) return "agent_skill";
-  if (text.includes("github action") || text.includes("github app") || text.includes("pull request")) return "github_plugin";
-  if (text.includes("ui") || text.includes("component") || text.includes("shadcn") || text.includes("tailwind")) return "ui_component";
+  const has = (pattern: RegExp) => pattern.test(text);
+  if (has(/\b(mcp|model-context-protocol)\b/)) return "mcp_server";
+  if (has(/\b(skill\.md|agent skill|codex skill)\b/)) return "agent_skill";
+  if (has(/\b(github action|github app|pull request)\b/)) return "github_plugin";
+  if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library)\b/)) return "ui_component";
   return "template_repo";
 }
 

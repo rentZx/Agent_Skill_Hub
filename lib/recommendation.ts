@@ -1,5 +1,6 @@
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
 import { typeLabels } from "@/lib/resource-types";
+import { getRiskReason } from "@/lib/risk";
 
 export type ProjectUnderstanding = {
   projectType: string;
@@ -27,6 +28,7 @@ export type RecommendedResource = {
   risk: RiskLevel;
   alternative: string;
   score: number;
+  matchKind: "domain" | "baseline" | "risk";
 };
 
 export type RecommendationGroup = {
@@ -55,10 +57,37 @@ export type RecommendationContext = {
 
 const capabilityModules: CapabilityModule[] = [
   {
+    id: "recipe-catalog",
+    label: "菜谱与食材数据",
+    description: "建立菜谱、食材、份量和制作步骤的数据模型，保证每道菜能被检索、展示和复用。",
+    keywords: ["菜谱", "食谱", "饭菜", "料理", "食材", "recipe", "recipes", "food", "meal", "ingredients", "cooking"],
+    preferredTags: ["recipe", "recipes", "food", "ingredients", "meal", "database"],
+    preferredTypes: ["template_repo", "mcp_server"],
+    projectStage: "菜谱数据模型、食材关系、份量字段、步骤内容管理"
+  },
+  {
+    id: "meal-recommendation",
+    label: "按人数与偏好的菜品推荐",
+    description: "根据用餐人数、随机入口和筛选条件返回可解释的菜品结果，并保留推荐依据。",
+    keywords: ["随机", "人数", "吃什么", "饭菜", "recommendation", "random", "servings", "meal planning", "what to cook"],
+    preferredTags: ["recipe", "meal-planning", "recommendation", "random-meal", "servings"],
+    preferredTypes: ["template_repo", "ui_component", "mcp_server"],
+    projectStage: "人数参数、随机推荐、筛选排序、推荐结果页"
+  },
+  {
+    id: "recipe-interaction",
+    label: "备菜清单与烹饪步骤交互",
+    description: "把食材清单和制作步骤做成可读、可勾选、可展开的交互流程，兼顾移动端烹饪场景。",
+    keywords: ["备菜", "制作", "步骤", "烹饪", "食材", "ingredients", "cooking", "steps", "ingredient-list", "step-by-step"],
+    preferredTags: ["ingredients", "cooking", "cooking-steps", "ingredient-list", "step-by-step", "ui"],
+    preferredTypes: ["ui_component", "template_repo"],
+    projectStage: "备菜清单、步骤展开、完成状态、移动端阅读"
+  },
+  {
     id: "data-collection",
     label: "数据采集",
     description: "从网站、仓库、表格或外部系统获取项目所需的原始数据，并保留可追溯来源。",
-    keywords: ["采集", "爬取", "抓取", "网页", "官网", "数据源", "公司", "客户", "线索", "research", "crawl", "scrape", "lead", "company"],
+    keywords: ["采集", "爬取", "抓取", "官网", "数据源", "公司", "客户", "线索", "research", "crawl", "scrape", "lead", "company"],
     preferredTags: ["firecrawl", "scraping", "research", "browser", "github"],
     preferredTypes: ["mcp_server", "agent_skill"],
     projectStage: "数据源确认、网页采集、证据留存、线索补全"
@@ -76,7 +105,7 @@ const capabilityModules: CapabilityModule[] = [
     id: "search-recommendation",
     label: "搜索推荐",
     description: "把项目数据转成可检索、可排序、可解释的推荐结果，支持关键词和语义扩展。",
-    keywords: ["搜索", "推荐", "匹配", "排序", "筛选", "向量", "语义", "pgvector", "embedding", "recommendation", "search"],
+    keywords: ["搜索", "匹配", "排序", "筛选", "向量", "语义", "pgvector", "embedding", "recommendation", "search"],
     preferredTags: ["pgvector", "embeddings", "supabase", "database", "ai-sdk"],
     preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
     projectStage: "需求归一化、检索排序、适配度解释、推荐结果生成"
@@ -121,7 +150,7 @@ const capabilityModules: CapabilityModule[] = [
     id: "agent-workflow",
     label: "Agent 开发工作流",
     description: "让 Codex 按项目上下文、官方文档、仓库约束和风险优先级执行开发。",
-    keywords: ["codex", "agent", "skill", "技能", "提示词", "开发", "github", "docs", "workflow"],
+    keywords: ["codex", "agent", "skill", "技能", "提示词", "github", "docs", "workflow"],
     preferredTags: ["codex", "github", "docs", "skills", "openai"],
     preferredTypes: ["agent_skill", "github_plugin"],
     projectStage: "需求拆解、实现规划、代码生成、验证和交接"
@@ -137,41 +166,47 @@ const groupDefinitions: Array<{
   types: ResourceType[];
   limit: number;
   requiredTags?: string[];
+  riskOnly?: boolean;
 }> = [
   {
     id: "required-skills",
     title: "必选 Skills",
     description: "约束 Codex 的开发方式、文档来源、浏览器验证和工程纪律。",
     types: ["agent_skill"],
-    limit: 4
+    limit: 4,
+    riskOnly: false
   },
   {
     id: "mcp-servers",
     title: "推荐 MCP Servers",
     description: "让 Agent 接入 GitHub、浏览器、数据库、文档和外部数据源。",
     types: ["mcp_server"],
-    limit: 5
+    limit: 5,
+    riskOnly: false
   },
   {
     id: "github-plugins",
     title: "推荐 GitHub 插件",
     description: "增强仓库协作、PR 检查、Issue 到代码和上线质量控制。",
     types: ["github_plugin"],
-    limit: 3
+    limit: 3,
+    riskOnly: false
   },
   {
     id: "ui-libraries",
     title: "推荐 UI 组件库",
     description: "优先选择低风险、可控、适合 AI SaaS 和后台工作台的 UI 资源。",
     types: ["ui_component"],
-    limit: 4
+    limit: 4,
+    riskOnly: false
   },
   {
     id: "template-repos",
     title: "推荐模板仓库",
     description: "作为项目骨架、数据库接入、AI 能力和推荐系统落地参考。",
     types: ["template_repo"],
-    limit: 4
+    limit: 6,
+    riskOnly: false
   },
   {
     id: "optional-enhancements",
@@ -180,8 +215,24 @@ const groupDefinitions: Array<{
     types: ["agent_skill", "mcp_server", "github_plugin", "ui_component", "template_repo"],
     limit: 4,
     requiredTags: ["automation", "memory", "animation", "ai-sdk", "review", "v0"]
+  },
+  {
+    id: "risk-alerts",
+    title: "高风险候选（人工复核）",
+    description: "这些资源可能与项目相关，但存在许可证、维护或社区验证风险，不会进入默认实施方案。",
+    types: ["agent_skill", "mcp_server", "github_plugin", "ui_component", "template_repo"],
+    limit: 4,
+    riskOnly: true
   }
 ];
+
+const baselineTagsByGroup: Record<string, string[]> = {
+  "required-skills": ["codex", "browser", "testing", "docs", "skills"],
+  "mcp-servers": ["mcp", "playwright", "context7", "github", "filesystem"],
+  "github-plugins": ["github", "actions", "review", "copilot", "connector"],
+  "template-repos": ["template", "nextjs", "fullstack", "database", "ai-sdk", "vercel"],
+  "optional-enhancements": ["automation", "memory", "animation", "ai-sdk", "review", "v0"]
+};
 
 export function extractProjectKeywords(input: string) {
   const normalized = input.toLowerCase();
@@ -222,27 +273,42 @@ export function detectCapabilityModules(input: string, keywords = extractProject
 
 export function buildProjectRecommendation(input: string, resources: Resource[], context: RecommendationContext = {}): ProjectRecommendation {
   const keywords = extractProjectKeywords(input);
-  const modules = detectCapabilityModules(input, keywords);
+  const moduleInput = `${input} ${(context.coreFeatures ?? []).join(" ")}`;
+  const modules = detectCapabilityModules(moduleInput, keywords);
+  const matchedModules = detectCapabilityModules(moduleInput, keywords, false);
+  const scoringModules = matchedModules.length > 0 ? matchedModules : modules;
   const understanding = buildProjectUnderstanding(input, keywords, modules, context);
-  const scored = scoreResources(resources, [...keywords, ...(context.coreFeatures ?? [])], modules);
+  const scored = scoreResources(resources, [...keywords, ...(context.coreFeatures ?? [])], scoringModules);
   const selectedIds = new Set<string>();
 
   const groups = groupDefinitions.map((group) => {
-    const candidates = scored
+    const matching = scored
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => !group.requiredTags || item.resource.tags.some((tag) => group.requiredTags?.includes(tag)))
-      .filter((item) => group.id !== "optional-enhancements" || !selectedIds.has(item.resource.id))
+      .filter((item) => group.riskOnly ? item.resource.risk_level === "high" : item.resource.risk_level !== "high")
+      .filter((item) => !selectedIds.has(item.resource.id))
+      .filter((item) => group.riskOnly || item.hasProjectSignal);
+    const baseline = scored
+      .filter((item) => !group.riskOnly && !item.hasProjectSignal)
+      .filter((item) => group.types.includes(item.resource.type))
+      .filter((item) => item.resource.risk_level !== "high")
+      .filter((item) => !group.requiredTags || item.resource.tags.some((tag) => group.requiredTags?.includes(tag)))
+      .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => item.resource.tags.some((resourceTag) => resourceTag.toLowerCase() === tag)))
+      .filter((item) => !selectedIds.has(item.resource.id));
+    const candidates = [...matching, ...baseline]
+      .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index)
       .slice(0, group.limit);
 
     candidates.forEach((item) => selectedIds.add(item.resource.id));
 
     const items = candidates.map((item) => ({
       ...item,
-      why: buildReason(item.resource, modules, keywords),
-      stage: buildStage(item.resource, modules),
+      why: buildReason(item.resource, scoringModules, keywords),
+      stage: buildStage(item.resource, scoringModules),
       install: item.resource.install_command,
       risk: item.resource.risk_level,
-      alternative: buildAlternative(item.resource, resources)
+      alternative: buildAlternative(item.resource, resources),
+      matchKind: (group.riskOnly ? "risk" : item.hasProjectSignal ? "domain" : "baseline") as RecommendedResource["matchKind"]
     }));
 
     return {
@@ -250,7 +316,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       title: group.title,
       description: group.description,
       items,
-      gap: items.length === 0 ? buildGap(group.title, group.types) : undefined
+      gap: items.length === 0 && !group.riskOnly ? buildGap(group.title, group.types) : undefined
     };
   });
 
@@ -269,23 +335,36 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
 function buildProjectUnderstanding(input: string, keywords: string[], modules: CapabilityModule[], context: RecommendationContext): ProjectUnderstanding {
   const text = input.toLowerCase();
   const has = (values: string[]) => values.some((value) => text.includes(value.toLowerCase()) || input.includes(value));
+  const recipeProject = has(["菜谱", "食谱", "做饭", "饭菜", "吃什么", "食材", "烹饪", "recipe", "food", "meal", "ingredients", "cooking"]);
 
-  const projectType = context.projectType ?? (has(["外贸", "客户", "线索", "获客", "lead"]) ? "获客/线索发现系统" :
+  const projectType = context.projectType ?? (recipeProject ? "菜谱与用餐决策 Web 应用" :
+    has(["外贸", "客户", "线索", "获客", "lead"]) ? "获客/线索发现系统" :
     has(["知识库", "搜索", "文档", "问答"]) ? "知识库与搜索推荐系统" :
     has(["后台", "管理", "dashboard", "saas"]) ? "SaaS 工作台/管理后台" :
     "AI 辅助 Web 应用");
 
-  const targetUsers = context.targetUsers ?? (has(["销售", "外贸", "客户", "运营"]) ? "销售、运营或业务拓展团队" :
+  const targetUsers = context.targetUsers ?? (recipeProject ? "家庭用户、个人用户和需要快速决定吃什么的人" :
+    has(["销售", "外贸", "客户", "运营"]) ? "销售、运营或业务拓展团队" :
     has(["开发者", "agent", "codex"]) ? "开发者与 AI Agent 使用者" :
     "需要把业务需求转成可执行工作流的产品/运营用户");
 
-  const featureSet = context.coreFeatures?.length ? context.coreFeatures : [
+  const featureSet = context.coreFeatures?.length ? context.coreFeatures : recipeProject ? [
+    "根据用餐人数推荐菜品",
+    "随机推荐与条件筛选",
+    "展示食材和备菜清单",
+    "展示分步骤制作过程",
+    "移动端烹饪阅读与完成状态"
+  ] : [
     has(["输入", "描述", "需求", "prompt"]) ? "项目需求输入与结构化理解" : "需求录入与参数配置",
     ...modules.slice(0, 5).map((module) => module.label),
     has(["导出", "excel", "csv", "报告"]) ? "结果导出与报告生成" : "结果保存与复用"
   ];
 
-  const dataSources = [
+  const dataSources = recipeProject ? [
+    "内置菜谱、食材、份量和制作步骤数据",
+    "用户选择的用餐人数与偏好参数",
+    "可选的官方菜谱 API 或公开数据源"
+  ] : [
     has(["网页", "官网", "爬取", "crawl", "scrape"]) ? "公开网页和官网内容" : "用户输入的项目描述",
     has(["github", "仓库", "issue", "pr"]) ? "GitHub 仓库、Issue 与 PR" : "本地 curated 资源库",
     has(["文档", "pdf", "word", "excel"]) ? "上传文档、表格或报告" : "资源标签、评分和风险元数据"
@@ -315,13 +394,11 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
     "responsive", "user-friendly", "dynamic-content", "api", "fullstack", "frontend", "backend"
   ]);
   const meaningfulKeywords = keywords.filter((keyword) =>
-    /[a-z0-9]/i.test(keyword) && keyword.length <= 18 && !genericKeywords.has(keyword.toLowerCase())
+    keyword.length <= 18 && !genericKeywords.has(keyword.toLowerCase()) && !["开发", "系统", "平台", "项目", "应用", "网页"].includes(keyword)
   );
   const moduleTags = modules.flatMap((module) => module.preferredTags);
-  const scoringInput = meaningfulKeywords.join(" ");
-  const scoringModules = detectCapabilityModules(scoringInput, meaningfulKeywords, false);
-  const scoringModuleKeywords = scoringModules.flatMap((module) => module.keywords);
-  const scoringModuleTypes = scoringModules.flatMap((module) => module.preferredTypes);
+  const scoringModuleKeywords = modules.flatMap((module) => module.keywords);
+  const scoringModuleTypes = modules.flatMap((module) => module.preferredTypes);
 
   return resources
     .map((resource) => {
@@ -341,6 +418,7 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 14 : 0;
       const riskPenalty = resource.risk_level === "high" ? 22 : resource.risk_level === "medium" ? 6 : 0;
       const universalUiSignal = resource.type === "ui_component" && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
+      const hasBaselineSignal = resource.tags.some((tag) => ["codex", "browser", "testing", "docs", "skills", "mcp", "playwright", "context7", "github", "filesystem", "actions", "review", "copilot", "connector", "template", "nextjs", "fullstack", "database", "ai-sdk", "vercel", "automation", "memory", "animation", "v0"].includes(tag.toLowerCase()));
       const hasProjectSignal = keywordHits > 0 || moduleKeywordHits > 0 || tagHits > 0 || universalUiSignal;
       const score =
         keywordHits * 11 +
@@ -351,9 +429,9 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
         resource.trust_score * 0.38 -
         riskPenalty;
 
-      return { resource, score, hasProjectSignal };
+      return { resource, score, hasProjectSignal, hasBaselineSignal };
     })
-    .filter((item) => item.score >= 52 && item.hasProjectSignal)
+    .filter((item) => item.score >= 52 && (item.hasProjectSignal || item.hasBaselineSignal))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -365,7 +443,11 @@ function buildReason(resource: Resource, modules: CapabilityModule[], keywords: 
   const keywordHit = keywords.find((keyword) =>
     `${resource.name} ${resource.description} ${resource.tags.join(" ")}`.toLowerCase().includes(keyword.toLowerCase())
   );
-  const trustSignal = `可信度 ${resource.trust_score}/100，适配度 ${resource.fit_score}/100，风险为 ${resource.risk_level}`;
+  const trustSignal = `可信度 ${resource.trust_score}/100，适配度 ${resource.fit_score}/100，风险为 ${resource.risk_level}；风险依据：${getRiskReason(resource)}`;
+
+  if (matchedModules.length === 0) {
+    return `基础工程能力候选；${trustSignal}，用于补齐项目开发、验证或交付环节。`;
+  }
 
   if (keywordHit) {
     return `匹配“${keywordHit}”及${moduleLabel}环节；${trustSignal}，适合作为优先候选。`;
@@ -423,7 +505,7 @@ function buildCodexPrompt(
       const items = group.items
         .map(
           (item) =>
-            `- ${item.resource.name}\n  - 为什么推荐：${item.why}\n  - 使用环节：${item.stage}\n  - 安装方式：${item.install}\n  - 风险等级：${item.risk}\n  - 替代方案：${item.alternative}`
+            `- ${item.resource.name}\n  - 为什么推荐：${item.why}\n  - 使用环节：${item.stage}\n  - 安装方式：${item.install}\n  - 风险等级：${item.risk}\n  - 风险依据：${getRiskReason(item.resource)}\n  - 替代方案：${item.alternative}`
         )
         .join("\n");
       return `${group.title}\n${items}`;
@@ -436,7 +518,7 @@ function buildCodexPrompt(
   const stackText = understanding.techStack.map((item) => `- ${item}`).join("\n");
   const gapText = gaps.length > 0 ? gaps.map((gap) => `- ${gap}`).join("\n") : "- 暂无关键缺口，先按推荐组合实现 MVP。";
 
-  return `请作为 Codex 帮我开发以下项目，并按“项目开发能力组合方案”执行。\n\n项目原始描述：\n${input}\n\n1. 项目需求理解\n- 项目类型：${understanding.projectType}\n- 目标用户：${understanding.targetUsers}\n- 核心功能：\n${featureText}\n- 可能的数据来源：\n${sourceText}\n- 推荐技术栈：\n${stackText}\n\n2. 所需能力模块\n${moduleText}\n\n3. 推荐资源组合\n${groupText}\n\n4. 当前缺口\n${gapText}\n\n5. 开发要求\n- 先实现可运行 MVP，再逐步接入外部服务。\n- 优先使用低风险、高可信、适配度高的资源；高风险资源必须说明权限和数据边界。\n- 不要只堆资源列表，要把每个资源绑定到具体开发环节。\n- 使用 Next.js、TypeScript、Tailwind CSS、shadcn/ui；需要持久化时优先 Supabase/Postgres。\n- 每次修改后运行相关构建、lint 或页面验证，并报告失败原因。`;
+  return `请作为 Codex 帮我开发以下项目，并按“项目开发能力组合方案”执行。\n\n项目原始描述：\n${input}\n\n1. 项目需求理解\n- 项目类型：${understanding.projectType}\n- 目标用户：${understanding.targetUsers}\n- 核心功能：\n${featureText}\n- 可能的数据来源：\n${sourceText}\n- 推荐技术栈：\n${stackText}\n\n2. 所需能力模块\n${moduleText}\n\n3. 推荐资源组合\n${groupText}\n\n4. 当前缺口\n${gapText}\n\n5. 开发要求\n- 先实现项目原始描述中的核心用户流程，再补充后台和增强能力。\n- 严格遵循上面的推荐技术栈，不要擅自把数据库或 ORM 切换成其他方案。\n- 优先使用低风险、高可信、适配度高的资源；高风险候选只用于人工复核，不能直接作为生产依赖。\n- 不要只堆资源列表，要把每个资源绑定到具体开发阶段，并先核对许可证、维护状态、权限和数据边界。\n- 每次修改后运行相关构建、lint 或页面验证，并报告失败原因。`;
 }
 
 export function rebuildCodexPrompt(input: string, recommendation: ProjectRecommendation) {

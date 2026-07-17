@@ -4,7 +4,7 @@ import {
   buildUseCases,
   inferInstallCommand,
   inferResourceType,
-  inferRiskLevel,
+  assessRiskLevel,
   parseGitHubRepoUrl
 } from "@/lib/github-import";
 
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       hasMcpManifest
     });
     const readme_summary = buildChineseSummary({ name: repo.name, description, type, readme });
-    const risk_level = inferRiskLevel({
+    const risk = assessRiskLevel({
       stars: repo.stargazers_count,
       license: repo.license?.spdx_id ?? null,
       latestCommitTime: latestCommit ?? repo.pushed_at,
@@ -108,8 +108,9 @@ export async function POST(request: Request) {
         supported_agents: inferSupportedAgents(type, topics, readme),
         install_command,
         use_cases: buildUseCases(type, topics),
-        risk_level,
-        trust_score: inferTrustScore(repo.stargazers_count, repo.license?.spdx_id ?? null, risk_level),
+        risk_level: risk.level,
+        risk_reason: risk.reason,
+        trust_score: inferTrustScore(repo.stargazers_count, repo.license?.spdx_id ?? null, risk.level),
         fit_score: inferFitScore(type, topics, skillMd, hasPackageJson, hasMcpManifest),
         repo_url: repo.html_url,
         source: "github_import",

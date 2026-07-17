@@ -9,6 +9,7 @@ export type GitHubParsedResource = {
   install_command: string;
   use_cases: string[];
   risk_level: RiskLevel;
+  risk_reason?: string;
   trust_score: number;
   fit_score: number;
   repo_url: string;
@@ -83,8 +84,7 @@ export function inferResourceType(input: {
   if (
     text.includes("shadcn") ||
     text.includes("tailwind") ||
-    text.includes("component") ||
-    text.includes("ui") ||
+    /\b(ui|component|design system|frontend library)\b/.test(text) ||
     text.includes("react")
   ) {
     return "ui_component";
@@ -166,22 +166,52 @@ export function inferRiskLevel(input: {
   latestCommitTime: string | null;
   archived: boolean;
 }): RiskLevel {
+  return assessRiskLevel(input).level;
+}
+
+export function assessRiskLevel(input: {
+  stars: number;
+  license: string | null;
+  latestCommitTime: string | null;
+  archived: boolean;
+}) {
+  const reasons: string[] = [];
+
   if (input.archived) {
-    return "high";
+    reasons.push("仓库已归档，通常不再维护");
   }
 
   const latestCommit = input.latestCommitTime ? new Date(input.latestCommitTime).getTime() : 0;
   const staleDays = latestCommit ? (Date.now() - latestCommit) / 86400000 : Number.POSITIVE_INFINITY;
 
-  if (!input.license || staleDays > 540) {
-    return "high";
+  if (!input.license) {
+    reasons.push("未检测到明确的 SPDX 许可证");
   }
 
-  if (input.stars < 50 || staleDays > 240) {
-    return "medium";
+  if (!latestCommit) {
+    reasons.push("没有可验证的最近提交时间");
+  } else if (staleDays > 540) {
+    reasons.push("最近提交超过 18 个月，维护活跃度较低");
   }
 
-  return "low";
+  if (input.stars < 50) {
+    reasons.push("GitHub Stars 少于 50，社区验证较少");
+  }
+
+  if (staleDays > 240 && staleDays <= 540) {
+    reasons.push("最近提交超过 8 个月，维护频率需要复核");
+  }
+
+  const level: RiskLevel = input.archived || !input.license || !latestCommit || staleDays > 540
+    ? "high"
+    : input.stars < 50 || staleDays > 240
+      ? "medium"
+      : "low";
+
+  return {
+    level,
+    reason: reasons.length > 0 ? reasons.join("；") : "已检测到许可证、近期维护和社区活跃度信号。"
+  };
 }
 
 export function typeNameZh(type: ResourceType) {

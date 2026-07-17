@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, ShieldCheck, Terminal, XCircle } from "lucide-react";
 import { riskLabels, typeLabels } from "@/lib/resource-types";
+import { getRiskReason } from "@/lib/risk";
 import { getResourceBySlug, getResources } from "@/lib/resources";
 import { Button } from "@/components/ui/button";
 import type { RiskLevel } from "@/lib/types";
@@ -106,7 +107,7 @@ export default async function ResourceDetailPage({
                 <AlertTriangle className="h-4 w-4" />
                 风险说明
               </div>
-              {getRiskNote(resource.risk_level)}
+              {getRiskReason(resource)}
             </div>
             <Button asChild variant="secondary" className="mt-4">
               <Link href={resource.repo_url} target="_blank" rel="noreferrer">
@@ -161,18 +162,6 @@ const riskClassName: Record<RiskLevel, string> = {
   medium: "border-amber-300/30 bg-amber-300/[0.12] text-amber-100",
   high: "border-rose-300/30 bg-rose-300/[0.12] text-rose-100"
 };
-
-function getRiskNote(risk: RiskLevel) {
-  if (risk === "low") {
-    return "低风险资源可以优先用于 MVP，但仍建议锁定版本并记录来源。";
-  }
-
-  if (risk === "medium") {
-    return "中风险资源适合在明确权限、环境变量和维护成本后接入，生产环境前需要额外验证。";
-  }
-
-  return "高风险资源必须限制权限范围，避免接触敏感数据，并准备本地替代方案。";
-}
 
 function getNonUseCases(type: string) {
   const common = "不适合在没有验证来源、许可证或维护状态前直接进入生产环境。";

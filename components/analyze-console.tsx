@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Clipboard, GitBranch, Layers3, Radar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { analyzeProject } from "@/lib/project-analyzer";
+import { getRiskReason } from "@/lib/risk";
 import type { Resource } from "@/lib/types";
 
 export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
@@ -90,18 +91,18 @@ export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
         {result.recommendation.groups.filter((group) => group.items.length > 0).map((group) => (
           <Panel key={group.id} title={presentationTitle(group.id)} icon={Layers3}>
             <div className="grid gap-2">
-              {group.items.map((item) => <div key={item.resource.id} className="rounded-md border border-white/10 bg-slate-950/45 p-3"><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-slate-100">{item.resource.name}</span><span className="text-xs text-cyan-200">适配度 {Math.round(item.score)}</span></div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><span className="rounded border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">可信度 {item.resource.trust_score}</span><span className={`rounded border px-2 py-1 ${riskClassName[item.resource.risk_level]}`}>风险 {item.resource.risk_level}</span><span className="rounded border border-white/10 px-2 py-1 text-slate-400">基础适配 {item.resource.fit_score}</span></div><div className="mt-2 text-xs leading-5 text-muted-foreground">{item.why}</div></div>)}
+              {group.items.map((item) => <div key={item.resource.id} className="rounded-md border border-white/10 bg-slate-950/45 p-3"><div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-slate-100">{item.resource.name}</span><span className="text-xs text-cyan-200">适配度 {Math.round(item.score)}</span></div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><span className="rounded border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">{matchKindLabels[item.matchKind]}</span><span className="rounded border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">可信度 {item.resource.trust_score}</span><span className={`rounded border px-2 py-1 ${riskClassName[item.resource.risk_level]}`}>风险 {item.resource.risk_level}</span><span className="rounded border border-white/10 px-2 py-1 text-slate-400">基础适配 {item.resource.fit_score}</span></div><div className="mt-2 text-xs leading-5 text-muted-foreground">{item.why}</div><div className="mt-1 text-[11px] leading-5 text-amber-100/80">风险依据：{getRiskReason(item.resource)}</div></div>)}
             </div>
           </Panel>
         ))}
       </section>
-      <section className="rounded-lg border border-cyan-300/25 bg-slate-950/60 p-5 shadow-focus-glow"><div className="mb-3 text-sm font-medium text-cyan-100">推荐资源与 Codex Prompt</div><div className="mb-4 text-sm text-muted-foreground">已从本地资源库匹配 {result.recommendation.groups.reduce((sum, group) => sum + group.items.length, 0)} 项 Skills、MCP、GitHub 插件、UI 和模板。</div><pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-4 text-sm leading-7 text-slate-200">{result.recommendation.codexPrompt}</pre></section>
+      <section className="rounded-lg border border-cyan-300/25 bg-slate-950/60 p-5 shadow-focus-glow"><div className="mb-3 text-sm font-medium text-cyan-100">推荐资源与 Codex Prompt</div><div className="mb-4 text-sm text-muted-foreground">已从资源库与 GitHub 匹配 {result.recommendation.groups.reduce((sum, group) => sum + group.items.length, 0)} 项 Skills、MCP、GitHub 插件、UI 和模板。</div><pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-4 text-sm leading-7 text-slate-200">{result.recommendation.codexPrompt}</pre></section>
     </div>
   );
 }
 
 function presentationTitle(id: string) {
-  const titles: Record<string, string> = { "required-skills": "推荐 Skills", "mcp-servers": "推荐 MCP", "github-plugins": "推荐 GitHub", "ui-libraries": "推荐 UI", "template-repos": "推荐 Template", "optional-enhancements": "可选增强" };
+  const titles: Record<string, string> = { "required-skills": "推荐 Skills", "mcp-servers": "推荐 MCP", "github-plugins": "推荐 GitHub", "ui-libraries": "推荐 UI", "template-repos": "推荐 Template", "optional-enhancements": "可选增强", "risk-alerts": "高风险候选" };
   return titles[id] ?? "推荐资源";
 }
 
@@ -110,6 +111,8 @@ const riskClassName = {
   medium: "border-amber-300/25 bg-amber-300/10 text-amber-100",
   high: "border-rose-300/25 bg-rose-300/10 text-rose-100"
 };
+
+const matchKindLabels = { domain: "领域匹配", baseline: "基础能力", risk: "风险候选" };
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Radar; children: React.ReactNode }) {
   return <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5"><div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-100"><Icon className="h-4 w-4 text-cyan-200" />{title}</div><div className="grid gap-3 text-sm leading-6">{children}</div></section>;

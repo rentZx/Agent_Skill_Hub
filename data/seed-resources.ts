@@ -164,7 +164,8 @@ export const seedResources = [
     fit_score: 80,
     repo_url: "https://github.com/modelcontextprotocol/servers",
     source: "curated_seed",
-    last_updated: "2026-07-09"
+    last_updated: "2026-07-09",
+    risk_reason: "可读写本地文件，权限边界取决于启动时传入的路径；误配置可能导致敏感文件泄露或被覆盖。"
   },
   {
     name: "MCP Server: Memory",
