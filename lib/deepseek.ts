@@ -69,7 +69,10 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{ id: 
       max_tokens: 2200,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "你是资源推荐重排器。只输出合法 JSON，不能编造资源事实。根据项目需求为每个资源打 0-100 的适配分，并用一句话说明理由。必须返回 {\"items\":[{\"id\":\"原始id\",\"score\":数字,\"reason\":\"理由\"}]}。可信度和风险只作为输入参考，不要修改它们。" },
+        {
+          role: "system",
+          content: "你是资源推荐重排器。只输出合法 JSON，不能编造资源事实。根据项目需求为每个资源打 0-100 的适配分。reason 必须使用中文，先根据候选资源的 name、description 和 tags 说明它具体做什么，再说明它与当前项目哪项需求直接匹配；不相关时明确说明不建议使用。禁止使用“对应开发环节”“提升开发效率”“提供支持”等空泛模板句，不要在 reason 中重复分数、可信度或风险。必须返回 {\"items\":[{\"id\":\"原始id\",\"score\":数字,\"reason\":\"具体理由\"}]}。可信度和风险只作为输入参考，不要修改它们。"
+        },
         { role: "user", content: JSON.stringify({ project: input, candidates }) }
       ]
     }),

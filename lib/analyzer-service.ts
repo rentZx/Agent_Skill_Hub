@@ -114,7 +114,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
             ? {
               ...item,
               score: Math.round(item.score * 0.55 + rerank.score * 0.45),
-              why: getLocalizedRecommendationReason(item.resource, rerank.score)
+              why: getLocalizedRecommendationReason(item.resource, rerank.score, rerank.reason)
             }
             : item;
         }).sort((a, b) => b.score - a.score);
