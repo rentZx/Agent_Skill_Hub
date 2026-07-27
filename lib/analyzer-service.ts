@@ -43,7 +43,22 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
   const fallback = analyzeProject(input, candidateResources, {}, capabilityGraph);
 
   try {
-    if (!ai) return { ...fallback, source: "rules", discoveredCount: discovered.length };
+    if (!ai) {
+      const evidenceBacked = applyEvidenceFallback(fallback.recommendation);
+      const recommendation = {
+        ...evidenceBacked,
+        codexPrompt: rebuildCodexPrompt(input, evidenceBacked)
+      };
+      return {
+        ...fallback,
+        source: "rules",
+        discoveredCount: discovered.length,
+        recommendation: {
+          ...recommendation,
+          codexPrompt: buildAnalyzerPrompt(input, fallback.analysis, recommendation.codexPrompt)
+        }
+      };
+    }
     const enriched = analyzeProject(input, candidateResources, {
       industry: ai.industry,
       projectType: ai.projectType,

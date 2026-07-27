@@ -300,25 +300,43 @@ function buildFallbackQuery(input: string, tags: string[]) {
 async function searchRepositories(query: string, perPage = 15): Promise<GitHubSearchItem[]> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, { headers, cache: "no-store" });
-  if (!response.ok) {
-    console.warn(`GitHub discovery failed for query ${query}: ${response.status}`);
+  try {
+    const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, {
+      headers,
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) {
+      console.warn(`GitHub discovery failed for query ${query}: ${response.status}`);
+      return [];
+    }
+    const payload = (await response.json()) as { items?: GitHubSearchItem[] };
+    return payload.items ?? [];
+  } catch (error) {
+    console.warn(`GitHub discovery timed out for query ${query}.`, error);
     return [];
   }
-  const payload = (await response.json()) as { items?: GitHubSearchItem[] };
-  return payload.items ?? [];
 }
 
 async function fetchRepository(fullName: string): Promise<GitHubSearchItem | null> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
-  const response = await fetch(`https://api.github.com/repos/${repositoryPath}`, { headers, cache: "no-store" });
-  if (!response.ok) {
-    console.warn(`GitHub discovery failed for repository ${fullName}: ${response.status}`);
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repositoryPath}`, {
+      headers,
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) {
+      console.warn(`GitHub discovery failed for repository ${fullName}: ${response.status}`);
+      return null;
+    }
+    return await response.json() as GitHubSearchItem;
+  } catch (error) {
+    console.warn(`GitHub discovery timed out for repository ${fullName}.`, error);
     return null;
   }
-  return await response.json() as GitHubSearchItem;
 }
 
 const repositoryInspectionCache = new Map<string, {

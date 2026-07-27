@@ -51,7 +51,8 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
         { role: "user", content: `请分析以下项目需求，并输出 JSON：${input}` }
       ]
     }),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000)
   });
 
   if (!response.ok) throw new Error(`DeepSeek API request failed: ${response.status}`);
@@ -100,7 +101,8 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
         { role: "user", content: JSON.stringify({ project: input, requiredCapabilities, candidates }) }
       ]
     }),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000)
   });
 
   if (!response.ok) throw new Error(`DeepSeek rerank failed: ${response.status}`);
