@@ -1,10 +1,5 @@
-import { getResources } from "@/lib/resources";
-import { RecommendationConsole } from "@/components/recommendation-console";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function RecommendPage() {
-  const resources = await getResources();
-
-  return <RecommendationConsole resources={resources} />;
+export default function RecommendPage() {
+  redirect("/analyze");
 }

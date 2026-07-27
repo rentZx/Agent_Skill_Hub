@@ -6,7 +6,7 @@ const navItems = [
   { href: "/", label: "首页", icon: Home },
   { href: "/resources", label: "资源库", icon: Boxes },
   { href: "/search", label: "搜索", icon: Search },
-  { href: "/recommend", label: "推荐", icon: Sparkles },
+  { href: "/analyze", label: "项目分析", icon: Sparkles },
   { href: "/favorites", label: "收藏", icon: Heart },
   { href: "/admin", label: "管理", icon: Database }
 ];
