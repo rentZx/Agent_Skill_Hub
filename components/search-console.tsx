@@ -138,22 +138,25 @@ export function SearchConsole({ resources, tags, initialQuery = "" }: { resource
           {filteredResources.map((resource) => {
             const isFavorite = favoriteIds.includes(resource.id);
             return (
-              <div key={resource.id} className="relative">
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(resource.id)}
-                  aria-label={isFavorite ? "取消收藏" : "收藏资源"}
-                  className={cn(
-                    "absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-md border shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition",
-                    isFavorite
-                      ? "border-cyan-300/40 bg-cyan-300/15 text-cyan-100"
-                      : "border-white/10 bg-slate-950/70 text-muted-foreground hover:border-cyan-300/30 hover:text-cyan-100"
-                  )}
-                >
-                  <Bookmark className={cn("h-4 w-4", isFavorite && "fill-current")} />
-                </button>
-                <ResourceCard resource={resource} />
-              </div>
+              <ResourceCard
+                key={resource.id}
+                resource={resource}
+                headerAction={(
+                  <button
+                    type="button"
+                    onClick={() => toggleFavorite(resource.id)}
+                    aria-label={isFavorite ? "取消收藏" : "收藏资源"}
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-md border shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition",
+                      isFavorite
+                        ? "border-cyan-300/40 bg-cyan-300/15 text-cyan-100"
+                        : "border-white/10 bg-slate-950/70 text-muted-foreground hover:border-cyan-300/30 hover:text-cyan-100"
+                    )}
+                  >
+                    <Bookmark className={cn("h-4 w-4", isFavorite && "fill-current")} />
+                  </button>
+                )}
+              />
             );
           })}
         </div>

@@ -25,6 +25,18 @@ const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
     { slug: "servings", label: "Servings", category: "workflow", weight: 7 },
     { slug: "random-meal", label: "Random Meal", category: "workflow", weight: 6 }
   ] },
+  { terms: ["炒股", "股票", "股市", "证券行情", "a股", "量化交易", "stock market", "stock trading"], tags: [
+    { slug: "stock-market", label: "Stock Market", category: "industry", weight: 10 },
+    { slug: "financial-data", label: "Financial Data", category: "domain", weight: 10 },
+    { slug: "market-data", label: "Market Data", category: "domain", weight: 9 },
+    { slug: "real-time-quotes", label: "Real-time Quotes", category: "workflow", weight: 9 },
+    { slug: "a-share", label: "A-share", category: "domain", weight: 9 },
+    { slug: "technical-analysis", label: "Technical Analysis", category: "workflow", weight: 8 },
+    { slug: "quantitative-trading", label: "Quantitative Trading", category: "domain", weight: 8 },
+    { slug: "backtesting", label: "Backtesting", category: "workflow", weight: 8 },
+    { slug: "trading-strategy", label: "Trading Strategy", category: "workflow", weight: 7 },
+    { slug: "multi-agent-research", label: "Multi-agent Research", category: "technology", weight: 6 }
+  ] },
   { terms: ["画室", "绘画", "美术", "培训", "教育"], tags: [
     { slug: "education", label: "Education", category: "industry", weight: 10 },
     { slug: "course", label: "Course", category: "domain", weight: 8 },

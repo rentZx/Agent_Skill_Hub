@@ -15,9 +15,57 @@ type GitHubSearchItem = {
   pushed_at: string | null;
 };
 
+type DiscoveryProfile = {
+  queries: string[];
+  repositories: string[];
+  relevanceTerms: string[];
+  typeOverrides: Record<string, ResourceType>;
+  tagOverrides: Record<string, string[]>;
+};
+
+const stockDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"stock analysis\" \"market data\" in:name,description,readme archived:false fork:false",
+    "\"A-share\" \"financial data\" in:name,description,readme archived:false fork:false",
+    "\"quantitative trading\" backtesting in:name,description,readme archived:false fork:false",
+    "\"financial charts\" library in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "ZhuLinsen/daily_stock_analysis",
+    "akfamily/akshare",
+    "mootdx/mootdx",
+    "microsoft/qlib",
+    "ricequant/rqalpha",
+    "hsliuping/TradingAgents-CN",
+    "tradingview/lightweight-charts"
+  ],
+  relevanceTerms: [
+    "stock analysis", "stock market", "market data", "financial data", "real-time quotes", "a-share",
+    "technical analysis", "quantitative trading", "backtesting", "trading strategy", "financial charts"
+  ],
+  typeOverrides: {
+    "zhulinsen/daily_stock_analysis": "agent_skill",
+    "tradingview/lightweight-charts": "ui_component"
+  },
+  tagOverrides: {
+    "zhulinsen/daily_stock_analysis": ["stock-market", "market-data", "real-time-quotes", "technical-analysis", "quantitative-trading", "agent-skill"],
+    "akfamily/akshare": ["financial-data", "a-share", "market-data", "stock-market"],
+    "mootdx/mootdx": ["market-data", "real-time-quotes", "a-share", "tongdaxin"],
+    "microsoft/qlib": ["quantitative-trading", "quant-research", "machine-learning", "backtesting"],
+    "ricequant/rqalpha": ["backtesting", "algorithmic-trading", "a-share", "trading-strategy"],
+    "hsliuping/tradingagents-cn": ["multi-agent-research", "stock-analysis", "quantitative-trading", "stock-market"],
+    "tradingview/lightweight-charts": ["financial-charts", "candlestick", "ui", "stock-market"]
+  }
+};
+
 export async function discoverGitHubResources(input: string, tags: string[], existing: Resource[]): Promise<Resource[]> {
-  const queries = buildQueries(input, tags);
-  let results = await Promise.all(queries.map((query) => searchRepositories(query)));
+  const profile = getDiscoveryProfile(input, tags);
+  const queries = profile?.queries ?? buildQueries(input, tags);
+  const [initialResults, preferredResults] = await Promise.all([
+    Promise.all(queries.map((query) => searchRepositories(query))),
+    Promise.all((profile?.repositories ?? []).map((repository) => fetchRepository(repository)))
+  ]);
+  let results = initialResults;
   if (results.flat().length === 0) {
     const fallbackQuery = buildFallbackQuery(input, tags);
     if (fallbackQuery && !queries.includes(fallbackQuery)) {
@@ -25,17 +73,35 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
+  const preferredNames = new Set((profile?.repositories ?? []).map((repository) => repository.toLowerCase()));
   const unique = new Map<string, GitHubSearchItem>();
 
   results.flat().forEach((item) => {
-    if (!existingUrls.has(item.html_url)) unique.set(item.full_name, item);
+    if (!existingUrls.has(item.html_url) || preferredNames.has(item.full_name.toLowerCase())) {
+      unique.set(item.full_name.toLowerCase(), item);
+    }
+  });
+  preferredResults.filter((item): item is GitHubSearchItem => Boolean(item)).forEach((item) => {
+    unique.set(item.full_name.toLowerCase(), item);
   });
 
-  const relevanceTerms = getDiscoveryTerms(input, tags);
+  const relevanceTerms = Array.from(new Set([
+    ...getDiscoveryTerms(input, tags),
+    ...(profile?.relevanceTerms ?? [])
+  ]));
   return Array.from(unique.values())
-    .sort((left, right) => scoreRepositoryRelevance(right, relevanceTerms) - scoreRepositoryRelevance(left, relevanceTerms))
+    .sort((left, right) =>
+      scoreRepositoryRelevance(right, relevanceTerms, preferredNames) -
+      scoreRepositoryRelevance(left, relevanceTerms, preferredNames)
+    )
     .slice(0, 24)
-    .map((item) => toResource(item, tags));
+    .map((item) => {
+      const key = item.full_name.toLowerCase();
+      return toResource(item, tags, {
+        typeOverride: profile?.typeOverrides[key],
+        tagOverrides: profile?.tagOverrides[key]
+      });
+    });
 }
 
 export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
@@ -83,6 +149,18 @@ async function searchRepositories(query: string, perPage = 15): Promise<GitHubSe
   return payload.items ?? [];
 }
 
+async function fetchRepository(fullName: string): Promise<GitHubSearchItem | null> {
+  const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`https://api.github.com/repos/${repositoryPath}`, { headers, cache: "no-store" });
+  if (!response.ok) {
+    console.warn(`GitHub discovery failed for repository ${fullName}: ${response.status}`);
+    return null;
+  }
+  return await response.json() as GitHubSearchItem;
+}
+
 function isAiPluginLike(item: GitHubSearchItem) {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const ai = /(artificial intelligence|\bai\b|llm|mcp|agent|copilot|claude|openai|gemini|rag|embedding)/i.test(text);
@@ -90,14 +168,23 @@ function isAiPluginLike(item: GitHubSearchItem) {
   return ai && plugin && !item.archived;
 }
 
-function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
+function toResource(
+  item: GitHubSearchItem,
+  projectTags: string[],
+  overrides: { typeOverride?: ResourceType; tagOverrides?: string[] } = {}
+): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
-  const type = inferDiscoveredType(text);
+  const type = overrides.typeOverride ?? inferDiscoveredType(text);
   const risk = assessRiskLevel({ stars: item.stargazers_count, license: item.license?.spdx_id ?? null, latestCommitTime: item.pushed_at, archived: item.archived });
   const matchedProjectTags = projectTags
     .map((tag) => tag.toLowerCase())
     .filter((tag) => matchesDiscoveryTerm(text, tag));
-  const tags = Array.from(new Set([...(item.topics ?? []), ...matchedProjectTags, type.replace("_", "-")])).slice(0, 18);
+  const tags = Array.from(new Set([
+    ...(overrides.tagOverrides ?? []),
+    ...(item.topics ?? []),
+    ...matchedProjectTags,
+    type.replace("_", "-")
+  ])).slice(0, 18);
 
   return {
     id: `github-${item.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -131,7 +218,7 @@ function inferDiscoveredType(text: string): ResourceType {
   if (has(/\b(mcp|model-context-protocol)\b/)) return "mcp_server";
   if (has(/\b(skill\.md|agent[- ]skills?|codex[- ]skills?|claude[- ]skills?|claude-code|skills?)\b/)) return "agent_skill";
   if (has(/\b(github action|github app|pull request)\b/)) return "github_plugin";
-  if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library|three\.?js|threejs|webgl|react-three-fiber|3d viewer|model viewer)\b/)) return "ui_component";
+  if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library|charting library|financial charts?|candlestick charts?|three\.?js|threejs|webgl|react-three-fiber|3d viewer|model viewer)\b/)) return "ui_component";
   return "template_repo";
 }
 
@@ -157,12 +244,20 @@ function quoteSearchTerm(term: string) {
   return /[\s-]/.test(term) ? `"${term}"` : term;
 }
 
-function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[]) {
+function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[], preferredNames = new Set<string>()) {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const directHits = terms.filter((term) => matchesDiscoveryTerm(text, term)).length;
   const tokenHits = terms.flatMap((term) => term.split(/[\s-]+/)).filter((term) => term.length > 1 && text.includes(term)).length;
   const popularity = Math.log10(Math.max(item.stargazers_count, 1)) * 4;
-  return directHits * 45 + tokenHits * 5 + popularity;
+  const preferredBoost = preferredNames.has(item.full_name.toLowerCase()) ? 500 : 0;
+  return directHits * 45 + tokenHits * 5 + popularity + preferredBoost;
+}
+
+function getDiscoveryProfile(input: string, tags: string[]) {
+  const source = `${input} ${tags.join(" ")}`.toLowerCase();
+  return /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)
+    ? stockDiscoveryProfile
+    : null;
 }
 
 function matchesDiscoveryTerm(text: string, term: string) {

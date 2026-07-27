@@ -57,6 +57,24 @@ export type RecommendationContext = {
 
 const capabilityModules: CapabilityModule[] = [
   {
+    id: "stock-market-analysis",
+    label: "股票行情与走势分析",
+    description: "接入股票、指数和板块行情，展示金融图表与技术指标，并支持策略回测和投研分析。",
+    keywords: [
+      "炒股", "股票", "股市", "证券", "行情", "走势", "a股", "stock-market", "stock market", "stock trading",
+      "market-data", "financial-data", "real-time-quotes", "candlestick", "technical-analysis", "macd", "rsi",
+      "bollinger", "quantitative-trading", "quant-trading", "backtesting", "trading-strategy", "akshare", "mootdx",
+      "qlib", "rqalpha", "daily-stock-analysis", "tradingagents"
+    ],
+    preferredTags: [
+      "stock-market", "financial-data", "market-data", "real-time-quotes", "a-share", "technical-analysis",
+      "quantitative-trading", "quant-trading", "backtesting", "trading-strategy", "multi-agent-research",
+      "stock-analysis", "financial-charts", "candlestick"
+    ],
+    preferredTypes: ["agent_skill", "template_repo", "github_plugin", "mcp_server", "ui_component"],
+    projectStage: "实时行情接入、K 线与分时图展示、技术指标计算、策略回测和多智能体投研"
+  },
+  {
     id: "image-to-3d",
     label: "2D 图像转 3D",
     description: "从单张或多张二维图像估计深度、几何结构和材质，并生成可预览、编辑或导出的三维模型。",
@@ -221,7 +239,7 @@ const groupDefinitions: Array<{
     title: "推荐模板仓库",
     description: "作为项目骨架、数据库接入、AI 能力和推荐系统落地参考。",
     types: ["template_repo"],
-    limit: 6,
+    limit: 8,
     riskOnly: false
   },
   {
@@ -411,7 +429,8 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
   const genericKeywords = new Set([
     "web", "web-app", "web application", "saas", "dashboard", "postgresql", "postgres", "next", "nextjs", "next.js",
     "react", "node", "nodejs", "js", "typescript", "javascript", "express", "mongodb", "mongoose", "vercel", "docker",
-    "responsive", "user-friendly", "dynamic-content", "api", "fullstack", "frontend", "backend"
+    "responsive", "user-friendly", "dynamic-content", "api", "fullstack", "frontend", "backend",
+    "skill", "skills", "github", "plugin", "plugins", "agent"
   ]);
   const meaningfulKeywords = keywords.filter((keyword) =>
     keyword.length <= 18 && !genericKeywords.has(keyword.toLowerCase()) && !["开发", "系统", "平台", "项目", "应用", "网页"].includes(keyword)

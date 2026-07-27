@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import {
   ArrowUpRight,
   Boxes,
@@ -27,7 +27,7 @@ const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   template_repo: Boxes
 };
 
-export function ResourceCard({ resource }: { resource: Resource }) {
+export function ResourceCard({ resource, headerAction }: { resource: Resource; headerAction?: ReactNode }) {
   const Icon = typeIcons[resource.type];
 
   return (
@@ -40,9 +40,12 @@ export function ResourceCard({ resource }: { resource: Resource }) {
           </div>
           <h3 className="mt-3 text-lg font-semibold leading-6 text-slate-50">{resource.name}</h3>
         </div>
-        <span className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] ${riskClassNames[resource.risk_level]}`}>
-          {riskLabels[resource.risk_level]}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`rounded-md border px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] ${riskClassNames[resource.risk_level]}`}>
+            {riskLabels[resource.risk_level]}
+          </span>
+          {headerAction}
+        </div>
       </div>
 
       <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">{getLocalizedResourceDescription(resource)}</p>

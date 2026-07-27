@@ -21,6 +21,21 @@ const typeLabels: Record<ResourceType, string> = {
 
 const topicRules: TopicRule[] = [
   {
+    terms: ["market-data", "financial-data", "real-time-quotes", "a-share", "akshare", "mootdx", "stock quote"],
+    label: "股票与金融行情数据",
+    purpose: "用于获取股票、指数、板块、财务和资金流等市场数据，可作为实时行情与历史数据分析的数据源。"
+  },
+  {
+    terms: ["quantitative-trading", "quant-trading", "backtesting", "trading-strategy", "qlib", "rqalpha", "technical-analysis"],
+    label: "量化研究、技术分析和策略回测",
+    purpose: "用于计算技术指标、研究量化因子、构建交易策略并执行历史回测或模拟验证。"
+  },
+  {
+    terms: ["financial-charts", "candlestick", "lightweight-charts", "k-line", "stock chart"],
+    label: "K 线、分时图和金融图表",
+    purpose: "用于展示 K 线、分时图、成交量和技术指标等股票行情可视化。"
+  },
+  {
     terms: ["image-to-3d", "image to 3d", "img2threejs", "2d-to-3d", "depth-estimation", "mesh-generation", "procedural-generation"],
     label: "二维图像转三维模型",
     purpose: "用于把二维参考图像重建为三维模型，覆盖深度或几何估计、程序化建模、质量检查与模型输出。"

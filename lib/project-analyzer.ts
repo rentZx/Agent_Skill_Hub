@@ -35,6 +35,7 @@ type Rule = {
 const rules: Rule[] = [
   { terms: ["2d转3d", "2d 转 3d", "image-to-3d", "image to 3d", "img2threejs"], industry: "计算机图形学", projectType: "图像转 3D 工具", targetUsers: "3D 设计师、游戏开发者和需要快速生成三维资产的创作者", features: ["上传二维参考图像", "估计深度与几何结构", "生成可编辑三维模型", "使用 Three.js/WebGL 预览模型", "导出 GLB、OBJ 或 STL 文件"] },
   { terms: ["做饭", "菜谱", "食谱", "吃什么", "备菜", "烹饪", "饭菜", "料理"], industry: "餐饮与生活服务", projectType: "菜谱推荐 Web 应用", targetUsers: "家庭用户和需要快速决定吃什么的人", features: ["随机或按条件推荐菜谱", "按用餐人数调整菜品和食材用量", "展示备菜清单", "展示分步骤制作过程", "收藏和复用喜欢的菜谱"] },
+  { terms: ["炒股", "股票", "股市", "证券行情", "a股", "量化交易", "stock market", "stock trading"], industry: "证券与量化金融", projectType: "股票行情与分析平台", targetUsers: "个人投资者、量化研究员和需要跟踪市场走势的分析人员", features: ["实时获取股票、指数和板块行情", "展示 K 线、分时图和成交量", "计算均线、MACD、RSI、布林带等技术指标", "管理自选股、价格提醒和市场新闻", "策略回测与走势分析"] },
   { terms: ["画室", "绘画", "美术", "培训", "课程"], industry: "教育培训", projectType: "SaaS 管理系统", targetUsers: "校长、老师、学生和家长", features: ["课程与班级管理", "学生档案", "教师排课", "家长通知", "缴费记录"] },
   { terms: ["crm", "客户", "线索", "销售", "获客"], industry: "销售与客户管理", projectType: "CRM / SaaS", targetUsers: "销售、运营和管理者", features: ["客户档案", "线索跟进", "销售漏斗", "团队协作", "数据报表"] },
   { terms: ["erp", "库存", "采购", "供应链", "财务"], industry: "企业经营管理", projectType: "ERP 管理系统", targetUsers: "企业管理者、财务和运营团队", features: ["组织权限", "采购与库存", "订单管理", "财务数据", "经营报表"] },
