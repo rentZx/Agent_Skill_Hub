@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Resource } from "@/lib/types";
 
 type ResourceQueryRow = Resource & {
-  metadata?: { risk_reason?: unknown };
+  metadata?: { risk_reason?: unknown; synced_at?: unknown };
   resource_tags?: Array<{
     tags: { name: string; slug: string } | null;
   }>;
@@ -58,6 +58,8 @@ export async function getResources(): Promise<Resource[]> {
       trust_score,
       fit_score,
       repo_url,
+      github_stars,
+      github_forks,
       source,
       last_updated,
       metadata,
@@ -88,11 +90,23 @@ export async function getResources(): Promise<Resource[]> {
       trust_score: resource.trust_score,
       fit_score: resource.fit_score,
       repo_url: resource.repo_url,
+      github_stars: resource.github_stars,
+      github_forks: resource.github_forks,
       source: resource.source,
       last_updated: resource.last_updated,
+      last_synced_at: getMetadataSyncTime(resource.metadata),
       risk_reason: typeof resource.metadata?.risk_reason === "string" ? resource.metadata.risk_reason : undefined
     };
   });
+}
+
+function getMetadataSyncTime(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || !("synced_at" in metadata)) {
+    return undefined;
+  }
+
+  const value = (metadata as { synced_at?: unknown }).synced_at;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export async function getResourceBySlug(slug: string): Promise<Resource | null> {

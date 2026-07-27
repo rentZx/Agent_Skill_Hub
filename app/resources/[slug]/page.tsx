@@ -5,13 +5,11 @@ import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, ShieldCheck, Term
 import { riskLabels, typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import { getResourceBySlug, getResources } from "@/lib/resources";
+import { getLocalizedResourceDescription, getLocalizedUseCases } from "@/lib/resource-localization";
 import { Button } from "@/components/ui/button";
 import type { RiskLevel } from "@/lib/types";
 
-export async function generateStaticParams() {
-  const resources = await getResources();
-  return resources.map((resource) => ({ slug: resource.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function ResourceDetailPage({
   params
@@ -51,7 +49,7 @@ export default async function ResourceDetailPage({
             </div>
           </div>
           <h1 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight text-balance sm:text-5xl">{resource.name}</h1>
-          <p className="mt-4 max-w-4xl text-base leading-7 text-muted-foreground">{resource.description}</p>
+          <p className="mt-4 max-w-4xl text-base leading-7 text-muted-foreground">{getLocalizedResourceDescription(resource)}</p>
           <div className="mt-5 flex flex-wrap gap-2">
             {resource.tags.map((tag) => (
               <span key={tag} className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground">
@@ -75,7 +73,7 @@ export default async function ResourceDetailPage({
 
           <Panel icon={<CheckCircle2 className="h-4 w-4" />} title="适用场景">
             <div className="grid gap-2">
-              {resource.use_cases.map((item) => (
+              {getLocalizedUseCases(resource).map((item) => (
                 <div key={item} className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.06] p-3 text-sm leading-6 text-slate-200">
                   {item}
                 </div>

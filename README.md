@@ -95,6 +95,8 @@ npm run sync:resources -- --source=npm --limit=30
 
 The sync job is additive/updating only. It stores source metadata and risk reasons in `resources.metadata`, and high-risk candidates remain visible for review instead of being silently discarded.
 
+GitHub Actions runs the same sync job every day at 02:00 China Standard Time through `.github/workflows/sync-resources.yml`. The resource cards show both the upstream source update date and the latest catalog synchronization date, so an old repository update date is not mistaken for a stale catalog.
+
 Do not expose server-only keys to client components.
 
 ## Current Features

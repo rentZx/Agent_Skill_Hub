@@ -5,6 +5,7 @@ import { discoverGitHubResources } from "@/lib/github-discovery-core";
 import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
+import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import type { Resource } from "@/lib/types";
 
 export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules"; discoveredCount: number }> {
@@ -106,7 +107,11 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
         const items = [...group.items].map((item) => {
           const rerank = scoreMap.get(item.resource.id);
           return rerank
-            ? { ...item, score: Math.round(item.score * 0.55 + rerank.score * 0.45), why: rerank.reason }
+            ? {
+              ...item,
+              score: Math.round(item.score * 0.55 + rerank.score * 0.45),
+              why: getLocalizedRecommendationReason(item.resource, rerank.score)
+            }
             : item;
         }).sort((a, b) => b.score - a.score);
         return {

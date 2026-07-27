@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
 import { riskLabels, typeLabels } from "@/lib/resource-types";
+import { getLocalizedResourceDescription } from "@/lib/resource-localization";
+import { formatResourceDate } from "@/lib/resource-ranking";
 
 const riskClassNames: Record<RiskLevel, string> = {
   low: "border-emerald-300/30 bg-emerald-300/[0.12] text-emerald-100",
@@ -43,7 +45,7 @@ export function ResourceCard({ resource }: { resource: Resource }) {
         </span>
       </div>
 
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">{resource.description}</p>
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">{getLocalizedResourceDescription(resource)}</p>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {resource.tags.slice(0, 4).map((tag) => (
@@ -66,7 +68,10 @@ export function ResourceCard({ resource }: { resource: Resource }) {
       <div className="mt-4 line-clamp-1 text-xs text-muted-foreground">支持工具：{resource.supported_agents.join(", ")}</div>
 
       <div className="mt-auto flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs text-muted-foreground">更新于 {resource.last_updated}</span>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <div>源仓库更新于 {formatResourceDate(resource.last_updated)}</div>
+          {resource.last_synced_at ? <div>目录同步于 {formatResourceDate(resource.last_synced_at)}</div> : null}
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <Link
             href={`/resources/${resource.slug}`}

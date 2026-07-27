@@ -8,7 +8,6 @@ import {
   GitPullRequestArrow,
   Layers3,
   Radar,
-  Search,
   ShieldCheck,
   Sparkles,
   WandSparkles
@@ -17,6 +16,9 @@ import type { ResourceType } from "@/lib/types";
 import { resourceTypes, typeLabels } from "@/lib/resource-types";
 import { getResources } from "@/lib/resources";
 import { ResourceCard } from "@/components/resource-card";
+import { ResourceSearchBar } from "@/components/resource-search-bar";
+
+export const dynamic = "force-dynamic";
 
 const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   agent_skill: BrainCircuit,
@@ -54,14 +56,7 @@ export default async function ResourcesPage() {
           <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
             这里汇总 Skills、MCP Servers、GitHub 插件、UI 组件库和模板仓库，用适配度、可信度和风险等级帮助你快速选型。
           </p>
-          <div className="mt-5 rounded-lg border border-cyan-300/20 bg-slate-950/58 p-2 shadow-focus-glow backdrop-blur-xl">
-            <div className="flex min-h-12 items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] px-3">
-              <Search className="h-4 w-4 shrink-0 text-cyan-200" />
-              <span className="text-sm text-slate-300">
-                可搜索方向：文档解析、网页抓取、GitHub MCP、Playwright MCP、shadcn/ui、Supabase...
-              </span>
-            </div>
-          </div>
+          <ResourceSearchBar />
           </div>
         </div>
 

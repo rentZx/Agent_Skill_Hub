@@ -14,10 +14,14 @@ import {
   WandSparkles
 } from "lucide-react";
 import type { ResourceType } from "@/lib/types";
-import { typeLabels } from "@/lib/resource-types";
+import { resourceTypes, typeLabels } from "@/lib/resource-types";
 import { getResources } from "@/lib/resources";
 import { Button } from "@/components/ui/button";
 import { HomeAnalyzerForm } from "@/components/home-analyzer-form";
+import { getLocalizedResourceDescription } from "@/lib/resource-localization";
+import { getCoverageScore, rankFeaturedResources } from "@/lib/resource-ranking";
+
+export const dynamic = "force-dynamic";
 
 const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   agent_skill: BrainCircuit,
@@ -33,9 +37,10 @@ export default async function HomePage() {
   const avgTrust = Math.round(resources.reduce((sum, item) => sum + item.trust_score, 0) / totalResources);
   const avgFit = Math.round(resources.reduce((sum, item) => sum + item.fit_score, 0) / totalResources);
   const lowRisk = resources.filter((item) => item.risk_level === "low").length;
-  const topResources = [...resources]
-    .sort((a, b) => b.fit_score + b.trust_score - (a.fit_score + a.trust_score))
-    .slice(0, 6);
+  const topResources = rankFeaturedResources(resources).slice(0, 6);
+  const coverageScores = Object.fromEntries(
+    resourceTypes.map((type) => [type, getCoverageScore(resources, type)])
+  ) as Record<ResourceType, number>;
 
   return (
     <div className="space-y-8 pb-10">
@@ -108,12 +113,13 @@ export default async function HomePage() {
                   <Radar className="h-5 w-5" />
                 </div>
               </div>
+              <p className="mb-4 text-xs leading-5 text-muted-foreground">
+                按资源数量、平均适配度、平均可信度和低风险占比计算，不代表单次推荐成功率。
+              </p>
               <div className="space-y-4">
-                <RadarRow label="Agent Skills" value={92} />
-                <RadarRow label="MCP 接入" value={89} />
-                <RadarRow label="GitHub 插件" value={82} />
-                <RadarRow label="UI 组件" value={88} />
-                <RadarRow label="模板适配" value={84} />
+                {resourceTypes.map((type) => (
+                  <RadarRow key={type} label={typeLabels[type]} value={coverageScores[type]} />
+                ))}
               </div>
             </div>
 
@@ -152,6 +158,9 @@ export default async function HomePage() {
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             当前版本使用精选本地资源库，优先展示适配度、可信度和风险等级，让资源比较更快、更清楚。
           </p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            精选排序：适配度 45%、可信度 30%、源仓库新鲜度 15%、社区热度 10%；高风险资源不会进入精选。
+          </p>
           <Button asChild variant="secondary" className="mt-5">
             <Link href="/resources">
               查看全部资源 <ArrowRight className="h-4 w-4" />
@@ -167,7 +176,7 @@ export default async function HomePage() {
             >
               <div className="text-xs text-cyan-200">{typeLabels[resource.type]}</div>
               <h3 className="mt-2 min-h-12 text-base font-semibold leading-6">{resource.name}</h3>
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{resource.description}</p>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{getLocalizedResourceDescription(resource)}</p>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                 <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-slate-300">可信 {resource.trust_score}</span>
                 <span className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">适配 {resource.fit_score}</span>

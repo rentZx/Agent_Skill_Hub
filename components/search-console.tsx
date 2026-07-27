@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 const riskLevels: RiskLevel[] = ["low", "medium", "high"];
 const favoritesKey = "agent-skill-hub:favorites";
 
-export function SearchConsole({ resources, tags }: { resources: Resource[]; tags: string[] }) {
-  const [query, setQuery] = useState("");
+export function SearchConsole({ resources, tags, initialQuery = "" }: { resources: Resource[]; tags: string[]; initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState<ResourceType | "all">("all");
   const [tag, setTag] = useState("all");
   const [risk, setRisk] = useState<RiskLevel | "all">("all");

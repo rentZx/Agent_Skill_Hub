@@ -176,8 +176,11 @@ function mapJoinedResources(
         trust_score: row.resource.trustScore,
         fit_score: row.resource.fitScore,
         repo_url: row.resource.repoUrl,
+        github_stars: row.resource.githubStars,
+        github_forks: row.resource.githubForks,
         source: row.resource.source,
-        last_updated: normalizeDate(row.resource.lastUpdated)
+        last_updated: normalizeDate(row.resource.lastUpdated),
+        last_synced_at: getMetadataSyncTime(row.resource.metadata) ?? normalizeDateTime(row.resource.updatedAt)
       });
     }
 
@@ -200,6 +203,10 @@ function normalizeDate(value: string | Date) {
   return value;
 }
 
+function normalizeDateTime(value: Date) {
+  return value.toISOString();
+}
+
 function parseOptionalDate(value: string | null) {
   return value ? new Date(value) : null;
 }
@@ -211,6 +218,15 @@ function getMetadataRiskReason(metadata: unknown) {
 
   const reason = (metadata as { risk_reason?: unknown }).risk_reason;
   return typeof reason === "string" && reason.length > 0 ? reason : undefined;
+}
+
+function getMetadataSyncTime(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || !("synced_at" in metadata)) {
+    return undefined;
+  }
+
+  const value = (metadata as { synced_at?: unknown }).synced_at;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function slugifyResource(value: string) {
