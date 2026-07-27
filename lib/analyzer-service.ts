@@ -120,8 +120,20 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
   try {
     const batches = chunk(candidates, 10);
     const results = await Promise.allSettled(
-      batches.map((batch) => rerankWithDeepSeek(input, batch))
+      batches.map((batch) => rerankWithDeepSeek(
+        input,
+        batch,
+        recommendation.modules.map((module) => ({
+          label: module.label,
+          description: module.description
+        }))
+      ))
     );
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.warn(`DeepSeek rerank batch ${index + 1} failed.`, result.reason);
+      }
+    });
     const scores = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
     if (scores.length === 0) return applyEvidenceFallback(recommendation);
 
@@ -219,9 +231,14 @@ function hasStrongRepositoryEvidence(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number]
 ) {
   return item.matchKind !== "baseline"
-    && (item.resource.ai_recommendation_weight ?? 0) >= 95
-    && Boolean(item.resource.evidence_summary)
-    && (item.resource.matched_capabilities?.length ?? 0) > 0;
+    && (
+      (item.resource.ai_recommendation_weight ?? 0) >= 100
+      || (
+        (item.resource.ai_recommendation_weight ?? 0) >= 95
+        && Boolean(item.resource.evidence_summary)
+        && (item.resource.matched_capabilities?.length ?? 0) > 0
+      )
+    );
 }
 
 function chunk<T>(items: T[], size: number) {
