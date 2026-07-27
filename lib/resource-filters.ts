@@ -5,30 +5,26 @@ export function getResourceTags(resources: Resource[]) {
 }
 
 export function filterResources(resources: Resource[], filters: ResourceFilters) {
-  const queryTerms = expandSearchQuery(filters.query);
+  const searchQuery = expandSearchQuery(filters.query);
 
-  return resources.filter((resource) => {
-    const haystack = [
-      resource.name,
-      resource.description,
-      resource.type,
-      resource.install_command,
-      resource.source,
-      ...resource.tags,
-      ...resource.supported_agents,
-      ...resource.use_cases
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    const matchesQuery = queryTerms.length === 0 || queryTerms.some((term) => haystack.includes(term));
-
+  return resources
+    .map((resource) => ({
+      resource,
+      searchScore: getSearchScore(resource, searchQuery)
+    }))
+    .filter(({ resource, searchScore }) => {
+    const matchesQuery = searchQuery.primary.length === 0 || searchScore >= 24;
     const matchesType = !filters.type || filters.type === "all" || resource.type === filters.type;
     const matchesTag = !filters.tag || filters.tag === "all" || resource.tags.includes(filters.tag);
     const matchesRisk = !filters.risk || filters.risk === "all" || resource.risk_level === filters.risk;
 
     return matchesQuery && matchesType && matchesTag && matchesRisk;
-  });
+    })
+    .sort((left, right) =>
+      right.searchScore - left.searchScore ||
+      right.resource.fit_score + right.resource.trust_score - (left.resource.fit_score + left.resource.trust_score)
+    )
+    .map(({ resource }) => resource);
 }
 
 const searchSynonyms: Array<[string[], string[]]> = [
@@ -55,6 +51,10 @@ const searchSynonyms: Array<[string[], string[]]> = [
   [
     ["测试", "自动化测试", "验收"],
     ["testing", "playwright", "browser", "e2e", "ci", "review", "测试"]
+  ],
+  [
+    ["金融", "财经", "投资", "证券", "银行", "保险", "fintech"],
+    ["finance", "financial", "fintech", "investment", "banking", "insurance", "trading", "金融", "财经", "投资"]
   ]
 ];
 
@@ -62,18 +62,68 @@ function expandSearchQuery(input?: string) {
   const raw = input?.trim().toLowerCase();
 
   if (!raw) {
-    return [];
+    return { primary: [], expanded: [] };
   }
 
-  const terms = new Set([raw]);
+  const primary = new Set([raw]);
   const splitTerms = raw.match(/[a-z0-9][a-z0-9/-]{1,}|[\u4e00-\u9fa5]{2,}/g) ?? [];
-  splitTerms.forEach((term) => terms.add(term));
+  splitTerms.forEach((term) => primary.add(term));
+  const expanded = new Set<string>();
 
   for (const [triggers, expansions] of searchSynonyms) {
     if (triggers.some((trigger) => raw.includes(trigger.toLowerCase()))) {
-      expansions.forEach((term) => terms.add(term.toLowerCase()));
+      expansions.forEach((term) => {
+        const normalized = term.toLowerCase();
+        if (!primary.has(normalized)) expanded.add(normalized);
+      });
     }
   }
 
-  return Array.from(terms);
+  return {
+    primary: Array.from(primary),
+    expanded: Array.from(expanded)
+  };
+}
+
+function getSearchScore(
+  resource: Resource,
+  query: ReturnType<typeof expandSearchQuery>
+) {
+  if (query.primary.length === 0) return 0;
+
+  const name = resource.name.toLowerCase();
+  const description = resource.description.toLowerCase();
+  const tags = resource.tags.map((tag) => tag.toLowerCase());
+  const useCases = resource.use_cases.map((useCase) => useCase.toLowerCase());
+  const agents = resource.supported_agents.map((agent) => agent.toLowerCase());
+
+  const primaryScore = query.primary.reduce((score, term) => {
+    if (!term) return score;
+    const descriptionIndex = description.indexOf(term);
+    return score +
+      (name === term ? 120 : name.includes(term) ? 90 : 0) +
+      (tags.includes(term) ? 70 : tags.some((tag) => tag.includes(term)) ? 52 : 0) +
+      (useCases.some((useCase) => useCase.includes(term)) ? 34 : 0) +
+      (agents.some((agent) => agent.includes(term)) ? 24 : 0) +
+      getDescriptionScore(descriptionIndex, 46, 28, 10);
+  }, 0);
+
+  const expandedScore = query.expanded.reduce((score, term) => {
+    if (!term) return score;
+    const descriptionIndex = description.indexOf(term);
+    return score +
+      (name.includes(term) ? 34 : 0) +
+      (tags.includes(term) ? 30 : tags.some((tag) => tag.includes(term)) ? 22 : 0) +
+      (useCases.some((useCase) => useCase.includes(term)) ? 16 : 0) +
+      getDescriptionScore(descriptionIndex, 18, 10, 3);
+  }, 0);
+
+  return primaryScore + expandedScore;
+}
+
+function getDescriptionScore(index: number, earlyScore: number, middleScore: number, lateScore: number) {
+  if (index < 0) return 0;
+  if (index < 240) return earlyScore;
+  if (index < 800) return middleScore;
+  return lateScore;
 }
