@@ -1,7 +1,10 @@
+import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import {
   Boxes,
   BrainCircuit,
+  ChevronLeft,
+  ChevronRight,
   DatabaseZap,
   Filter,
   Gauge,
@@ -19,6 +22,7 @@ import { ResourceCard } from "@/components/resource-card";
 import { ResourceSearchBar } from "@/components/resource-search-bar";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 60;
 
 const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   agent_skill: BrainCircuit,
@@ -28,8 +32,18 @@ const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   template_repo: Boxes
 };
 
-export default async function ResourcesPage() {
+export default async function ResourcesPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   const resources = await getResources();
+  const params = await searchParams;
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const pageCount = Math.max(1, Math.ceil(resources.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageResources = resources.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const totalResources = resources.length;
   const averageTrust = Math.round(
     resources.reduce((sum, resource) => sum + resource.trust_score, 0) / totalResources
@@ -104,12 +118,44 @@ export default async function ResourcesPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {resources.map((resource) => (
+          {pageResources.map((resource) => (
             <ResourceCard key={resource.id} resource={resource} />
           ))}
         </div>
+
+        <ResourcePagination page={currentPage} pageCount={pageCount} />
       </section>
     </div>
+  );
+}
+
+function ResourcePagination({ page, pageCount }: { page: number; pageCount: number }) {
+  if (pageCount <= 1) {
+    return null;
+  }
+
+  return (
+    <nav className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-3" aria-label="资源分页">
+      <Link
+        href={page > 1 ? `/resources?page=${page - 1}` : "/resources"}
+        aria-disabled={page === 1}
+        className={`inline-flex items-center gap-1 rounded-md border px-3 py-2 text-xs transition ${page === 1 ? "pointer-events-none border-white/5 text-slate-600" : "border-white/10 text-slate-200 hover:border-cyan-300/35 hover:bg-cyan-300/10"}`}
+      >
+        <ChevronLeft className="h-4 w-4" />
+        上一页
+      </Link>
+      <span className="text-xs text-muted-foreground">
+        第 {page} / {pageCount} 页
+      </span>
+      <Link
+        href={page < pageCount ? `/resources?page=${page + 1}` : `/resources?page=${pageCount}`}
+        aria-disabled={page === pageCount}
+        className={`inline-flex items-center gap-1 rounded-md border px-3 py-2 text-xs transition ${page === pageCount ? "pointer-events-none border-white/5 text-slate-600" : "border-white/10 text-slate-200 hover:border-cyan-300/35 hover:bg-cyan-300/10"}`}
+      >
+        下一页
+        <ChevronRight className="h-4 w-4" />
+      </Link>
+    </nav>
   );
 }
 
