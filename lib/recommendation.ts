@@ -509,9 +509,14 @@ function scoreResources(
         capability.negativeKeywords.filter((keyword) => matchesScoringTerm(haystack, keyword))
       ).length;
       const riskPenalty = resource.risk_level === "high" ? 16 : resource.risk_level === "medium" ? 5 : 0;
-      const universalUiSignal = modules.some((module) => module.id === "ui-components")
-        && resource.type === "ui_component"
-        && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
+      const universalUiSignal = resource.type === "ui_component"
+        && (
+          isOfficialShadcnUi(resource)
+          || (
+            modules.some((module) => module.id === "ui-components")
+            && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()))
+          )
+        );
       const foundationalUiBoost = resource.type === "ui_component"
         ? isOfficialShadcnUi(resource)
           ? 30
