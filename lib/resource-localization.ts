@@ -21,6 +21,26 @@ const typeLabels: Record<ResourceType, string> = {
 
 const topicRules: TopicRule[] = [
   {
+    terms: ["howtocook", "chinese-recipes", "chinese recipe"],
+    label: "中文菜谱数据与标准化制作步骤",
+    purpose: "用于提供中文菜名、食材用量、厨房准备和标准化制作步骤，可作为本地菜谱数据库的基础数据源。"
+  },
+  {
+    terms: ["recipe-mcp", "howtocook-mcp", "recipe mcp"],
+    label: "菜谱查询与菜单推荐 MCP",
+    purpose: "用于让 Agent 查询菜谱、按条件组织菜单，并把食材和制作步骤作为结构化结果返回。"
+  },
+  {
+    terms: ["personalized-nutrition", "age-aware", "dietary-restrictions", "food-allergies", "macrochef", "health conditions"],
+    label: "年龄、营养目标、忌口和过敏过滤",
+    purpose: "用于根据年龄、身体指标、营养目标、忌口、过敏原和饮食偏好筛选或排序菜品。"
+  },
+  {
+    terms: ["ingredient-recommendation", "ingredient recommendation", "pantry", "portion-scaling"],
+    label: "按现有食材推荐与人数份量换算",
+    purpose: "用于匹配用户现有食材、计算缺少的材料，并按用餐人数换算食材份量。"
+  },
+  {
     terms: ["market-data", "financial-data", "real-time-quotes", "a-share", "akshare", "mootdx", "stock quote"],
     label: "股票与金融行情数据",
     purpose: "用于获取股票、指数、板块、财务和资金流等市场数据，可作为实时行情与历史数据分析的数据源。"

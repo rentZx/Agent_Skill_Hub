@@ -58,6 +58,49 @@ const stockDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
+const recipeDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"recipe recommendation\" ingredients nutrition in:name,description,readme archived:false fork:false",
+    "\"chinese recipes\" \"cooking steps\" in:name,description,readme archived:false fork:false",
+    "\"recipe mcp\" server in:name,description,readme archived:false fork:false",
+    "\"personalized nutrition\" age dietary in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "Anduin2017/HowToCook",
+    "worryzyy/HowToCook-mcp",
+    "chitralputhran/Recipe-AI-Easy-Recipes",
+    "mealie-recipes/mealie",
+    "TandoorRecipes/recipes",
+    "grocy/grocy",
+    "magedbekheet/macrochefai",
+    "ShreyaKumar-dev/Caloriet"
+  ],
+  relevanceTerms: [
+    "recipe recommendation", "chinese recipes", "ingredients", "cooking steps", "servings", "portion scaling",
+    "dietary restrictions", "food allergies", "personalized nutrition", "age", "meal planning", "recipe mcp"
+  ],
+  typeOverrides: {
+    "anduin2017/howtocook": "template_repo",
+    "worryzyy/howtocook-mcp": "mcp_server",
+    "chitralputhran/recipe-ai-easy-recipes": "template_repo",
+    "mealie-recipes/mealie": "template_repo",
+    "tandoorrecipes/recipes": "template_repo",
+    "grocy/grocy": "template_repo",
+    "magedbekheet/macrochefai": "template_repo",
+    "shreyakumar-dev/caloriet": "template_repo"
+  },
+  tagOverrides: {
+    "anduin2017/howtocook": ["chinese-recipes", "recipe", "ingredients", "cooking-steps", "recipe-dataset"],
+    "worryzyy/howtocook-mcp": ["recipe-mcp", "chinese-recipes", "recipe", "ingredients", "cooking-steps"],
+    "chitralputhran/recipe-ai-easy-recipes": ["ingredient-recommendation", "recipe", "cooking-steps", "nutrition", "shopping-list"],
+    "mealie-recipes/mealie": ["recipe", "meal-planning", "shopping-list", "servings", "recipe-import"],
+    "tandoorrecipes/recipes": ["recipe", "meal-planning", "shopping-list", "ingredients", "servings"],
+    "grocy/grocy": ["ingredients", "pantry", "meal-planning", "shopping-list", "food-inventory"],
+    "magedbekheet/macrochefai": ["personalized-nutrition", "age-aware", "ingredient-recommendation", "dietary-restrictions", "food-allergies", "health-conditions"],
+    "shreyakumar-dev/caloriet": ["personalized-nutrition", "age-aware", "dietary-restrictions", "ingredient-recommendation", "nutrition"]
+  }
+};
+
 export async function discoverGitHubResources(input: string, tags: string[], existing: Resource[]): Promise<Resource[]> {
   const profile = getDiscoveryProfile(input, tags);
   const queries = profile?.queries ?? buildQueries(input, tags);
@@ -257,9 +300,13 @@ function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[], prefe
 
 function getDiscoveryProfile(input: string, tags: string[]) {
   const source = `${input} ${tags.join(" ")}`.toLowerCase();
-  return /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)
-    ? stockDiscoveryProfile
-    : null;
+  if (/(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)) {
+    return stockDiscoveryProfile;
+  }
+  if (/(做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
+    return recipeDiscoveryProfile;
+  }
+  return null;
 }
 
 function matchesDiscoveryTerm(text: string, term: string) {

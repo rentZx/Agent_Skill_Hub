@@ -94,19 +94,35 @@ const capabilityModules: CapabilityModule[] = [
     id: "recipe-catalog",
     label: "菜谱与食材数据",
     description: "建立菜谱、食材、份量和制作步骤的数据模型，保证每道菜能被检索、展示和复用。",
-    keywords: ["菜谱", "食谱", "饭菜", "料理", "食材", "recipe", "recipes", "food", "meal", "ingredients", "cooking"],
-    preferredTags: ["recipe", "recipes", "food", "ingredients", "meal", "database"],
-    preferredTypes: ["template_repo", "mcp_server"],
-    projectStage: "菜谱数据模型、食材关系、份量字段、步骤内容管理"
+    keywords: ["菜谱", "食谱", "饭菜", "料理", "食材", "中文菜谱", "recipe", "recipes", "food", "meal", "ingredients", "cooking", "howtocook"],
+    preferredTags: ["recipe", "recipes", "food", "ingredients", "meal", "database", "chinese-recipes", "recipe-mcp"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    projectStage: "中文菜谱数据导入、食材关系、份量字段、制作步骤和菜谱查询接口"
   },
   {
     id: "meal-recommendation",
     label: "按人数与偏好的菜品推荐",
     description: "根据用餐人数、随机入口和筛选条件返回可解释的菜品结果，并保留推荐依据。",
-    keywords: ["随机", "人数", "吃什么", "饭菜", "recommendation", "random", "servings", "meal planning", "what to cook"],
-    preferredTags: ["recipe", "meal-planning", "recommendation", "random-meal", "servings"],
-    preferredTypes: ["template_repo", "ui_component", "mcp_server"],
-    projectStage: "人数参数、随机推荐、筛选排序、推荐结果页"
+    keywords: ["随机", "人数", "吃什么", "饭菜", "现有食材", "按食材", "recommendation", "random", "servings", "portion scaling", "meal planning", "what to cook", "ingredient recommendation"],
+    preferredTags: ["recipe", "meal-planning", "recommendation", "random-meal", "servings", "portion-scaling", "ingredient-recommendation"],
+    preferredTypes: ["template_repo", "ui_component", "mcp_server", "agent_skill"],
+    projectStage: "现有食材匹配、人数参数、份量换算、筛选排序和推荐结果页"
+  },
+  {
+    id: "personalized-nutrition",
+    label: "忌口、年龄与营养约束",
+    description: "根据年龄、身体指标、营养目标、忌口、过敏原和饮食偏好过滤并排序菜品。",
+    keywords: [
+      "年龄", "老人", "儿童", "忌口", "过敏", "营养", "健康", "饮食偏好", "减脂", "增肌",
+      "age", "allergy", "allergen", "dietary restrictions", "nutrition", "health conditions",
+      "calorie", "macro", "personalized nutrition", "food preferences", "macrochef"
+    ],
+    preferredTags: [
+      "age-aware", "food-allergies", "dietary-restrictions", "personalized-nutrition", "nutrition",
+      "health-conditions", "calorie", "macro", "food-preferences"
+    ],
+    preferredTypes: ["template_repo", "agent_skill", "mcp_server"],
+    projectStage: "用户饮食档案、年龄与营养规则、过敏原硬过滤、健康目标排序和风险提示"
   },
   {
     id: "recipe-interaction",

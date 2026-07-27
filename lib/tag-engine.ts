@@ -19,10 +19,19 @@ const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
   { terms: ["做饭", "菜谱", "食谱", "吃什么", "备菜", "烹饪", "饭菜", "料理"], tags: [
     { slug: "food", label: "Food", category: "industry", weight: 10 },
     { slug: "recipe", label: "Recipe", category: "domain", weight: 9 },
+    { slug: "chinese-recipes", label: "Chinese Recipes", category: "domain", weight: 9 },
+    { slug: "ingredient-recommendation", label: "Ingredient Recommendation", category: "workflow", weight: 9 },
     { slug: "meal-planning", label: "Meal Planning", category: "domain", weight: 8 },
     { slug: "ingredients", label: "Ingredients", category: "domain", weight: 8 },
+    { slug: "dietary-restrictions", label: "Dietary Restrictions", category: "domain", weight: 8 },
+    { slug: "food-allergies", label: "Food Allergies", category: "domain", weight: 8 },
+    { slug: "personalized-nutrition", label: "Personalized Nutrition", category: "domain", weight: 8 },
+    { slug: "age-aware", label: "Age-aware", category: "workflow", weight: 8 },
     { slug: "cooking-steps", label: "Cooking Steps", category: "workflow", weight: 7 },
     { slug: "servings", label: "Servings", category: "workflow", weight: 7 },
+    { slug: "portion-scaling", label: "Portion Scaling", category: "workflow", weight: 7 },
+    { slug: "recipe-mcp", label: "Recipe MCP", category: "technology", weight: 7 },
+    { slug: "shopping-list", label: "Shopping List", category: "workflow", weight: 6 },
     { slug: "random-meal", label: "Random Meal", category: "workflow", weight: 6 }
   ] },
   { terms: ["炒股", "股票", "股市", "证券行情", "a股", "量化交易", "stock market", "stock trading"], tags: [
