@@ -332,35 +332,21 @@ const genericProjectKeywords = new Set([
   "ai", "agent", "agents", "app", "application", "web", "website", "system", "platform", "project",
   "tool", "tools", "skill", "skills", "plugin", "plugins", "github", "api", "database", "frontend", "backend",
   "react", "next", "nextjs", "next.js", "node", "nodejs", "python", "typescript", "javascript", "docker",
-  "vercel", "saas", "dashboard", "workflow", "automation", "recommendation", "interactive", "management"
+  "vercel", "saas", "dashboard", "workflow", "automation", "recommendation", "interactive", "management",
+  "table", "data-table", "form", "forms", "filter", "filters", "component", "components", "layout", "responsive"
 ]);
 
 function hasDirectDomainSignal(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   projectKeywords: string[]
 ) {
-  if (
-    item.resource.type === "ui_component"
-    && (
-      item.resource.name.toLowerCase() === "shadcn/ui"
-      || item.resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui")
-    )
-  ) return true;
-  if ((item.resource.ai_recommendation_weight ?? 0) >= 100) return true;
-
-  const capabilityIds = new Set([
-    ...item.matchedCapabilityIds,
-    ...(item.resource.matched_capabilities ?? [])
-  ]);
-  if (Array.from(capabilityIds).some((id) => !broadCapabilityIds.has(id))) return true;
-
   const haystack = [
     item.resource.name,
     item.resource.description,
     ...item.resource.tags,
     ...item.resource.use_cases
   ].join(" ").toLowerCase();
-  return projectKeywords.some((keyword) => {
+  const hasProjectKeyword = projectKeywords.some((keyword) => {
     const normalized = keyword.toLowerCase().trim();
     return normalized.length >= 3
       && normalized.length <= 40
@@ -370,6 +356,20 @@ function hasDirectDomainSignal(
         || haystack.includes(normalized.replace(/[-_]+/g, " "))
       );
   });
+  if (item.resource.type === "ui_component") {
+    return item.resource.name.toLowerCase() === "shadcn/ui"
+      || item.resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui")
+      || hasProjectKeyword;
+  }
+  if ((item.resource.ai_recommendation_weight ?? 0) >= 100) return true;
+
+  const capabilityIds = new Set([
+    ...item.matchedCapabilityIds,
+    ...(item.resource.matched_capabilities ?? [])
+  ]);
+  if (Array.from(capabilityIds).some((id) => !broadCapabilityIds.has(id))) return true;
+
+  return hasProjectKeyword;
 }
 
 function chunk<T>(items: T[], size: number) {
