@@ -464,6 +464,7 @@ function toResource(
   } = {}
 ): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
+  const displayName = item.full_name.toLowerCase() === "shadcn-ui/ui" ? "shadcn/ui" : item.name;
   const inferredType = inferDiscoveredType(text);
   const type = overrides.typeOverride ?? inferEvidenceType(inferredType, overrides.evidence);
   const effectiveLicense = overrides.riskOverride?.license ?? item.license?.spdx_id ?? null;
@@ -483,9 +484,9 @@ function toResource(
   return {
     id: `github-${item.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     slug: `github-${item.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    name: item.name,
+    name: displayName,
     type,
-    description: item.description ?? `${item.name} GitHub repository`,
+    description: item.description ?? `${displayName} GitHub repository`,
     tags,
     supported_agents: type === "mcp_server" ? ["Codex", "Claude", "Cursor"] : ["Codex"],
     install_command: type === "agent_skill"
@@ -506,7 +507,7 @@ function toResource(
     github_forks: item.forks_count,
     license: effectiveLicense,
     latest_commit_at: item.pushed_at,
-    readme_summary: item.description ?? `${item.name} GitHub repository`,
+    readme_summary: item.description ?? `${displayName} GitHub repository`,
     has_skill_md: overrides.evidence?.hasSkillMd,
     has_mcp_manifest: overrides.evidence?.hasMcpManifest,
     has_package_json: overrides.evidence?.hasPackageJson,
