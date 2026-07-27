@@ -125,6 +125,38 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
+const vehicleRoutingDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"vehicle routing problem\" capacity \"time windows\" in:name,description,readme archived:false fork:false",
+    "\"route optimization\" delivery fleet vrptw in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "VROOM-Project/vroom",
+    "PyVRP/PyVRP",
+    "google/or-tools",
+    "graphhopper/jsprit",
+    "N-Wouda/ALNS"
+  ],
+  relevanceTerms: [
+    "vehicle routing problem", "vrp", "vrptw", "route optimization", "fleet routing",
+    "vehicle capacity", "time windows", "pickup delivery", "delivery scheduling"
+  ],
+  typeOverrides: {
+    "vroom-project/vroom": "template_repo",
+    "pyvrp/pyvrp": "template_repo",
+    "google/or-tools": "template_repo",
+    "graphhopper/jsprit": "template_repo",
+    "n-wouda/alns": "template_repo"
+  },
+  tagOverrides: {
+    "vroom-project/vroom": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows", "pickup-delivery"],
+    "pyvrp/pyvrp": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows", "multi-depot"],
+    "google/or-tools": ["operations-research", "vehicle-routing", "route-optimization", "vrp", "constraint-programming"],
+    "graphhopper/jsprit": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows"],
+    "n-wouda/alns": ["optimization", "vehicle-routing", "routing-algorithm", "operations-research"]
+  }
+};
+
 const imageTo3dDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"image to 3d\" threejs in:name,description,readme archived:false fork:false",
@@ -523,6 +555,9 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   }
   if (/(做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
     return recipeDiscoveryProfile;
+  }
+  if (/(配送|调度|车辆容量|时间窗|路线规划|路径优化|vehicle.routing|route.optimization|vrptw|fleet.routing)/i.test(source)) {
+    return vehicleRoutingDiscoveryProfile;
   }
   return null;
 }

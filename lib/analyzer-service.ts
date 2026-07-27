@@ -285,8 +285,11 @@ function addFoundationalUiFallback(
     item.resource.risk_level !== "high"
     && (
       item.resource.name.toLowerCase() === "shadcn/ui"
-      || item.resource.tags.some((tag) => tag.toLowerCase() === "shadcn")
+      || item.resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui")
     )
+  ) ?? originalUiGroup?.items.find((item) =>
+    item.resource.risk_level !== "high"
+    && item.resource.tags.some((tag) => tag.toLowerCase() === "shadcn")
   ) ?? originalUiGroup?.items.find((item) => item.resource.risk_level === "low");
   if (!candidate) return groups;
 
@@ -336,7 +339,13 @@ function hasDirectDomainSignal(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   projectKeywords: string[]
 ) {
-  if (item.resource.type === "ui_component") return true;
+  if (
+    item.resource.type === "ui_component"
+    && (
+      item.resource.name.toLowerCase() === "shadcn/ui"
+      || item.resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui")
+    )
+  ) return true;
   if ((item.resource.ai_recommendation_weight ?? 0) >= 100) return true;
 
   const capabilityIds = new Set([

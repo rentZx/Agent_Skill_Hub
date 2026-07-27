@@ -513,11 +513,13 @@ function scoreResources(
         && resource.type === "ui_component"
         && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
       const foundationalUiBoost = resource.type === "ui_component"
-        ? resource.tags.some((tag) => ["shadcn", "radix"].includes(tag.toLowerCase()))
-          ? 18
-          : resource.tags.some((tag) => ["ui", "components", "design-system"].includes(tag.toLowerCase()))
-            ? 6
-            : 0
+        ? isOfficialShadcnUi(resource)
+          ? 30
+          : resource.tags.some((tag) => ["shadcn", "radix"].includes(tag.toLowerCase()))
+            ? 18
+            : resource.tags.some((tag) => ["ui", "components", "design-system"].includes(tag.toLowerCase()))
+              ? 6
+              : 0
         : 0;
       const hasBaselineSignal = resource.tags.some((tag) => [
         "codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai",
@@ -562,6 +564,11 @@ function scoreResources(
 function hasAnyTag(resource: Resource, tags: string[]) {
   const resourceTags = new Set(resource.tags.map((tag) => tag.toLowerCase()));
   return tags.some((tag) => resourceTags.has(tag.toLowerCase()));
+}
+
+function isOfficialShadcnUi(resource: Resource) {
+  return resource.name.toLowerCase() === "shadcn/ui"
+    || resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui");
 }
 
 function matchesScoringTerm(haystack: string, term: string) {
