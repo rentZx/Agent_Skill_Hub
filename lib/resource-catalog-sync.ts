@@ -144,7 +144,7 @@ async function syncGitHubSkillFiles(limit: number) {
     queries.map(async (query) => {
       try {
         const items = await fetchGitHubCodeSearch(query, limit);
-        return items.map((item) => mapGitHubSkillFile(item, query));
+        return items.map((item) => ({ item, query }));
       } catch (error) {
         console.warn(`GitHub skill file search failed: ${query}`, error);
         return [];
@@ -152,7 +152,24 @@ async function syncGitHubSkillFiles(limit: number) {
     })
   );
 
-  return results
+  const uniqueItems = Array.from(
+    new Map(results.flat().map((entry) => [`${entry.item.repository.full_name}:${entry.item.path}`, entry])).values()
+  ).slice(0, Math.min(limit * 2, 200));
+  const enriched = await Promise.all(
+    uniqueItems.map(async (entry) => {
+      try {
+        const repository = await fetchGitHubRepository(entry.item.repository.full_name);
+        return { item: { ...entry.item, repository }, query: entry.query };
+      } catch (error) {
+        console.warn(`GitHub repository metadata failed: ${entry.item.repository.full_name}`, error);
+        return null;
+      }
+    })
+  );
+
+  return enriched
+    .filter((entry): entry is { item: GitHubCodeSearchItem; query: string } => Boolean(entry))
+    .map(({ item, query }) => mapGitHubSkillFile(item, query))
     .flat()
     .filter((candidate) => candidate.repository_stars >= 50)
     .sort((left, right) => right.repository_stars - left.repository_stars)
@@ -167,7 +184,11 @@ async function syncGitHubSkillFiles(limit: number) {
 async function fetchGitHubCodeSearch(query: string, limit: number) {
   const params = new URLSearchParams({ q: query, per_page: String(Math.min(limit, 100)) });
   const data = await fetchJson<{ items?: GitHubCodeSearchItem[] }>(`https://api.github.com/search/code?${params.toString()}`, githubHeaders());
-  return (data.items ?? []).filter((item) => !item.repository.archived);
+  return data.items ?? [];
+}
+
+async function fetchGitHubRepository(fullName: string) {
+  return fetchJson<GitHubRepository>(`https://api.github.com/repos/${fullName}`, githubHeaders());
 }
 
 function mapGitHubSkillFile(item: GitHubCodeSearchItem, query: string): CatalogCandidate & { repository_stars: number } {
