@@ -1,4 +1,5 @@
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
+import type { CapabilityGraph } from "@/lib/capability-engine";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 
@@ -53,6 +54,7 @@ export type RecommendationContext = {
   targetUsers?: string;
   coreFeatures?: string[];
   techStack?: string[];
+  capabilityGraph?: CapabilityGraph;
 };
 
 const capabilityModules: CapabilityModule[] = [
@@ -325,13 +327,23 @@ export function detectCapabilityModules(input: string, keywords = extractProject
 export function buildProjectRecommendation(input: string, resources: Resource[], context: RecommendationContext = {}): ProjectRecommendation {
   const keywords = extractProjectKeywords(input);
   const moduleInput = `${input} ${(context.coreFeatures ?? []).join(" ")}`;
-  const modules = detectCapabilityModules(moduleInput, keywords);
-  const matchedModules = detectCapabilityModules(moduleInput, keywords, false);
+  const dynamicModules = capabilityGraphToModules(context.capabilityGraph);
+  const detectedModules = detectCapabilityModules(moduleInput, keywords);
+  const modules = dedupeModules([...dynamicModules, ...detectedModules]).slice(0, 10);
+  const matchedModules = dedupeModules([
+    ...dynamicModules,
+    ...detectCapabilityModules(moduleInput, keywords, false)
+  ]);
   const infrastructureModuleIds = new Set(["document-parsing", "database-storage", "ui-components", "automated-testing", "deployment", "agent-workflow"]);
   const domainModules = matchedModules.filter((module) => !infrastructureModuleIds.has(module.id));
   const scoringModules = domainModules.length > 0 ? domainModules : matchedModules.length > 0 ? matchedModules : modules;
   const understanding = buildProjectUnderstanding(input, keywords, modules, context);
-  const scored = scoreResources(resources, [...keywords, ...(context.coreFeatures ?? [])], scoringModules);
+  const scored = scoreResources(
+    resources,
+    [...keywords, ...(context.coreFeatures ?? [])],
+    scoringModules,
+    context.capabilityGraph
+  );
   const selectedIds = new Set<string>();
 
   const groups = groupDefinitions.map((group) => {
@@ -349,9 +361,12 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => hasAnyTag(item.resource, [tag])))
       .filter((item) => !selectedIds.has(item.resource.id))
       .slice(0, matching.length > 0 || Boolean(group.requiredTags) ? 0 : 1);
-    const candidates = [...matching, ...baseline]
-      .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index)
-      .slice(0, group.limit);
+    const candidates = selectDiverseCandidates(
+      [...matching, ...baseline]
+        .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index),
+      group.limit,
+      context.capabilityGraph
+    );
 
     candidates.forEach((item) => selectedIds.add(item.resource.id));
 
@@ -441,7 +456,12 @@ function buildProjectUnderstanding(input: string, keywords: string[], modules: C
   };
 }
 
-function scoreResources(resources: Resource[], keywords: string[], modules: CapabilityModule[]) {
+function scoreResources(
+  resources: Resource[],
+  keywords: string[],
+  modules: CapabilityModule[],
+  capabilityGraph?: CapabilityGraph
+) {
   const genericKeywords = new Set([
     "web", "web-app", "web application", "saas", "dashboard", "postgresql", "postgres", "next", "nextjs", "next.js",
     "react", "node", "nodejs", "js", "typescript", "javascript", "express", "mongodb", "mongoose", "vercel", "docker",
@@ -474,6 +494,18 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
       const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
       const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
+      const matchedCapabilities = (capabilityGraph?.capabilities ?? []).filter((capability) =>
+        capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))
+      );
+      const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.required) ?? [];
+      const requiredWeight = Math.max(1, requiredCapabilities.length);
+      const matchedRequired = matchedCapabilities.filter((capability) => capability.required).length;
+      const capabilityCoverage = matchedRequired / requiredWeight;
+      const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
+      const evidenceHits = matchedCapabilities.filter((capability) => inspectedCapabilityHits.has(capability.id)).length;
+      const negativeHits = (capabilityGraph?.capabilities ?? []).flatMap((capability) =>
+        capability.negativeKeywords.filter((keyword) => matchesScoringTerm(haystack, keyword))
+      ).length;
       const riskPenalty = resource.risk_level === "high" ? 16 : resource.risk_level === "medium" ? 5 : 0;
       const universalUiSignal = modules.some((module) => module.id === "ui-components")
         && resource.type === "ui_component"
@@ -484,19 +516,34 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
         "actions", "review", "copilot", "connector", "github-plugin", "github-app", "code-review", "automation",
         "template", "starter", "boilerplate", "example", "nextjs", "react", "fullstack", "ai-sdk", "vercel", "memory", "animation", "v0"
       ].includes(tag.toLowerCase()));
-      const hasProjectSignal = strongKeywordHits > 0 || moduleKeywordHits >= 2 || tagHits > 0 || universalUiSignal;
+      const hasProjectSignal = strongKeywordHits > 0
+        || moduleKeywordHits >= 2
+        || tagHits > 0
+        || matchedCapabilities.length > 0
+        || evidenceHits > 0
+        || universalUiSignal;
       const score = Math.min(100,
         keywordHits * 5 +
         moduleKeywordHits * 2 +
         tagHits * 6 +
         typeBoost +
         curatedBoost +
+        capabilityCoverage * 30 +
+        evidenceHits * 6 -
+        negativeHits * 12 +
         resource.fit_score * 0.28 +
         resource.trust_score * 0.22 -
         riskPenalty
       );
 
-      return { resource, score, hasProjectSignal, hasBaselineSignal };
+      return {
+        resource,
+        score,
+        hasProjectSignal,
+        hasBaselineSignal,
+        matchedCapabilityIds: matchedCapabilities.map((capability) => capability.id),
+        capabilityCoverage
+      };
     })
     .filter((item) => item.score >= 52 && (item.hasProjectSignal || item.hasBaselineSignal))
     .sort((a, b) => b.score - a.score);
@@ -507,7 +554,51 @@ function hasAnyTag(resource: Resource, tags: string[]) {
   return tags.some((tag) => resourceTags.has(tag.toLowerCase()));
 }
 
+function matchesScoringTerm(haystack: string, term: string) {
+  const normalized = term.toLowerCase().trim();
+  if (normalized.length < 3) return false;
+  return haystack.includes(normalized) || haystack.includes(normalized.replace(/[-_]+/g, " "));
+}
+
+function selectDiverseCandidates<T extends {
+  score: number;
+  matchedCapabilityIds: string[];
+}>(
+  candidates: T[],
+  limit: number,
+  capabilityGraph?: CapabilityGraph
+) {
+  if (!capabilityGraph || candidates.length <= 1) return candidates.slice(0, limit);
+
+  const requiredIds = new Set(
+    capabilityGraph.capabilities.filter((capability) => capability.required).map((capability) => capability.id)
+  );
+  const covered = new Set<string>();
+  const remaining = [...candidates];
+  const selected: T[] = [];
+
+  while (remaining.length > 0 && selected.length < limit) {
+    remaining.sort((left, right) => {
+      const leftNew = left.matchedCapabilityIds.filter((id) => requiredIds.has(id) && !covered.has(id)).length;
+      const rightNew = right.matchedCapabilityIds.filter((id) => requiredIds.has(id) && !covered.has(id)).length;
+      const leftRedundant = left.matchedCapabilityIds.filter((id) => covered.has(id)).length;
+      const rightRedundant = right.matchedCapabilityIds.filter((id) => covered.has(id)).length;
+      return (right.score + rightNew * 14 - rightRedundant * 2)
+        - (left.score + leftNew * 14 - leftRedundant * 2);
+    });
+    const next = remaining.shift();
+    if (!next) break;
+    selected.push(next);
+    next.matchedCapabilityIds.forEach((id) => covered.add(id));
+  }
+
+  return selected;
+}
+
 function buildReason(resource: Resource, modules: CapabilityModule[], keywords: string[]) {
+  if (resource.evidence_summary && resource.matched_capabilities?.length) {
+    return `${resource.evidence_summary}可信度 ${resource.trust_score}/100，适配度 ${resource.fit_score}/100，风险为 ${resource.risk_level}；风险依据：${getRiskReason(resource)}`;
+  }
   const matchedModules = modules.filter((module) =>
     module.preferredTypes.includes(resource.type) || resource.tags.some((tag) => module.preferredTags.includes(tag))
   );
@@ -595,6 +686,18 @@ function buildCodexPrompt(
 
 export function rebuildCodexPrompt(input: string, recommendation: ProjectRecommendation) {
   return buildCodexPrompt(input, recommendation.understanding, recommendation.modules, recommendation.groups, recommendation.gaps);
+}
+
+function capabilityGraphToModules(capabilityGraph?: CapabilityGraph): CapabilityModule[] {
+  return (capabilityGraph?.capabilities ?? []).map((capability) => ({
+    id: capability.id,
+    label: capability.label,
+    description: capability.description,
+    keywords: capability.keywords,
+    preferredTags: Array.from(new Set([capability.id, ...capability.keywords.map((keyword) => keyword.toLowerCase())])),
+    preferredTypes: capability.preferredTypes,
+    projectStage: capability.description
+  }));
 }
 
 function dedupeModules(modules: CapabilityModule[]) {

@@ -1,4 +1,5 @@
 import { assessRiskLevel } from "./github-import";
+import type { CapabilityRequirement } from "./capability-engine";
 import type { Resource, ResourceType, RiskLevel } from "./types";
 
 type GitHubSearchItem = {
@@ -13,6 +14,21 @@ type GitHubSearchItem = {
   license: { spdx_id: string | null } | null;
   archived: boolean;
   pushed_at: string | null;
+  default_branch?: string;
+};
+
+type DiscoveryContext = {
+  capabilities?: CapabilityRequirement[];
+  searchQueries?: string[];
+};
+
+type RepositoryEvidence = {
+  hasSkillMd: boolean;
+  hasMcpManifest: boolean;
+  hasPackageJson: boolean;
+  matchedCapabilities: string[];
+  evidenceFiles: string[];
+  summary: string;
 };
 
 type DiscoveryProfile = {
@@ -109,15 +125,20 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
-export async function discoverGitHubResources(input: string, tags: string[], existing: Resource[]): Promise<Resource[]> {
+export async function discoverGitHubResources(
+  input: string,
+  tags: string[],
+  existing: Resource[],
+  context: DiscoveryContext = {}
+): Promise<Resource[]> {
   const profile = getDiscoveryProfile(input, tags);
-  const queries = profile?.queries ?? buildQueries(input, tags);
+  const queries = buildPlannedQueries(input, tags, context.searchQueries ?? [], profile);
   const [initialResults, preferredResults] = await Promise.all([
     Promise.all(queries.map((query) => searchRepositories(query))),
     Promise.all((profile?.repositories ?? []).map((repository) => fetchRepository(repository)))
   ]);
   let results = initialResults;
-  if (results.flat().length === 0) {
+  if (results.flat().length < 12) {
     const fallbackQuery = buildFallbackQuery(input, tags);
     if (fallbackQuery && !queries.includes(fallbackQuery)) {
       results = [...results, await searchRepositories(fallbackQuery, 12)];
@@ -138,21 +159,33 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
 
   const relevanceTerms = Array.from(new Set([
     ...getDiscoveryTerms(input, tags),
-    ...(profile?.relevanceTerms ?? [])
+    ...(profile?.relevanceTerms ?? []),
+    ...(context.searchQueries ?? []),
+    ...(context.capabilities ?? []).flatMap((capability) => capability.keywords)
   ]));
-  return Array.from(unique.values())
+  const ranked = Array.from(unique.values())
     .sort((left, right) =>
       scoreRepositoryRelevance(right, relevanceTerms, preferredNames) -
       scoreRepositoryRelevance(left, relevanceTerms, preferredNames)
     )
-    .slice(0, 24)
+    .slice(0, 24);
+  const evidenceEntries = await Promise.all(
+    ranked.slice(0, 12).map(async (item) => [
+      item.full_name.toLowerCase(),
+      await inspectRepository(item, context.capabilities ?? [])
+    ] as const)
+  );
+  const evidenceByRepository = new Map(evidenceEntries);
+
+  return ranked
     .map((item) => {
       const key = item.full_name.toLowerCase();
       return toResource(item, tags, {
         typeOverride: profile?.typeOverrides[key],
         tagOverrides: profile?.tagOverrides[key],
         recommendationWeight: preferredNames.has(key) ? 100 : undefined,
-        riskOverride: profile?.riskOverrides?.[key]
+        riskOverride: profile?.riskOverrides?.[key],
+        evidence: evidenceByRepository.get(key)
       });
     });
 }
@@ -186,6 +219,19 @@ function buildQueries(input: string, tags: string[]) {
   return Array.from(new Set([...focusedQueries, inputQuery])).filter(Boolean).slice(0, 6);
 }
 
+function buildPlannedQueries(input: string, tags: string[], searchQueries: string[], profile: DiscoveryProfile | null) {
+  const planned = searchQueries
+    .map((query) => query.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .map((query) => `${query} in:name,description,readme archived:false fork:false`);
+  const profileQueries = profile?.queries.slice(0, 2) ?? [];
+  return Array.from(new Set([
+    ...planned,
+    ...profileQueries,
+    ...buildQueries(input, tags)
+  ])).slice(0, 6);
+}
+
 function buildFallbackQuery(input: string, tags: string[]) {
   return getDiscoveryTerms(input, tags).slice(0, 3).map(quoteSearchTerm).join(" ");
 }
@@ -214,6 +260,103 @@ async function fetchRepository(fullName: string): Promise<GitHubSearchItem | nul
   return await response.json() as GitHubSearchItem;
 }
 
+const repositoryInspectionCache = new Map<string, {
+  expiresAt: number;
+  value: Promise<{ paths: string[]; readme: string }>;
+}>();
+
+async function inspectRepository(
+  item: GitHubSearchItem,
+  capabilities: CapabilityRequirement[]
+): Promise<RepositoryEvidence> {
+  const inspection = await getRepositoryInspection(item);
+  const normalizedPaths = inspection.paths.map((path) => path.toLowerCase());
+  const hasSkillMd = normalizedPaths.some((path) => /(^|\/)skill\.md$/.test(path));
+  const hasPackageJson = normalizedPaths.some((path) => /(^|\/)package\.json$/.test(path));
+  const hasMcpManifest = normalizedPaths.some((path) =>
+    /(^|\/)(mcp\.json|\.mcp\.json|mcp-server\.json|server\.json)$/.test(path)
+  ) || /\b(model context protocol|mcp server)\b/i.test(inspection.readme);
+  const evidenceSource = [
+    item.name,
+    item.description ?? "",
+    ...(item.topics ?? []),
+    ...inspection.paths.slice(0, 500),
+    inspection.readme.slice(0, 24000)
+  ].join(" ").toLowerCase();
+  const matched = capabilities.filter((capability) =>
+    capability.keywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
+  );
+  const evidenceFiles = inspection.paths.filter((path) =>
+    /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
+  ).slice(0, 8);
+  const signals = [
+    hasSkillMd ? "检测到 SKILL.md" : "",
+    hasMcpManifest ? "检测到 MCP Server 或配置清单" : "",
+    hasPackageJson ? "检测到 package.json" : "",
+    matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : ""
+  ].filter(Boolean);
+
+  return {
+    hasSkillMd,
+    hasMcpManifest,
+    hasPackageJson,
+    matchedCapabilities: matched.map((capability) => capability.id),
+    evidenceFiles,
+    summary: signals.length > 0 ? `仓库证据：${signals.join("；")}。` : "仓库证据：未检测到明确的 Skill、MCP 或核心能力文件信号。"
+  };
+}
+
+async function getRepositoryInspection(item: GitHubSearchItem) {
+  const key = item.full_name.toLowerCase();
+  const cached = repositoryInspectionCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const value = Promise.all([
+    fetchRepositoryTree(item.full_name, item.default_branch ?? "main"),
+    fetchRepositoryReadme(item.full_name)
+  ]).then(([paths, readme]) => ({ paths, readme }));
+
+  if (repositoryInspectionCache.size >= 200) {
+    const oldest = repositoryInspectionCache.keys().next().value;
+    if (oldest) repositoryInspectionCache.delete(oldest);
+  }
+  repositoryInspectionCache.set(key, { expiresAt: Date.now() + 60 * 60 * 1000, value });
+  return value;
+}
+
+async function fetchRepositoryTree(fullName: string, branch: string) {
+  const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(
+    `https://api.github.com/repos/${repositoryPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+    { headers, cache: "no-store" }
+  );
+  if (!response.ok) return [];
+  const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }> };
+  return (payload.tree ?? [])
+    .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
+    .map((entry) => entry.path as string);
+}
+
+async function fetchRepositoryReadme(fullName: string) {
+  const headers: HeadersInit = { Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`https://api.github.com/repos/${repositoryPath}/readme`, {
+    headers,
+    cache: "no-store"
+  });
+  if (!response.ok) return "";
+  return (await response.text()).slice(0, 40000);
+}
+
+function matchesEvidenceTerm(source: string, term: string) {
+  const normalized = term.toLowerCase().trim();
+  if (normalized.length < 3) return false;
+  return source.includes(normalized) || source.includes(normalized.replace(/[-_]+/g, " "));
+}
+
 function isAiPluginLike(item: GitHubSearchItem) {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const ai = /(artificial intelligence|\bai\b|llm|mcp|agent|copilot|claude|openai|gemini|rag|embedding)/i.test(text);
@@ -229,10 +372,12 @@ function toResource(
     tagOverrides?: string[];
     recommendationWeight?: number;
     riskOverride?: { level: RiskLevel; reason: string; license?: string };
+    evidence?: RepositoryEvidence;
   } = {}
 ): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
-  const type = overrides.typeOverride ?? inferDiscoveredType(text);
+  const inferredType = inferDiscoveredType(text);
+  const type = overrides.typeOverride ?? inferEvidenceType(inferredType, overrides.evidence);
   const effectiveLicense = overrides.riskOverride?.license ?? item.license?.spdx_id ?? null;
   const detectedRisk = assessRiskLevel({ stars: item.stargazers_count, license: effectiveLicense, latestCommitTime: item.pushed_at, archived: item.archived });
   const risk = overrides.riskOverride ?? detectedRisk;
@@ -243,6 +388,7 @@ function toResource(
     ...(overrides.tagOverrides ?? []),
     ...(item.topics ?? []),
     ...matchedProjectTags,
+    ...(overrides.evidence?.matchedCapabilities ?? []),
     type.replace("_", "-")
   ])).slice(0, 18);
 
@@ -257,7 +403,11 @@ function toResource(
     install_command: type === "agent_skill"
       ? `npx skills add ${item.html_url}`
       : `Review and integrate from ${item.html_url}`,
-    use_cases: ["GitHub-discovered project resource", ...(item.language ? [`${item.language} project`] : [])],
+    use_cases: [
+      ...(overrides.evidence?.summary ? [overrides.evidence.summary] : []),
+      "GitHub-discovered project resource",
+      ...(item.language ? [`${item.language} project`] : [])
+    ],
     risk_level: risk.level,
     risk_reason: risk.reason,
     trust_score: calculateTrust(item.stargazers_count, item.license?.spdx_id ?? null, risk.level),
@@ -269,6 +419,11 @@ function toResource(
     license: effectiveLicense,
     latest_commit_at: item.pushed_at,
     readme_summary: item.description ?? `${item.name} GitHub repository`,
+    has_skill_md: overrides.evidence?.hasSkillMd,
+    has_mcp_manifest: overrides.evidence?.hasMcpManifest,
+    has_package_json: overrides.evidence?.hasPackageJson,
+    matched_capabilities: overrides.evidence?.matchedCapabilities,
+    evidence_summary: overrides.evidence?.summary,
     source: "github_live",
     last_updated: (item.pushed_at ?? new Date().toISOString()).slice(0, 10)
   };
@@ -281,6 +436,12 @@ function inferDiscoveredType(text: string): ResourceType {
   if (has(/\b(github action|github app|pull request)\b/)) return "github_plugin";
   if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library|charting library|financial charts?|candlestick charts?|three\.?js|threejs|webgl|react-three-fiber|3d viewer|model viewer)\b/)) return "ui_component";
   return "template_repo";
+}
+
+function inferEvidenceType(fallback: ResourceType, evidence?: RepositoryEvidence): ResourceType {
+  if (evidence?.hasSkillMd) return "agent_skill";
+  if (evidence?.hasMcpManifest) return "mcp_server";
+  return fallback;
 }
 
 function calculateTrust(stars: number, license: string | null, risk: string) {

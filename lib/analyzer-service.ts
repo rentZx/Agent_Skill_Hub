@@ -1,6 +1,7 @@
 import "server-only";
 
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
+import { buildCapabilityGraph } from "@/lib/capability-engine";
 import { discoverGitHubResources } from "@/lib/github-discovery-core";
 import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
@@ -17,19 +18,31 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     console.warn("DeepSeek analysis failed, using rules tags.", error);
   }
 
+  const capabilityGraph = buildCapabilityGraph(input, {
+    projectType: ai?.projectType ?? initial.analysis.projectType,
+    coreFeatures: ai?.coreFeatures?.length ? ai.coreFeatures : initial.analysis.coreFeatures,
+    tags: Array.from(new Set([...initial.analysis.tags, ...(ai?.tags ?? [])])),
+    capabilities: ai?.capabilities,
+    constraints: ai?.constraints,
+    searchQueries: ai?.searchQueries
+  });
+
   let discovered: Resource[] = [];
   try {
     const discoveryTags = Array.from(new Set([
       ...initial.analysis.tags,
       ...(ai?.tags ?? [])
     ]));
-    discovered = await discoverGitHubResources(input, discoveryTags, resources);
+    discovered = await discoverGitHubResources(input, discoveryTags, resources, {
+      capabilities: capabilityGraph.capabilities,
+      searchQueries: capabilityGraph.searchQueries
+    });
   } catch (error) {
     console.warn("GitHub discovery failed, keeping database resources.", error);
   }
 
   const candidateResources = mergeResources(resources, discovered);
-  const fallback = analyzeProject(input, candidateResources);
+  const fallback = analyzeProject(input, candidateResources, {}, capabilityGraph);
 
   try {
     if (!ai) return { ...fallback, source: "rules", discoveredCount: discovered.length };
@@ -46,7 +59,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       deploy: ai.deploy,
       difficulty: ai.difficulty,
       tags: ai.tags
-    });
+    }, capabilityGraph);
     const reranked = await rerankRecommendation(input, enriched.recommendation);
     const analysis = {
       ...enriched.analysis,
@@ -96,6 +109,8 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     type: item.resource.type,
     description: item.resource.description,
     tags: item.resource.tags,
+    evidence: item.resource.evidence_summary,
+    matchedCapabilities: item.resource.matched_capabilities,
     trust: item.resource.trust_score,
     fit: item.resource.fit_score,
     risk: item.resource.risk_level

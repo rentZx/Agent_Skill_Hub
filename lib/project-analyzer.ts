@@ -1,5 +1,6 @@
 import { buildProjectRecommendation } from "@/lib/recommendation";
 import type { ProjectRecommendation } from "@/lib/recommendation";
+import type { CapabilityGraph } from "@/lib/capability-engine";
 import type { Resource } from "@/lib/types";
 import { extractProjectTags } from "@/lib/tag-engine";
 
@@ -56,7 +57,12 @@ function includesTerm(input: string, term: string) {
 
 export type ProjectAnalysisOverrides = Partial<Omit<ProjectAnalysis, "roadmap">>;
 
-export function analyzeProject(input: string, resources: Resource[], overrides: ProjectAnalysisOverrides = {}): AnalyzerResult {
+export function analyzeProject(
+  input: string,
+  resources: Resource[],
+  overrides: ProjectAnalysisOverrides = {},
+  capabilityGraph?: CapabilityGraph
+): AnalyzerResult {
   const normalized = input.trim() || "通用 SaaS 项目";
   const matchedRules = rules.filter((rule) => rule.terms.some((term) => includesTerm(normalized, term)));
   const rule = matchedRules[0] ?? defaultRule;
@@ -83,7 +89,8 @@ export function analyzeProject(input: string, resources: Resource[], overrides: 
     projectType: analysis.projectType,
     targetUsers: analysis.targetUsers,
     coreFeatures: analysis.coreFeatures,
-    techStack: [analysis.frontend, analysis.backend, analysis.database, analysis.orm, analysis.deploy]
+    techStack: [analysis.frontend, analysis.backend, analysis.database, analysis.orm, analysis.deploy],
+    capabilityGraph
   });
 
   return {

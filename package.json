@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "sync:resources": "tsx scripts/sync-resource-catalog.ts"
+    "sync:resources": "tsx scripts/sync-resource-catalog.ts",
+    "test:recommendation": "tsx scripts/recommendation-benchmark.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",

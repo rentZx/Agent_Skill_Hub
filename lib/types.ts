@@ -39,6 +39,11 @@ export type SeedResource = {
   latest_commit_at?: string | null;
   readme_summary?: string;
   risk_reason?: string;
+  has_skill_md?: boolean;
+  has_mcp_manifest?: boolean;
+  has_package_json?: boolean;
+  matched_capabilities?: string[];
+  evidence_summary?: string;
 };
 
 export type Resource = SeedResource & {
