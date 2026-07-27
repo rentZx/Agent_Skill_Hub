@@ -125,6 +125,35 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
+const imageTo3dDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"image to 3d\" threejs in:name,description,readme archived:false fork:false",
+    "\"single image\" \"3d model\" reconstruction in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "img2threejs/img2threejs",
+    "Stability-AI/stable-fast-3d",
+    "TencentARC/InstantMesh",
+    "VAST-AI-Research/TripoSR"
+  ],
+  relevanceTerms: [
+    "image to 3d", "single image 3d", "threejs", "depth estimation", "mesh generation",
+    "3d reconstruction", "model viewer"
+  ],
+  typeOverrides: {
+    "img2threejs/img2threejs": "agent_skill",
+    "stability-ai/stable-fast-3d": "template_repo",
+    "tencentarc/instantmesh": "template_repo",
+    "vast-ai-research/triposr": "template_repo"
+  },
+  tagOverrides: {
+    "img2threejs/img2threejs": ["image-to-3d", "threejs", "webgl", "procedural-generation", "agent-skill"],
+    "stability-ai/stable-fast-3d": ["image-to-3d", "3d-reconstruction", "mesh-generation"],
+    "tencentarc/instantmesh": ["image-to-3d", "3d-reconstruction", "mesh-generation"],
+    "vast-ai-research/triposr": ["image-to-3d", "3d-reconstruction", "mesh-generation"]
+  }
+};
+
 export async function discoverGitHubResources(
   input: string,
   tags: string[],
@@ -170,7 +199,7 @@ export async function discoverGitHubResources(
     )
     .slice(0, 24);
   const evidenceEntries = await Promise.all(
-    ranked.slice(0, 12).map(async (item) => [
+    ranked.slice(0, 6).map(async (item) => [
       item.full_name.toLowerCase(),
       await inspectRepository(item, context.capabilities ?? [])
     ] as const)
@@ -328,27 +357,36 @@ async function fetchRepositoryTree(fullName: string, branch: string) {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
-  const response = await fetch(
-    `https://api.github.com/repos/${repositoryPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    { headers, cache: "no-store" }
-  );
-  if (!response.ok) return [];
-  const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }> };
-  return (payload.tree ?? [])
-    .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
-    .map((entry) => entry.path as string);
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repositoryPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+      { headers, cache: "no-store", signal: AbortSignal.timeout(5000) }
+    );
+    if (!response.ok) return [];
+    const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }> };
+    return (payload.tree ?? [])
+      .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
+      .map((entry) => entry.path as string);
+  } catch {
+    return [];
+  }
 }
 
 async function fetchRepositoryReadme(fullName: string) {
   const headers: HeadersInit = { Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
-  const response = await fetch(`https://api.github.com/repos/${repositoryPath}/readme`, {
-    headers,
-    cache: "no-store"
-  });
-  if (!response.ok) return "";
-  return (await response.text()).slice(0, 40000);
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repositoryPath}/readme`, {
+      headers,
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) return "";
+    return (await response.text()).slice(0, 40000);
+  } catch {
+    return "";
+  }
 }
 
 function matchesEvidenceTerm(source: string, term: string) {
@@ -479,6 +517,9 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   const source = `${input} ${tags.join(" ")}`.toLowerCase();
   if (/(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)) {
     return stockDiscoveryProfile;
+  }
+  if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
+    return imageTo3dDiscoveryProfile;
   }
   if (/(做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
     return recipeDiscoveryProfile;

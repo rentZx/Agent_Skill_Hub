@@ -90,12 +90,12 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
     body: JSON.stringify({
       model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
       temperature: 0.1,
-      max_tokens: 2200,
+      max_tokens: 1800,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content: "你是资源推荐重排器。只输出合法 JSON，不能编造资源事实。根据项目需求为每个资源打 0-100 的适配分，并判断是否应该进入最终推荐。优先使用候选的 evidence 和 matchedCapabilities 作为能力证据；没有证据时只能依据 name、description 和 tags，不得推断未声明的功能。只有能直接实现项目核心功能或明确支撑其技术方案的资源，recommended 才能为 true；仅仅属于通用 AI、研究、GitHub、自动化或基础设施不能视为相关。score 低于 50、缺少目标功能、与需求无直接关系或不建议使用时，recommended 必须为 false。reason 必须使用中文，先说明资源有证据支持的具体功能，再说明它与当前项目哪项需求直接匹配；不相关时明确说明原因。禁止使用“对应开发环节”“提升开发效率”“提供支持”等空泛模板句，不要在 reason 中重复分数、可信度或风险。必须返回 {\"items\":[{\"id\":\"原始id\",\"score\":数字,\"recommended\":布尔值,\"reason\":\"具体理由\"}]}。可信度和风险只作为输入参考，不要修改它们。"
+          content: "你是资源推荐重排器。只输出合法 JSON，不能编造资源事实。根据项目需求为每个资源打 0-100 的适配分，并判断是否应该进入最终推荐。优先使用候选的 evidence 和 matchedCapabilities 作为能力证据；没有证据时只能依据 name、description 和 tags，不得推断未声明的功能。只有能直接实现项目核心功能或明确支撑其技术方案的资源，recommended 才能为 true；仅仅属于通用 AI、研究、GitHub、自动化或基础设施不能视为相关。score 低于 50、缺少目标功能、与需求无直接关系或不建议使用时，recommended 必须为 false。reason 必须使用中文并控制在 80 个汉字以内，说明有证据支持的具体功能及其直接匹配需求；不相关时明确说明原因。禁止空泛模板句，不要重复分数、可信度或风险。必须返回 {\"items\":[{\"id\":\"原始id\",\"score\":数字,\"recommended\":布尔值,\"reason\":\"具体理由\"}]}。可信度和风险只作为输入参考，不要修改它们。"
         },
         { role: "user", content: JSON.stringify({ project: input, candidates }) }
       ]

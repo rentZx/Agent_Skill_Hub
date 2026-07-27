@@ -38,6 +38,12 @@ const resourceTypes: ResourceType[] = [
   "template_repo"
 ];
 
+const genericCapabilityKeywords = new Set([
+  "ai", "agent", "agents", "app", "application", "web", "platform", "software", "system", "tool", "tools",
+  "github", "skill", "skills", "plugin", "plugins", "api", "database", "frontend", "backend", "service",
+  "management", "user", "users", "project"
+]);
+
 const capabilityPatterns: Array<{
   id: string;
   label: string;
@@ -151,7 +157,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
 
 function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | null {
   const label = seed.label?.trim();
-  const keywords = cleanStrings(seed.keywords ?? [], 12);
+  const keywords = cleanStrings(seed.keywords ?? [], 12).filter(isSpecificCapabilityKeyword);
   if (!label || keywords.length === 0) return null;
 
   const preferredTypes = (seed.preferredTypes ?? [])
@@ -210,6 +216,11 @@ function sanitizeSearchQuery(query: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
+}
+
+function isSpecificCapabilityKeyword(keyword: string) {
+  const normalized = keyword.toLowerCase().trim();
+  return normalized.length >= 3 && !genericCapabilityKeywords.has(normalized);
 }
 
 function quoteTerm(term: string) {

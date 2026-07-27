@@ -103,7 +103,7 @@ function mergeResources(catalog: Resource[], discovered: Resource[]) {
 }
 
 async function rerankRecommendation(input: string, recommendation: AnalyzerResult["recommendation"]) {
-  const candidates = recommendation.groups.flatMap((group) => group.items).map((item) => ({
+  const candidates = selectRerankCandidates(recommendation).map((item) => ({
     id: item.resource.id,
     name: item.resource.name,
     type: item.resource.type,
@@ -163,6 +163,23 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     console.warn("DeepSeek rerank failed, keeping rule scores.", error);
     return recommendation;
   }
+}
+
+function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]) {
+  const firstByGroup = recommendation.groups.flatMap((group) => group.items.slice(0, 1));
+  const selectedIds = new Set(firstByGroup.map((item) => item.resource.id));
+  const remaining = recommendation.groups
+    .flatMap((group) => group.items)
+    .filter((item) => !selectedIds.has(item.resource.id))
+    .sort((left, right) => {
+      const leftEvidence = left.resource.evidence_summary ? 12 : 0;
+      const rightEvidence = right.resource.evidence_summary ? 12 : 0;
+      const leftDomain = left.matchKind === "domain" ? 8 : 0;
+      const rightDomain = right.matchKind === "domain" ? 8 : 0;
+      return right.score + rightEvidence + rightDomain - (left.score + leftEvidence + leftDomain);
+    });
+
+  return [...firstByGroup, ...remaining].slice(0, 18);
 }
 
 function shouldKeepRerankedItem(
