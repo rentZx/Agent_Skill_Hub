@@ -13,7 +13,7 @@ export function filterResources(resources: Resource[], filters: ResourceFilters)
       searchScore: getSearchScore(resource, searchQuery)
     }))
     .filter(({ resource, searchScore }) => {
-    const matchesQuery = searchQuery.primary.length === 0 || searchScore >= 24;
+    const matchesQuery = searchQuery.primary.length === 0 || searchScore >= 30;
     const matchesType = !filters.type || filters.type === "all" || resource.type === filters.type;
     const matchesTag = !filters.tag || filters.tag === "all" || resource.tags.includes(filters.tag);
     const matchesRisk = !filters.risk || filters.risk === "all" || resource.risk_level === filters.risk;
@@ -108,17 +108,22 @@ function getSearchScore(
       getDescriptionScore(descriptionIndex, 46, 28, 10);
   }, 0);
 
-  const expandedScore = query.expanded.reduce((score, term) => {
+  const expandedMetadataScore = query.expanded.reduce((score, term) => {
     if (!term) return score;
-    const descriptionIndex = description.indexOf(term);
     return score +
       (name.includes(term) ? 34 : 0) +
       (tags.includes(term) ? 30 : tags.some((tag) => tag.includes(term)) ? 22 : 0) +
-      (useCases.some((useCase) => useCase.includes(term)) ? 16 : 0) +
-      getDescriptionScore(descriptionIndex, 18, 10, 3);
+      (useCases.some((useCase) => useCase.includes(term)) ? 16 : 0);
   }, 0);
+  const expandedDescriptionScore = Math.min(
+    18,
+    query.expanded.reduce(
+      (score, term) => score + getDescriptionScore(description.indexOf(term), 18, 10, 3),
+      0
+    )
+  );
 
-  return primaryScore + expandedScore;
+  return primaryScore + expandedMetadataScore + expandedDescriptionScore;
 }
 
 function getDescriptionScore(index: number, earlyScore: number, middleScore: number, lateScore: number) {
