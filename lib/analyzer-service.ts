@@ -136,9 +136,22 @@ async function discoverSafely(
 }
 
 function mergeResources(catalog: Resource[], discovered: Resource[]) {
-  const merged = new Map(catalog.map((resource) => [resource.repo_url || resource.id, resource]));
-  discovered.forEach((resource) => merged.set(resource.repo_url || resource.id, resource));
+  const merged = new Map(catalog.map((resource) => {
+    const normalized = normalizeOfficialResourceName(resource);
+    return [normalized.repo_url || normalized.id, normalized];
+  }));
+  discovered.forEach((resource) => {
+    const normalized = normalizeOfficialResourceName(resource);
+    merged.set(normalized.repo_url || normalized.id, normalized);
+  });
   return Array.from(merged.values());
+}
+
+function normalizeOfficialResourceName(resource: Resource): Resource {
+  const repoUrl = resource.repo_url.toLowerCase().replace(/\/+$/, "");
+  return repoUrl.endsWith("github.com/shadcn-ui/ui")
+    ? { ...resource, name: "shadcn/ui" }
+    : resource;
 }
 
 async function rerankRecommendation(input: string, recommendation: AnalyzerResult["recommendation"]) {
