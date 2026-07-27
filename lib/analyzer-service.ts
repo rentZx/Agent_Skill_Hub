@@ -118,8 +118,12 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
   if (candidates.length === 0) return recommendation;
 
   try {
-    const scores = await rerankWithDeepSeek(input, candidates);
-    if (scores.length === 0) return recommendation;
+    const batches = chunk(candidates, 10);
+    const results = await Promise.allSettled(
+      batches.map((batch) => rerankWithDeepSeek(input, batch))
+    );
+    const scores = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+    if (scores.length === 0) return applyEvidenceFallback(recommendation);
 
     const scoreMap = new Map(scores.map((item) => [item.id, item]));
     const originalGroupGaps = new Set(
@@ -129,9 +133,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     const groups = recommendation.groups.map((group) => {
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
-        if (!rerank) {
-          return item.matchKind === "domain" ? [item] : [];
-        }
+        if (!rerank) return hasStrongRepositoryEvidence(item) ? [item] : [];
         if (!shouldKeepRerankedItem(item, rerank)) return [];
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
@@ -160,17 +162,17 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       ]))
     };
   } catch (error) {
-    console.warn("DeepSeek rerank failed, keeping rule scores.", error);
-    return recommendation;
+    console.warn("DeepSeek rerank failed, keeping evidence-backed resources only.", error);
+    return applyEvidenceFallback(recommendation);
   }
 }
 
 function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]) {
-  const firstByGroup = recommendation.groups.flatMap((group) => group.items.slice(0, 1));
-  const selectedIds = new Set(firstByGroup.map((item) => item.resource.id));
-  const remaining = recommendation.groups
+  const candidates = recommendation.groups
     .flatMap((group) => group.items)
-    .filter((item) => !selectedIds.has(item.resource.id))
+    .filter((item, index, items) =>
+      items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index
+    )
     .sort((left, right) => {
       const leftEvidence = left.resource.evidence_summary ? 12 : 0;
       const rightEvidence = right.resource.evidence_summary ? 12 : 0;
@@ -179,15 +181,52 @@ function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]
       return right.score + rightEvidence + rightDomain - (left.score + leftEvidence + leftDomain);
     });
 
-  return [...firstByGroup, ...remaining].slice(0, 18);
+  return candidates.slice(0, 36);
 }
 
 function shouldKeepRerankedItem(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number]
 ) {
-  const curatedDomain = item.matchKind === "domain" && (item.resource.ai_recommendation_weight ?? 0) >= 80;
-  const minimumScore = curatedDomain ? 35 : item.matchKind === "baseline" ? 40 : 50;
+  const minimumScore = item.matchKind === "baseline" ? 55 : 50;
   const negativeReason = /不建议使用|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(rerank.reason);
-  return (rerank.recommended || curatedDomain) && rerank.score >= minimumScore && !negativeReason;
+  return rerank.recommended && rerank.score >= minimumScore && !negativeReason;
+}
+
+function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
+  const groups = recommendation.groups.map((group) => {
+    const items = group.items.filter(hasStrongRepositoryEvidence);
+    return {
+      ...group,
+      items,
+      gap: items.length > 0
+        ? undefined
+        : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
+    };
+  });
+
+  return {
+    ...recommendation,
+    groups,
+    gaps: Array.from(new Set([
+      ...recommendation.gaps,
+      ...groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
+    ]))
+  };
+}
+
+function hasStrongRepositoryEvidence(
+  item: AnalyzerResult["recommendation"]["groups"][number]["items"][number]
+) {
+  return item.matchKind !== "baseline"
+    && (item.resource.ai_recommendation_weight ?? 0) >= 95
+    && Boolean(item.resource.evidence_summary)
+    && (item.resource.matched_capabilities?.length ?? 0) > 0;
+}
+
+function chunk<T>(items: T[], size: number) {
+  return Array.from(
+    { length: Math.ceil(items.length / size) },
+    (_, index) => items.slice(index * size, (index + 1) * size)
+  );
 }
