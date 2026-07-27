@@ -99,7 +99,8 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
       const key = item.full_name.toLowerCase();
       return toResource(item, tags, {
         typeOverride: profile?.typeOverrides[key],
-        tagOverrides: profile?.tagOverrides[key]
+        tagOverrides: profile?.tagOverrides[key],
+        recommendationWeight: preferredNames.has(key) ? 100 : undefined
       });
     });
 }
@@ -171,7 +172,7 @@ function isAiPluginLike(item: GitHubSearchItem) {
 function toResource(
   item: GitHubSearchItem,
   projectTags: string[],
-  overrides: { typeOverride?: ResourceType; tagOverrides?: string[] } = {}
+  overrides: { typeOverride?: ResourceType; tagOverrides?: string[]; recommendationWeight?: number } = {}
 ): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const type = overrides.typeOverride ?? inferDiscoveredType(text);
@@ -202,6 +203,7 @@ function toResource(
     risk_reason: risk.reason,
     trust_score: calculateTrust(item.stargazers_count, item.license?.spdx_id ?? null, risk.level),
     fit_score: Math.min(92, 55 + Math.min(25, Math.floor(Math.log10(Math.max(item.stargazers_count, 1)) * 8)) + (item.topics?.length ? 8 : 0)),
+    ai_recommendation_weight: overrides.recommendationWeight,
     repo_url: item.html_url,
     github_stars: item.stargazers_count,
     github_forks: item.forks_count,

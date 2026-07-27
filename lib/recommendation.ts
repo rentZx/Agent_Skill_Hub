@@ -457,6 +457,7 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
       const normalizedModuleTags = moduleTags.map((tag) => tag.toLowerCase());
       const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
+      const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
       const riskPenalty = resource.risk_level === "high" ? 16 : resource.risk_level === "medium" ? 5 : 0;
       const universalUiSignal = modules.some((module) => module.id === "ui-components")
         && resource.type === "ui_component"
@@ -473,6 +474,7 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
         moduleKeywordHits * 2 +
         tagHits * 6 +
         typeBoost +
+        curatedBoost +
         resource.fit_score * 0.28 +
         resource.trust_score * 0.22 -
         riskPenalty
