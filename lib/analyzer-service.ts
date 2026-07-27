@@ -104,33 +104,54 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
 
   try {
     const scores = await rerankWithDeepSeek(input, candidates);
+    if (scores.length === 0) return recommendation;
+
     const scoreMap = new Map(scores.map((item) => [item.id, item]));
+    const originalGroupGaps = new Set(
+      recommendation.groups.map((group) => group.gap).filter((gap): gap is string => Boolean(gap))
+    );
+    const retainedGaps = recommendation.gaps.filter((gap) => !originalGroupGaps.has(gap));
+    const groups = recommendation.groups.map((group) => {
+      const items = group.items.flatMap((item) => {
+        const rerank = scoreMap.get(item.resource.id);
+        if (!rerank || !shouldKeepRerankedItem(item.matchKind, rerank)) return [];
+
+        const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
+        return [{
+          ...item,
+          score,
+          why: getLocalizedRecommendationReason(item.resource, score, rerank.reason)
+        }];
+      }).sort((a, b) => b.score - a.score);
+
+      return {
+        ...group,
+        items,
+        gap: items.length > 0
+          ? undefined
+          : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
+      };
+    });
+
     return {
       ...recommendation,
-      groups: recommendation.groups.map((group) => {
-        const items = [...group.items].map((item) => {
-          const rerank = scoreMap.get(item.resource.id);
-          return rerank
-            ? {
-              ...item,
-              score: Math.round(item.score * 0.55 + rerank.score * 0.45),
-              why: getLocalizedRecommendationReason(item.resource, rerank.score, rerank.reason)
-            }
-            : item;
-        }).sort((a, b) => b.score - a.score);
-        return {
-          ...group,
-          items,
-          gap: items.length > 0 ? group.gap : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
-        };
-      }),
+      groups,
       gaps: Array.from(new Set([
-        ...recommendation.gaps,
-        ...recommendation.groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
+        ...retainedGaps,
+        ...groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
       ]))
     };
   } catch (error) {
     console.warn("DeepSeek rerank failed, keeping rule scores.", error);
     return recommendation;
   }
+}
+
+function shouldKeepRerankedItem(
+  matchKind: AnalyzerResult["recommendation"]["groups"][number]["items"][number]["matchKind"],
+  rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number]
+) {
+  const minimumScore = matchKind === "baseline" ? 40 : 50;
+  const negativeReason = /不建议使用|不推荐|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(rerank.reason);
+  return rerank.recommended && rerank.score >= minimumScore && !negativeReason;
 }
