@@ -165,9 +165,9 @@ async function syncGitHubSkillFiles(limit: number) {
 }
 
 async function fetchGitHubCodeSearch(query: string, limit: number) {
-  const params = new URLSearchParams({ q: `${query} archived:false fork:false`, per_page: String(Math.min(limit, 100)) });
+  const params = new URLSearchParams({ q: query, per_page: String(Math.min(limit, 100)) });
   const data = await fetchJson<{ items?: GitHubCodeSearchItem[] }>(`https://api.github.com/search/code?${params.toString()}`, githubHeaders());
-  return data.items ?? [];
+  return (data.items ?? []).filter((item) => !item.repository.archived);
 }
 
 function mapGitHubSkillFile(item: GitHubCodeSearchItem, query: string): CatalogCandidate & { repository_stars: number } {
