@@ -114,7 +114,10 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     const groups = recommendation.groups.map((group) => {
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
-        if (!rerank || !shouldKeepRerankedItem(item.matchKind, rerank)) return [];
+        if (!rerank) {
+          return item.matchKind === "domain" ? [item] : [];
+        }
+        if (!shouldKeepRerankedItem(item.matchKind, rerank)) return [];
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
         return [{
