@@ -146,7 +146,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
         if (!rerank) return hasStrongRepositoryEvidence(item) ? [item] : [];
-        if (!shouldKeepRerankedItem(item, rerank)) return [];
+        if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords)) return [];
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
         return [{
@@ -198,11 +198,15 @@ function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]
 
 function shouldKeepRerankedItem(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
-  rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number]
+  rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number],
+  projectKeywords: string[]
 ) {
   const minimumScore = item.matchKind === "baseline" ? 55 : 50;
-  const negativeReason = /不建议使用|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(rerank.reason);
-  return rerank.recommended && rerank.score >= minimumScore && !negativeReason;
+  const negativeReason = /不建议使用|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力|缺少领域特定|缺少具体领域|仅.{0,8}通用/i.test(rerank.reason);
+  return rerank.recommended
+    && rerank.score >= minimumScore
+    && !negativeReason
+    && hasDirectDomainSignal(item, projectKeywords);
 }
 
 function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
@@ -239,6 +243,60 @@ function hasStrongRepositoryEvidence(
         && (item.resource.matched_capabilities?.length ?? 0) > 0
       )
     );
+}
+
+const broadCapabilityIds = new Set([
+  "domain-data",
+  "real-time-integration",
+  "personalized-recommendation",
+  "visualization",
+  "workflow-automation",
+  "document-processing",
+  "web-research",
+  "domain-rules",
+  "ui-components",
+  "database-storage",
+  "automated-testing",
+  "deployment",
+  "agent-workflow"
+]);
+
+const genericProjectKeywords = new Set([
+  "ai", "agent", "agents", "app", "application", "web", "website", "system", "platform", "project",
+  "tool", "tools", "skill", "skills", "plugin", "plugins", "github", "api", "database", "frontend", "backend",
+  "react", "next", "nextjs", "next.js", "node", "nodejs", "python", "typescript", "javascript", "docker",
+  "vercel", "saas", "dashboard", "workflow", "automation", "recommendation", "interactive", "management"
+]);
+
+function hasDirectDomainSignal(
+  item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
+  projectKeywords: string[]
+) {
+  if (item.resource.type === "ui_component") return true;
+  if ((item.resource.ai_recommendation_weight ?? 0) >= 100) return true;
+
+  const capabilityIds = new Set([
+    ...item.matchedCapabilityIds,
+    ...(item.resource.matched_capabilities ?? [])
+  ]);
+  if (Array.from(capabilityIds).some((id) => !broadCapabilityIds.has(id))) return true;
+
+  const haystack = [
+    item.resource.name,
+    item.resource.description,
+    ...item.resource.tags,
+    ...item.resource.use_cases
+  ].join(" ").toLowerCase();
+  return projectKeywords.some((keyword) => {
+    const normalized = keyword.toLowerCase().trim();
+    return normalized.length >= 3
+      && normalized.length <= 40
+      && !genericProjectKeywords.has(normalized)
+      && (
+        haystack.includes(normalized)
+        || haystack.includes(normalized.replace(/[-_]+/g, " "))
+      );
+  });
 }
 
 function chunk<T>(items: T[], size: number) {

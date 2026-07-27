@@ -30,6 +30,8 @@ export type RecommendedResource = {
   alternative: string;
   score: number;
   matchKind: "domain" | "baseline" | "risk";
+  matchedCapabilityIds: string[];
+  capabilityCoverage: number;
 };
 
 export type RecommendationGroup = {
@@ -510,6 +512,13 @@ function scoreResources(
       const universalUiSignal = modules.some((module) => module.id === "ui-components")
         && resource.type === "ui_component"
         && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
+      const foundationalUiBoost = resource.type === "ui_component"
+        ? resource.tags.some((tag) => ["shadcn", "radix"].includes(tag.toLowerCase()))
+          ? 18
+          : resource.tags.some((tag) => ["ui", "components", "design-system"].includes(tag.toLowerCase()))
+            ? 6
+            : 0
+        : 0;
       const hasBaselineSignal = resource.tags.some((tag) => [
         "codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai",
         "mcp", "mcp-server", "registry", "playwright", "context7", "github", "filesystem", "database",
@@ -531,6 +540,7 @@ function scoreResources(
         capabilityCoverage * 30 +
         evidenceHits * 6 -
         negativeHits * 12 +
+        foundationalUiBoost +
         resource.fit_score * 0.28 +
         resource.trust_score * 0.22 -
         riskPenalty
