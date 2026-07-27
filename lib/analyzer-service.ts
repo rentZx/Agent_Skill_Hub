@@ -11,12 +11,15 @@ import type { Resource } from "@/lib/types";
 
 export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules"; discoveredCount: number }> {
   const initial = analyzeProject(input, resources);
-  let ai: Awaited<ReturnType<typeof analyzeWithDeepSeek>> = null;
-  try {
-    ai = await analyzeWithDeepSeek(input);
-  } catch (error) {
-    console.warn("DeepSeek analysis failed, using rules tags.", error);
-  }
+  const preliminaryGraph = buildCapabilityGraph(input, {
+    projectType: initial.analysis.projectType,
+    coreFeatures: initial.analysis.coreFeatures,
+    tags: initial.analysis.tags
+  });
+  const [ai, preliminaryDiscovered] = await Promise.all([
+    analyzeSafely(input),
+    discoverSafely(input, initial.analysis.tags, resources, preliminaryGraph)
+  ]);
 
   const capabilityGraph = buildCapabilityGraph(input, {
     projectType: ai?.projectType ?? initial.analysis.projectType,
@@ -27,18 +30,13 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     searchQueries: ai?.searchQueries
   });
 
-  let discovered: Resource[] = [];
-  try {
+  let discovered = preliminaryDiscovered;
+  if (ai && !preliminaryDiscovered.some((resource) => (resource.ai_recommendation_weight ?? 0) >= 100)) {
     const discoveryTags = Array.from(new Set([
       ...initial.analysis.tags,
       ...(ai?.tags ?? [])
     ]));
-    discovered = await discoverGitHubResources(input, discoveryTags, resources, {
-      capabilities: capabilityGraph.capabilities,
-      searchQueries: capabilityGraph.searchQueries
-    });
-  } catch (error) {
-    console.warn("GitHub discovery failed, keeping database resources.", error);
+    discovered = await discoverSafely(input, discoveryTags, resources, capabilityGraph);
   }
 
   const candidateResources = mergeResources(resources, discovered);
@@ -96,6 +94,32 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
   }
 }
 
+async function analyzeSafely(input: string) {
+  try {
+    return await analyzeWithDeepSeek(input);
+  } catch (error) {
+    console.warn("DeepSeek analysis failed, using rules tags.", error);
+    return null;
+  }
+}
+
+async function discoverSafely(
+  input: string,
+  tags: string[],
+  resources: Resource[],
+  capabilityGraph: ReturnType<typeof buildCapabilityGraph>
+) {
+  try {
+    return await discoverGitHubResources(input, tags, resources, {
+      capabilities: capabilityGraph.capabilities,
+      searchQueries: capabilityGraph.searchQueries
+    });
+  } catch (error) {
+    console.warn("GitHub discovery failed, keeping database resources.", error);
+    return [];
+  }
+}
+
 function mergeResources(catalog: Resource[], discovered: Resource[]) {
   const merged = new Map(catalog.map((resource) => [resource.repo_url || resource.id, resource]));
   discovered.forEach((resource) => merged.set(resource.repo_url || resource.id, resource));
@@ -142,7 +166,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       recommendation.groups.map((group) => group.gap).filter((gap): gap is string => Boolean(gap))
     );
     const retainedGaps = recommendation.gaps.filter((gap) => !originalGroupGaps.has(gap));
-    const groups = recommendation.groups.map((group) => {
+    const rerankedGroups = recommendation.groups.map((group) => {
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
         if (!rerank) return hasStrongRepositoryEvidence(item) ? [item] : [];
@@ -164,6 +188,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
           : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
       };
     });
+    const groups = addFoundationalUiFallback(rerankedGroups, recommendation);
 
     return {
       ...recommendation,
@@ -180,8 +205,11 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
 }
 
 function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]) {
-  const candidates = recommendation.groups
+  const firstByGroup = recommendation.groups.flatMap((group) => group.items.slice(0, 1));
+  const selectedIds = new Set(firstByGroup.map((item) => item.resource.id));
+  const remaining = recommendation.groups
     .flatMap((group) => group.items)
+    .filter((item) => !selectedIds.has(item.resource.id))
     .filter((item, index, items) =>
       items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index
     )
@@ -193,7 +221,7 @@ function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]
       return right.score + rightEvidence + rightDomain - (left.score + leftEvidence + leftDomain);
     });
 
-  return candidates.slice(0, 36);
+  return [...firstByGroup, ...remaining].slice(0, 20);
 }
 
 function shouldKeepRerankedItem(
@@ -243,6 +271,42 @@ function hasStrongRepositoryEvidence(
         && (item.resource.matched_capabilities?.length ?? 0) > 0
       )
     );
+}
+
+function addFoundationalUiFallback(
+  groups: AnalyzerResult["recommendation"]["groups"],
+  original: AnalyzerResult["recommendation"]
+) {
+  const uiGroup = groups.find((group) => group.id === "ui-libraries");
+  if (!uiGroup || uiGroup.items.length > 0) return groups;
+
+  const originalUiGroup = original.groups.find((group) => group.id === "ui-libraries");
+  const candidate = originalUiGroup?.items.find((item) =>
+    item.resource.risk_level !== "high"
+    && (
+      item.resource.name.toLowerCase() === "shadcn/ui"
+      || item.resource.tags.some((tag) => tag.toLowerCase() === "shadcn")
+    )
+  ) ?? originalUiGroup?.items.find((item) => item.resource.risk_level === "low");
+  if (!candidate) return groups;
+
+  const score = Math.min(82, Math.max(65, Math.round(candidate.score)));
+  const featureLabels = original.understanding.coreFeatures.slice(0, 3).join("、");
+  const fallback = {
+    ...candidate,
+    score,
+    matchKind: "baseline" as const,
+    why: getLocalizedRecommendationReason(
+      candidate.resource,
+      score,
+      `提供表单、筛选、弹窗和响应式布局，可承载${featureLabels || "核心业务流程"}；仅负责界面，不包含业务算法。`
+    )
+  };
+
+  return groups.map((group) => group.id === "ui-libraries"
+    ? { ...group, items: [fallback], gap: undefined }
+    : group
+  );
 }
 
 const broadCapabilityIds = new Set([
