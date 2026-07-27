@@ -19,7 +19,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
 
   let discovered: Resource[] = [];
   try {
-    discovered = await discoverGitHubResources(input, ai?.tags?.length ? ai.tags : initial.analysis.tags, []);
+    discovered = await discoverGitHubResources(input, ai?.tags?.length ? ai.tags : initial.analysis.tags, resources);
   } catch (error) {
     console.warn("GitHub discovery failed, keeping database resources.", error);
   }
@@ -29,7 +29,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
 
   try {
     if (!ai) return { ...fallback, source: "rules", discoveredCount: discovered.length };
-    const enriched = analyzeProject(`${input} ${(ai.tags ?? []).join(" ")}`, candidateResources, {
+    const enriched = analyzeProject(input, candidateResources, {
       industry: ai.industry,
       projectType: ai.projectType,
       platform: ai.platform,

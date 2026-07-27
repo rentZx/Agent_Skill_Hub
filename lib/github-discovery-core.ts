@@ -31,7 +31,11 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
     if (!existingUrls.has(item.html_url)) unique.set(item.full_name, item);
   });
 
-  return Array.from(unique.values()).slice(0, 24).map((item) => toResource(item, tags));
+  const relevanceTerms = getDiscoveryTerms(input, tags);
+  return Array.from(unique.values())
+    .sort((left, right) => scoreRepositoryRelevance(right, relevanceTerms) - scoreRepositoryRelevance(left, relevanceTerms))
+    .slice(0, 24)
+    .map((item) => toResource(item, tags));
 }
 
 export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
@@ -51,27 +55,23 @@ export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
 }
 
 function buildQueries(input: string, tags: string[]) {
-  const cleanTags = tags
-    .map((tag) => tag.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim())
-    .filter((tag) => tag.length > 2)
-    .slice(0, 5);
-  const queryText = cleanTags.flatMap((tag) => tag.split(" ")).slice(0, 5).join(" ");
-  return Array.from(new Set([
-    `${queryText} ${input.match(/[a-z0-9-]{3,}/gi)?.slice(0, 2).join(" ") ?? ""}`.trim(),
-    `${queryText} dashboard`.trim(),
-    `${queryText} template OR starter OR mcp`.trim()
-  ])).filter(Boolean).slice(0, 3);
+  const focusedTags = getDiscoveryTerms(input, tags).slice(0, 5);
+  const inputTerms = input.match(/[a-z0-9][a-z0-9-]{1,}/gi)?.map((term) => term.toLowerCase()) ?? [];
+  const focusedQueries = focusedTags.map(
+    (tag) => `${quoteSearchTerm(tag)} in:name,description,readme archived:false fork:false`
+  );
+  const inputQuery = inputTerms.length > 0
+    ? `${inputTerms.slice(0, 4).map(quoteSearchTerm).join(" ")} in:name,description,readme archived:false fork:false`
+    : "";
+
+  return Array.from(new Set([...focusedQueries, inputQuery])).filter(Boolean).slice(0, 6);
 }
 
 function buildFallbackQuery(input: string, tags: string[]) {
-  const tagWords = tags
-    .flatMap((tag) => tag.toLowerCase().match(/[a-z0-9-]{3,}/g) ?? [])
-    .filter((word) => !["web", "saas", "dashboard", "nextjs", "react", "nodejs"].includes(word));
-  const inputWords = input.match(/[a-z0-9-]{3,}/gi)?.map((word) => word.toLowerCase()) ?? [];
-  return Array.from(new Set([...tagWords, ...inputWords])).slice(0, 3).join(" ");
+  return getDiscoveryTerms(input, tags).slice(0, 3).map(quoteSearchTerm).join(" ");
 }
 
-async function searchRepositories(query: string, perPage = 8): Promise<GitHubSearchItem[]> {
+async function searchRepositories(query: string, perPage = 15): Promise<GitHubSearchItem[]> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, { headers, cache: "no-store" });
@@ -94,7 +94,10 @@ function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const type = inferDiscoveredType(text);
   const risk = assessRiskLevel({ stars: item.stargazers_count, license: item.license?.spdx_id ?? null, latestCommitTime: item.pushed_at, archived: item.archived });
-  const tags = Array.from(new Set([...(item.topics ?? []), ...projectTags.map((tag) => tag.toLowerCase()), type.replace("_", "-")])).slice(0, 18);
+  const matchedProjectTags = projectTags
+    .map((tag) => tag.toLowerCase())
+    .filter((tag) => matchesDiscoveryTerm(text, tag));
+  const tags = Array.from(new Set([...(item.topics ?? []), ...matchedProjectTags, type.replace("_", "-")])).slice(0, 18);
 
   return {
     id: `github-${item.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -104,7 +107,9 @@ function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
     description: item.description ?? `${item.name} GitHub repository`,
     tags,
     supported_agents: type === "mcp_server" ? ["Codex", "Claude", "Cursor"] : ["Codex"],
-    install_command: `Review and integrate from ${item.html_url}`,
+    install_command: type === "agent_skill"
+      ? `npx skills add ${item.html_url}`
+      : `Review and integrate from ${item.html_url}`,
     use_cases: ["GitHub-discovered project resource", ...(item.language ? [`${item.language} project`] : [])],
     risk_level: risk.level,
     risk_reason: risk.reason,
@@ -124,13 +129,44 @@ function toResource(item: GitHubSearchItem, projectTags: string[]): Resource {
 function inferDiscoveredType(text: string): ResourceType {
   const has = (pattern: RegExp) => pattern.test(text);
   if (has(/\b(mcp|model-context-protocol)\b/)) return "mcp_server";
-  if (has(/\b(skill\.md|agent skill|codex skill)\b/)) return "agent_skill";
+  if (has(/\b(skill\.md|agent[- ]skills?|codex[- ]skills?|claude[- ]skills?|claude-code|skills?)\b/)) return "agent_skill";
   if (has(/\b(github action|github app|pull request)\b/)) return "github_plugin";
-  if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library)\b/)) return "ui_component";
+  if (has(/\b(ui|component|design system|shadcn|tailwind|frontend library|three\.?js|threejs|webgl|react-three-fiber|3d viewer|model viewer)\b/)) return "ui_component";
   return "template_repo";
 }
 
 function calculateTrust(stars: number, license: string | null, risk: string) {
   const starScore = Math.min(32, Math.floor(Math.log10(Math.max(stars, 1)) * 12));
   return Math.min(95, 35 + starScore + (license ? 16 : 0) + (risk === "low" ? 22 : risk === "medium" ? 12 : 4));
+}
+
+const genericDiscoveryTerms = new Set([
+  "web", "web-app", "saas", "dashboard", "postgresql", "postgres", "nextjs", "next.js", "react", "nodejs",
+  "typescript", "javascript", "frontend", "backend", "api", "docker", "vercel", "user-upload", "file-export"
+]);
+
+function getDiscoveryTerms(input: string, tags: string[]) {
+  const tagTerms = tags
+    .map((tag) => tag.toLowerCase().replace(/[^a-z0-9\s.-]/g, " ").replace(/\s+/g, " ").trim())
+    .filter((tag) => tag.length > 1 && !genericDiscoveryTerms.has(tag));
+  const inputTerms = input.match(/[a-z0-9][a-z0-9-]{1,}/gi)?.map((term) => term.toLowerCase()) ?? [];
+  return Array.from(new Set([...tagTerms, ...inputTerms])).filter((term) => !genericDiscoveryTerms.has(term));
+}
+
+function quoteSearchTerm(term: string) {
+  return /[\s-]/.test(term) ? `"${term}"` : term;
+}
+
+function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[]) {
+  const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
+  const directHits = terms.filter((term) => matchesDiscoveryTerm(text, term)).length;
+  const tokenHits = terms.flatMap((term) => term.split(/[\s-]+/)).filter((term) => term.length > 1 && text.includes(term)).length;
+  const popularity = Math.log10(Math.max(item.stargazers_count, 1)) * 4;
+  return directHits * 45 + tokenHits * 5 + popularity;
+}
+
+function matchesDiscoveryTerm(text: string, term: string) {
+  const normalizedText = text.replace(/[^a-z0-9]+/g, " ");
+  const normalizedTerm = term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return text.includes(term.toLowerCase()) || (normalizedTerm.length > 1 && normalizedText.includes(normalizedTerm));
 }

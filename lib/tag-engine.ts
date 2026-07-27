@@ -6,6 +6,16 @@ export type ProjectTag = {
 };
 
 const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
+  { terms: ["2d转3d", "2d 转 3d", "image-to-3d", "image to 3d", "img2threejs", "threejs", "three.js"], tags: [
+    { slug: "image-to-3d", label: "Image to 3D", category: "domain", weight: 10 },
+    { slug: "computer-graphics", label: "Computer Graphics", category: "industry", weight: 9 },
+    { slug: "threejs", label: "Three.js", category: "technology", weight: 9 },
+    { slug: "webgl", label: "WebGL", category: "technology", weight: 8 },
+    { slug: "depth-estimation", label: "Depth Estimation", category: "workflow", weight: 8 },
+    { slug: "mesh-generation", label: "Mesh Generation", category: "workflow", weight: 8 },
+    { slug: "model-viewer", label: "3D Model Viewer", category: "workflow", weight: 7 },
+    { slug: "model-export", label: "3D Model Export", category: "workflow", weight: 7 }
+  ] },
   { terms: ["做饭", "菜谱", "食谱", "吃什么", "备菜", "烹饪", "饭菜", "料理"], tags: [
     { slug: "food", label: "Food", category: "industry", weight: 10 },
     { slug: "recipe", label: "Recipe", category: "domain", weight: 9 },

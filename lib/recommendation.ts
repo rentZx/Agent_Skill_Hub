@@ -57,6 +57,22 @@ export type RecommendationContext = {
 
 const capabilityModules: CapabilityModule[] = [
   {
+    id: "image-to-3d",
+    label: "2D 图像转 3D",
+    description: "从单张或多张二维图像估计深度、几何结构和材质，并生成可预览、编辑或导出的三维模型。",
+    keywords: [
+      "2d转3d", "2d 转 3d", "2d-to-3d", "image-to-3d", "image to 3d", "img2threejs", "threejs", "three.js",
+      "webgl", "3d-modeling", "3d modeling", "depth-estimation", "depth estimation", "mesh-generation", "mesh generation",
+      "photogrammetry", "texture-mapping", "point-cloud", "model-viewer", "glb-format", "obj-format", "stl-format"
+    ],
+    preferredTags: [
+      "2d-to-3d", "image-to-3d", "3d", "threejs", "webgl", "computer-graphics", "procedural-generation",
+      "depth-estimation", "mesh-generation", "photogrammetry", "model-viewer"
+    ],
+    preferredTypes: ["agent_skill", "template_repo", "ui_component"],
+    projectStage: "图像输入、深度与几何重建、Three.js/WebGL 预览、模型质量检查和 GLB/OBJ/STL 导出"
+  },
+  {
     id: "recipe-catalog",
     label: "菜谱与食材数据",
     description: "建立菜谱、食材、份量和制作步骤的数据模型，保证每道菜能被检索、展示和复用。",
@@ -230,6 +246,7 @@ const baselineTagsByGroup: Record<string, string[]> = {
   "required-skills": ["codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai"],
   "mcp-servers": ["mcp", "mcp-server", "registry", "playwright", "context7", "github", "filesystem", "browser", "database", "ai"],
   "github-plugins": ["github", "actions", "review", "copilot", "connector", "github-plugin", "github-app", "code-review", "automation"],
+  "ui-libraries": ["ui", "components", "shadcn", "tailwind", "react", "threejs", "webgl", "model-viewer"],
   "template-repos": ["template", "starter", "boilerplate", "example", "nextjs", "react", "fullstack", "database", "ai-sdk", "vercel"],
   "optional-enhancements": ["automation", "memory", "animation", "ai-sdk", "review", "v0"]
 };
@@ -276,7 +293,9 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
   const moduleInput = `${input} ${(context.coreFeatures ?? []).join(" ")}`;
   const modules = detectCapabilityModules(moduleInput, keywords);
   const matchedModules = detectCapabilityModules(moduleInput, keywords, false);
-  const scoringModules = matchedModules.length > 0 ? matchedModules : modules;
+  const infrastructureModuleIds = new Set(["document-parsing", "database-storage", "ui-components", "automated-testing", "deployment", "agent-workflow"]);
+  const domainModules = matchedModules.filter((module) => !infrastructureModuleIds.has(module.id));
+  const scoringModules = domainModules.length > 0 ? domainModules : matchedModules.length > 0 ? matchedModules : modules;
   const understanding = buildProjectUnderstanding(input, keywords, modules, context);
   const scored = scoreResources(resources, [...keywords, ...(context.coreFeatures ?? [])], scoringModules);
   const selectedIds = new Set<string>();
@@ -294,16 +313,9 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => item.resource.risk_level !== "high")
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => hasAnyTag(item.resource, [tag])))
-      .filter((item) => !selectedIds.has(item.resource.id));
-    // Keep the core recommendation contract complete when a source is weakly tagged
-    // or the model returns noisy project labels. Optional enhancements stay strict.
-    const typeFallback = !group.riskOnly && !group.requiredTags
-      ? scored
-        .filter((item) => group.types.includes(item.resource.type))
-        .filter((item) => item.resource.risk_level !== "high")
-        .filter((item) => !selectedIds.has(item.resource.id))
-      : [];
-    const candidates = [...matching, ...baseline, ...typeFallback]
+      .filter((item) => !selectedIds.has(item.resource.id))
+      .slice(0, matching.length > 0 || Boolean(group.requiredTags) ? 0 : 1);
+    const candidates = [...matching, ...baseline]
       .filter((item, index, items) => items.findIndex((candidate) => candidate.resource.id === item.resource.id) === index)
       .slice(0, group.limit);
 
@@ -421,27 +433,31 @@ function scoreResources(resources: Resource[], keywords: string[], modules: Capa
       ].join(" ").toLowerCase();
 
       const keywordHits = meaningfulKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
+      const strongKeywordHits = meaningfulKeywords.filter((keyword) => keyword.length >= 4 && haystack.includes(keyword.toLowerCase())).length;
       const moduleKeywordHits = scoringModuleKeywords.filter((keyword) => haystack.includes(keyword.toLowerCase())).length;
       const normalizedModuleTags = moduleTags.map((tag) => tag.toLowerCase());
       const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
-      const typeBoost = scoringModuleTypes.includes(resource.type) ? 14 : 0;
-      const riskPenalty = resource.risk_level === "high" ? 22 : resource.risk_level === "medium" ? 6 : 0;
-      const universalUiSignal = resource.type === "ui_component" && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
+      const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
+      const riskPenalty = resource.risk_level === "high" ? 16 : resource.risk_level === "medium" ? 5 : 0;
+      const universalUiSignal = modules.some((module) => module.id === "ui-components")
+        && resource.type === "ui_component"
+        && resource.tags.some((tag) => ["ui", "components", "shadcn", "tailwind", "react"].includes(tag.toLowerCase()));
       const hasBaselineSignal = resource.tags.some((tag) => [
         "codex", "browser", "testing", "docs", "skills", "agent-skill", "agent-skills", "coding", "workflow", "ai",
         "mcp", "mcp-server", "registry", "playwright", "context7", "github", "filesystem", "database",
         "actions", "review", "copilot", "connector", "github-plugin", "github-app", "code-review", "automation",
         "template", "starter", "boilerplate", "example", "nextjs", "react", "fullstack", "ai-sdk", "vercel", "memory", "animation", "v0"
       ].includes(tag.toLowerCase()));
-      const hasProjectSignal = keywordHits > 0 || moduleKeywordHits > 0 || tagHits > 0 || universalUiSignal;
-      const score =
-        keywordHits * 11 +
-        moduleKeywordHits * 4 +
-        tagHits * 10 +
+      const hasProjectSignal = strongKeywordHits > 0 || moduleKeywordHits >= 2 || tagHits > 0 || universalUiSignal;
+      const score = Math.min(100,
+        keywordHits * 5 +
+        moduleKeywordHits * 2 +
+        tagHits * 6 +
         typeBoost +
-        resource.fit_score * 0.44 +
-        resource.trust_score * 0.38 -
-        riskPenalty;
+        resource.fit_score * 0.28 +
+        resource.trust_score * 0.22 -
+        riskPenalty
+      );
 
       return { resource, score, hasProjectSignal, hasBaselineSignal };
     })
