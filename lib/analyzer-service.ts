@@ -117,7 +117,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
         if (!rerank) {
           return item.matchKind === "domain" ? [item] : [];
         }
-        if (!shouldKeepRerankedItem(item.matchKind, rerank)) return [];
+        if (!shouldKeepRerankedItem(item, rerank)) return [];
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
         return [{
@@ -151,10 +151,11 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
 }
 
 function shouldKeepRerankedItem(
-  matchKind: AnalyzerResult["recommendation"]["groups"][number]["items"][number]["matchKind"],
+  item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number]
 ) {
-  const minimumScore = matchKind === "baseline" ? 40 : 50;
-  const negativeReason = /不建议使用|不推荐|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(rerank.reason);
-  return rerank.recommended && rerank.score >= minimumScore && !negativeReason;
+  const curatedDomain = item.matchKind === "domain" && (item.resource.ai_recommendation_weight ?? 0) >= 80;
+  const minimumScore = curatedDomain ? 35 : item.matchKind === "baseline" ? 40 : 50;
+  const negativeReason = /不建议使用|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(rerank.reason);
+  return (rerank.recommended || curatedDomain) && rerank.score >= minimumScore && !negativeReason;
 }
