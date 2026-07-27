@@ -1,5 +1,5 @@
 import { assessRiskLevel } from "./github-import";
-import type { Resource, ResourceType } from "./types";
+import type { Resource, ResourceType, RiskLevel } from "./types";
 
 type GitHubSearchItem = {
   full_name: string;
@@ -21,6 +21,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
   typeOverrides: Record<string, ResourceType>;
   tagOverrides: Record<string, string[]>;
+  riskOverrides?: Record<string, { level: RiskLevel; reason: string; license?: string }>;
 };
 
 const stockDiscoveryProfile: DiscoveryProfile = {
@@ -98,6 +99,13 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
     "grocy/grocy": ["ingredients", "pantry", "meal-planning", "shopping-list", "food-inventory"],
     "magedbekheet/macrochefai": ["personalized-nutrition", "age-aware", "ingredient-recommendation", "dietary-restrictions", "food-allergies", "health-conditions"],
     "shreyakumar-dev/caloriet": ["personalized-nutrition", "age-aware", "dietary-restrictions", "ingredient-recommendation", "nutrition"]
+  },
+  riskOverrides: {
+    "tandoorrecipes/recipes": {
+      level: "medium",
+      license: "AGPL-3.0 + Commons Clause selling exception",
+      reason: "仓库采用 GNU AGPL v3，并附带 Commons Clause 销售例外；商业托管、销售和分发边界需要在接入前复核。"
+    }
   }
 };
 
@@ -143,7 +151,8 @@ export async function discoverGitHubResources(input: string, tags: string[], exi
       return toResource(item, tags, {
         typeOverride: profile?.typeOverrides[key],
         tagOverrides: profile?.tagOverrides[key],
-        recommendationWeight: preferredNames.has(key) ? 100 : undefined
+        recommendationWeight: preferredNames.has(key) ? 100 : undefined,
+        riskOverride: profile?.riskOverrides?.[key]
       });
     });
 }
@@ -215,11 +224,18 @@ function isAiPluginLike(item: GitHubSearchItem) {
 function toResource(
   item: GitHubSearchItem,
   projectTags: string[],
-  overrides: { typeOverride?: ResourceType; tagOverrides?: string[]; recommendationWeight?: number } = {}
+  overrides: {
+    typeOverride?: ResourceType;
+    tagOverrides?: string[];
+    recommendationWeight?: number;
+    riskOverride?: { level: RiskLevel; reason: string; license?: string };
+  } = {}
 ): Resource {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const type = overrides.typeOverride ?? inferDiscoveredType(text);
-  const risk = assessRiskLevel({ stars: item.stargazers_count, license: item.license?.spdx_id ?? null, latestCommitTime: item.pushed_at, archived: item.archived });
+  const effectiveLicense = overrides.riskOverride?.license ?? item.license?.spdx_id ?? null;
+  const detectedRisk = assessRiskLevel({ stars: item.stargazers_count, license: effectiveLicense, latestCommitTime: item.pushed_at, archived: item.archived });
+  const risk = overrides.riskOverride ?? detectedRisk;
   const matchedProjectTags = projectTags
     .map((tag) => tag.toLowerCase())
     .filter((tag) => matchesDiscoveryTerm(text, tag));
@@ -250,7 +266,7 @@ function toResource(
     repo_url: item.html_url,
     github_stars: item.stargazers_count,
     github_forks: item.forks_count,
-    license: item.license?.spdx_id ?? null,
+    license: effectiveLicense,
     latest_commit_at: item.pushed_at,
     readme_summary: item.description ?? `${item.name} GitHub repository`,
     source: "github_live",
