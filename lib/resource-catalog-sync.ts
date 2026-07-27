@@ -16,6 +16,14 @@ type GitHubRepository = {
   default_branch: string;
 };
 
+type GitHubCodeSearchItem = {
+  name: string;
+  path: string;
+  sha: string;
+  html_url: string;
+  repository: GitHubRepository;
+};
+
 type NpmPackage = {
   name: string;
   version: string;
@@ -51,6 +59,7 @@ export type CatalogCandidate = SeedResource & {
 export type CatalogSyncOptions = {
   limitPerQuery?: number;
   mcpLimit?: number;
+  skillLimit?: number;
   sources?: Set<"github" | "mcp" | "npm">;
 };
 
@@ -58,6 +67,11 @@ const githubQueries: Array<{ type: ResourceType; query: string; tags: string[] }
   { type: "agent_skill", query: "skill.md in:name,description,readme", tags: ["skills", "agent-skill"] },
   { type: "agent_skill", query: "agent skill in:readme", tags: ["skills", "agent-skill"] },
   { type: "agent_skill", query: "codex skill in:name,description,readme", tags: ["codex", "skills"] },
+  { type: "agent_skill", query: "topic:agent-skills", tags: ["agent-skills", "skills"] },
+  { type: "agent_skill", query: "topic:claude-code skills", tags: ["claude-code", "skills"] },
+  { type: "agent_skill", query: "topic:codex skills", tags: ["codex", "skills"] },
+  { type: "agent_skill", query: "awesome claude skills", tags: ["claude", "skills", "awesome-list"] },
+  { type: "agent_skill", query: "agent skills collection", tags: ["agent", "skills", "collection"] },
   { type: "github_plugin", query: "org:openai plugins in:name,description,readme", tags: ["openai", "codex", "plugins"] },
   { type: "github_plugin", query: "github action ai review", tags: ["github", "actions", "review"] },
   { type: "github_plugin", query: "github app code review", tags: ["github", "github-app", "review"] },
@@ -80,11 +94,16 @@ const npmQueries: Array<{ type: ResourceType; query: string; tags: string[] }> =
 export async function syncResourceCatalog(options: CatalogSyncOptions = {}) {
   const limitPerQuery = Math.min(Math.max(options.limitPerQuery ?? 20, 1), 50);
   const mcpLimit = Math.min(Math.max(options.mcpLimit ?? 100, 1), 500);
+  const skillLimit = Math.min(Math.max(options.skillLimit ?? 100, 1), 500);
   const sources = options.sources ?? new Set(["github", "mcp", "npm"]);
   const candidates: CatalogCandidate[] = [];
 
   if (sources.has("github")) {
     candidates.push(...await syncGitHubCatalog(limitPerQuery));
+  }
+
+  if (sources.has("github")) {
+    candidates.push(...await syncGitHubSkillFiles(skillLimit));
   }
 
   if (sources.has("mcp")) {
@@ -112,6 +131,79 @@ async function syncGitHubCatalog(limit: number) {
   }
 
   return candidates;
+}
+
+async function syncGitHubSkillFiles(limit: number) {
+  const queries = [
+    "filename:SKILL.md stars:>100",
+    "filename:SKILL.md topic:agent-skills",
+    "filename:SKILL.md topic:claude-code stars:>10",
+    "filename:SKILL.md topic:codex stars:>10"
+  ];
+  const results = await Promise.all(
+    queries.map(async (query) => {
+      try {
+        const items = await fetchGitHubCodeSearch(query, limit);
+        return items.map((item) => mapGitHubSkillFile(item, query));
+      } catch (error) {
+        console.warn(`GitHub skill file search failed: ${query}`, error);
+        return [];
+      }
+    })
+  );
+
+  return results
+    .flat()
+    .filter((candidate) => candidate.repository_stars >= 50)
+    .sort((left, right) => right.repository_stars - left.repository_stars)
+    .slice(0, limit * 2)
+    .map((item) => {
+      const { repository_stars, ...candidate } = item;
+      void repository_stars;
+      return candidate;
+    });
+}
+
+async function fetchGitHubCodeSearch(query: string, limit: number) {
+  const params = new URLSearchParams({ q: `${query} archived:false fork:false`, per_page: String(Math.min(limit, 100)) });
+  const data = await fetchJson<{ items?: GitHubCodeSearchItem[] }>(`https://api.github.com/search/code?${params.toString()}`, githubHeaders());
+  return data.items ?? [];
+}
+
+function mapGitHubSkillFile(item: GitHubCodeSearchItem, query: string): CatalogCandidate & { repository_stars: number } {
+  const repositoryCandidate = mapGitHubRepository(item.repository, {
+    type: "agent_skill",
+    query,
+    tags: ["skills", "agent-skill", "skill-md"]
+  });
+  const skillName = getSkillName(item.path, item.repository.name);
+  const pathTags = extractTags(item.path.replace(/\.md$/i, ""));
+  const slug = `catalog-skill-${item.repository.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${item.path.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+  return {
+    ...repositoryCandidate,
+    slug,
+    name: `${skillName} · ${item.repository.name}`,
+    description: `${item.repository.description ?? `${item.repository.name} Agent Skill`}，技能文件位于 ${item.path}。`,
+    tags: Array.from(new Set([...repositoryCandidate.tags, ...pathTags])).slice(0, 20),
+    install_command: `npx skills add ${item.repository.html_url} --skill ${skillName}`,
+    readme_summary: `GitHub 仓库中的 ${skillName} 技能，来源文件：${item.path}`,
+    metadata: {
+      ...repositoryCandidate.metadata,
+      source_kind: "github_skill_file",
+      skill_path: item.path,
+      skill_sha: item.sha,
+      skill_name: skillName,
+      repository: item.repository.full_name,
+      repository_stars: item.repository.stargazers_count
+    },
+    repository_stars: item.repository.stargazers_count
+  };
+}
+
+function getSkillName(path: string, repositoryName: string) {
+  const segments = path.split("/").filter(Boolean);
+  return segments.length > 1 ? segments[segments.length - 2] : repositoryName;
 }
 
 function isRelevantGitHubRepository(repository: GitHubRepository, type: ResourceType) {
@@ -316,7 +408,10 @@ function dedupeCandidates(candidates: CatalogCandidate[]) {
   const merged = new Map<string, CatalogCandidate>();
 
   for (const candidate of candidates) {
-    const key = candidate.repo_url || `${candidate.source}:${candidate.name}`;
+    const skillPath = typeof candidate.metadata.skill_path === "string" ? candidate.metadata.skill_path : "";
+    const key = skillPath
+      ? `${candidate.repo_url}:${skillPath}`
+      : candidate.repo_url || `${candidate.source}:${candidate.name}`;
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, candidate);

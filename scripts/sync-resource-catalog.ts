@@ -105,13 +105,14 @@ function parseOptions(args: string[]) {
   const sourceArg = args.find((arg) => arg.startsWith("--source="))?.split("=")[1] ?? "all";
   const limitArg = Number(args.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? process.env.RESOURCE_SYNC_LIMIT ?? 20);
   const mcpLimitArg = Number(args.find((arg) => arg.startsWith("--mcp-limit="))?.split("=")[1] ?? process.env.MCP_SYNC_LIMIT ?? 100);
+  const skillLimitArg = Number(args.find((arg) => arg.startsWith("--skills-limit="))?.split("=")[1] ?? process.env.SKILLS_SYNC_LIMIT ?? 100);
   const available = new Set(["github", "mcp", "npm"] as const);
   const sources = sourceArg === "all"
     ? available
     : new Set(sourceArg.split(",").filter((source): source is "github" | "mcp" | "npm" => available.has(source as "github" | "mcp" | "npm")));
 
   if (sources.size === 0) throw new Error("--source must contain github, mcp, npm, or all.");
-  return { limitPerQuery: clamp(limitArg, 1, 50), mcpLimit: clamp(mcpLimitArg, 1, 500), sources };
+  return { limitPerQuery: clamp(limitArg, 1, 50), mcpLimit: clamp(mcpLimitArg, 1, 500), skillLimit: clamp(skillLimitArg, 1, 500), sources };
 }
 
 function clamp(value: number, min: number, max: number) {

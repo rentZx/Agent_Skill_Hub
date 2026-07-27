@@ -77,18 +77,19 @@ Variable usage:
 
 ### Resource catalog sync
 
-The catalog sync job imports real resources from the GitHub API, the official MCP Registry, and the npm registry. It normalizes, deduplicates, risk-labels, and upserts candidates into PostgreSQL; it does not delete curated seed resources.
+The catalog sync job imports real resources from the GitHub API, GitHub `SKILL.md` code search, the official MCP Registry, and the npm registry. Agent Skills are collected from popular skill repositories and individual skill files, then normalized, deduplicated, risk-labeled, and upserted into PostgreSQL; it does not delete curated seed resources.
 
 Run from a server or a trusted local environment with `DATABASE_URL` configured:
 
 ```bash
-npm run sync:resources -- --source=all --limit=20 --mcp-limit=100
+npm run sync:resources -- --source=all --limit=20 --skills-limit=100 --mcp-limit=100
 ```
 
 Useful targeted runs:
 
 ```bash
 npm run sync:resources -- --source=github --limit=30
+npm run sync:resources -- --source=github --skills-limit=200
 npm run sync:resources -- --source=mcp --mcp-limit=200
 npm run sync:resources -- --source=npm --limit=30
 ```
