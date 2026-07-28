@@ -27,4 +27,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             npm ci --no-audit --no-fund
-            npm run sync:resources -- --source=all --limit=30 --skills-limit=100 --mcp-limit=200
+            set -a
+            . ./.env.local
+            . ./.env.sync
+            set +a
+            ./node_modules/.bin/tsx scripts/sync-resource-catalog.ts \
+              --source=all --limit=30 --skills-limit=100 --mcp-limit=200
