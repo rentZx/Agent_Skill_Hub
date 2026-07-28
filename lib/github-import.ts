@@ -38,7 +38,10 @@ export type GitHubParseResponse =
 export function parseGitHubRepoUrl(input: string) {
   try {
     const url = new URL(input.trim());
-    if (url.hostname !== "github.com" && url.hostname !== "www.github.com") {
+    if (
+      url.protocol !== "https:"
+      || (url.hostname !== "github.com" && url.hostname !== "www.github.com")
+    ) {
       return null;
     }
 
@@ -51,6 +54,135 @@ export function parseGitHubRepoUrl(input: string) {
   } catch {
     return null;
   }
+}
+
+export function validateGitHubParsedResource(value: unknown): GitHubParsedResource | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const github = candidate.github;
+  if (!github || typeof github !== "object") return null;
+  const githubData = github as Record<string, unknown>;
+
+  const type = candidate.type;
+  const riskLevel = candidate.risk_level;
+  const repoUrl = validString(candidate.repo_url, 500);
+  const parsedRepo = repoUrl ? parseGitHubRepoUrl(repoUrl) : null;
+  const owner = validString(githubData.owner, 100);
+  const repo = validString(githubData.repo, 100);
+
+  if (
+    !["agent_skill", "mcp_server", "github_plugin", "ui_component", "template_repo"].includes(String(type))
+    || !["low", "medium", "high"].includes(String(riskLevel))
+    || candidate.source !== "github_import"
+    || !repoUrl
+    || !parsedRepo
+    || !owner
+    || !repo
+    || parsedRepo.owner.toLowerCase() !== owner.toLowerCase()
+    || parsedRepo.repo.toLowerCase() !== repo.toLowerCase()
+  ) {
+    return null;
+  }
+
+  const name = validString(candidate.name, 200);
+  const description = validString(candidate.description, 4000);
+  const installCommand = validString(candidate.install_command, 1000, true);
+  const riskReason = validString(candidate.risk_reason, 1000, true);
+  const readmeSummary = validString(candidate.readme_summary, 4000);
+  const lastUpdated = validString(candidate.last_updated, 10);
+  const supportedAgents = validStringArray(candidate.supported_agents, 12, 80);
+  const tags = validStringArray(candidate.tags, 24, 80);
+  const useCases = validStringArray(candidate.use_cases, 12, 500);
+  const topics = validStringArray(githubData.topics, 24, 80);
+  const license = githubData.license === null ? null : validString(githubData.license, 100);
+  const latestCommitTime = githubData.latest_commit_time === null
+    ? null
+    : validString(githubData.latest_commit_time, 100);
+  const defaultBranch = validString(githubData.default_branch, 200);
+  const trustScore = validScore(candidate.trust_score);
+  const fitScore = validScore(candidate.fit_score);
+  const stars = validNonNegativeInteger(githubData.stars);
+  const forks = validNonNegativeInteger(githubData.forks);
+
+  if (
+    !name
+    || !description
+    || installCommand === null
+    || riskReason === null
+    || !readmeSummary
+    || !/^\d{4}-\d{2}-\d{2}$/.test(lastUpdated ?? "")
+    || !supportedAgents
+    || !tags
+    || !useCases
+    || !topics
+    || license === undefined
+    || latestCommitTime === undefined
+    || !defaultBranch
+    || trustScore === null
+    || fitScore === null
+    || stars === null
+    || forks === null
+    || typeof githubData.has_skill_md !== "boolean"
+    || typeof githubData.has_package_json !== "boolean"
+    || typeof githubData.has_mcp_manifest !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    name,
+    type: type as ResourceType,
+    description,
+    tags,
+    supported_agents: supportedAgents,
+    install_command: installCommand,
+    use_cases: useCases,
+    risk_level: riskLevel as RiskLevel,
+    ...(riskReason ? { risk_reason: riskReason } : {}),
+    trust_score: trustScore,
+    fit_score: fitScore,
+    repo_url: repoUrl,
+    source: "github_import",
+    last_updated: lastUpdated as string,
+    readme_summary: readmeSummary,
+    github: {
+      owner,
+      repo,
+      stars,
+      forks,
+      license,
+      latest_commit_time: latestCommitTime,
+      topics,
+      has_skill_md: githubData.has_skill_md,
+      has_package_json: githubData.has_package_json,
+      has_mcp_manifest: githubData.has_mcp_manifest,
+      default_branch: defaultBranch
+    }
+  };
+}
+
+function validString(value: unknown, maxLength: number, allowEmpty = false) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if ((!allowEmpty && normalized.length === 0) || normalized.length > maxLength) return null;
+  return normalized;
+}
+
+function validStringArray(value: unknown, maxItems: number, maxItemLength: number) {
+  if (!Array.isArray(value) || value.length > maxItems) return null;
+  const normalized = value.map((item) => validString(item, maxItemLength));
+  if (normalized.some((item) => !item)) return null;
+  return normalized as string[];
+}
+
+function validScore(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100
+    ? Number(value)
+    : null;
+}
+
+function validNonNegativeInteger(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
 }
 
 export function inferResourceType(input: {

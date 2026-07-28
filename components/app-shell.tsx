@@ -2,16 +2,19 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Boxes, Database, Heart, Home, Search, Sparkles } from "lucide-react";
 
-const navItems = [
+const publicNavItems = [
   { href: "/", label: "首页", icon: Home },
   { href: "/resources", label: "资源库", icon: Boxes },
   { href: "/search", label: "搜索", icon: Search },
   { href: "/analyze", label: "项目分析", icon: Sparkles },
-  { href: "/favorites", label: "收藏", icon: Heart },
-  { href: "/admin", label: "管理", icon: Database }
+  { href: "/favorites", label: "收藏", icon: Heart }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const navItems = process.env.NODE_ENV === "production"
+    ? publicNavItems
+    : [...publicNavItems, { href: "/admin", label: "管理", icon: Database }];
+
   return (
     <div className="min-h-screen overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -43,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-5 sm:py-8">{children}</main>
 
-      <nav className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-6 rounded-lg border border-white/10 bg-slate-950/85 p-1 shadow-glass backdrop-blur-xl md:hidden">
+      <nav className={`fixed inset-x-3 bottom-3 z-30 grid rounded-lg border border-white/10 bg-slate-950/85 p-1 shadow-glass backdrop-blur-xl md:hidden ${navItems.length === 5 ? "grid-cols-5" : "grid-cols-6"}`}>
         {navItems.map((item) => {
           const Icon = item.icon;
           return (

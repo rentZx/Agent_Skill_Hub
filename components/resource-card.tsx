@@ -12,6 +12,7 @@ import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
 import { riskLabels, typeLabels } from "@/lib/resource-types";
 import { getLocalizedResourceDescription } from "@/lib/resource-localization";
 import { formatResourceDate } from "@/lib/resource-ranking";
+import { getSafeExternalUrl } from "@/lib/resource-url";
 
 const riskClassNames: Record<RiskLevel, string> = {
   low: "border-emerald-300/30 bg-emerald-300/[0.12] text-emerald-100",
@@ -29,6 +30,7 @@ const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
 
 export function ResourceCard({ resource, headerAction }: { resource: Resource; headerAction?: ReactNode }) {
   const Icon = typeIcons[resource.type];
+  const sourceUrl = getSafeExternalUrl(resource.repo_url);
 
   return (
     <article className="group flex min-h-[340px] flex-col rounded-lg border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.032))] p-4 shadow-glass backdrop-blur-xl transition duration-300 ease-out hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.07] hover:shadow-[0_18px_46px_rgba(34,211,238,0.10)] sm:p-5">
@@ -82,14 +84,16 @@ export function ResourceCard({ resource, headerAction }: { resource: Resource; h
           >
             详情
           </Link>
-          <Link
-            href={resource.repo_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2.5 py-2 text-xs text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
-          >
-            来源 <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+          {sourceUrl ? (
+            <Link
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2.5 py-2 text-xs text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
+            >
+              来源 <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>

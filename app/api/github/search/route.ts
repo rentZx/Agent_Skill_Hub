@@ -1,5 +1,9 @@
-import { NextResponse } from "next/server";
 import { inferRiskLevel } from "@/lib/github-import";
+import {
+  adminSurfaceUnavailable,
+  enforceRateLimit,
+  noStoreJson
+} from "@/lib/server-security";
 
 type GitHubSearchResponse = {
   items?: Array<{
@@ -18,16 +22,27 @@ type GitHubSearchResponse = {
 };
 
 export async function GET(request: Request) {
+  const unavailable = adminSurfaceUnavailable();
+  if (unavailable) return unavailable;
+
+  const rateLimited = enforceRateLimit(request, "github-search", 20, 10 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
   const query = new URL(request.url).searchParams.get("q")?.trim();
-  if (!query) return NextResponse.json({ ok: false, error: "缺少 GitHub 搜索关键词。" }, { status: 400 });
+  if (!query || query.length > 100) {
+    return noStoreJson({ ok: false, error: "GitHub 搜索关键词无效。" }, { status: 400 });
+  }
 
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=20`, { headers, cache: "no-store" });
-  if (!response.ok) return NextResponse.json({ ok: false, error: `GitHub API request failed: ${response.status}` }, { status: response.status });
+  if (!response.ok) {
+    console.warn(`[github-search] upstream request failed: ${response.status}`);
+    return noStoreJson({ ok: false, error: "GitHub 搜索暂时不可用。" }, { status: 502 });
+  }
   const payload = (await response.json()) as GitHubSearchResponse;
 
-  return NextResponse.json({
+  return noStoreJson({
     ok: true,
     items: (payload.items ?? []).map((item) => ({
       name: item.name,

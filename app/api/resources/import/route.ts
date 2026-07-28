@@ -1,28 +1,34 @@
-import { NextResponse } from "next/server";
-import type { GitHubParsedResource } from "@/lib/github-import";
+import { validateGitHubParsedResource } from "@/lib/github-import";
 import { importResourceWithTags } from "@/lib/db/resources";
+import {
+  adminSurfaceUnavailable,
+  enforceRateLimit,
+  noStoreJson,
+  readJsonBody,
+  RequestValidationError
+} from "@/lib/server-security";
 
 export async function POST(request: Request) {
-  let payload: { resource?: GitHubParsedResource };
-  try {
-    payload = (await request.json()) as { resource?: GitHubParsedResource };
-  } catch {
-    return NextResponse.json({ ok: false, error: "请求体不是有效 JSON。" }, { status: 400 });
-  }
+  const unavailable = adminSurfaceUnavailable();
+  if (unavailable) return unavailable;
 
-  const { resource } = payload;
-
-  if (!resource) {
-    return NextResponse.json({ ok: false, error: "缺少待保存的资源解析结果。" }, { status: 400 });
-  }
+  const rateLimited = enforceRateLimit(request, "resource-import", 10, 10 * 60 * 1000);
+  if (rateLimited) return rateLimited;
 
   try {
+    const payload = await readJsonBody<{ resource?: unknown }>(request, 64 * 1024);
+    const resource = validateGitHubParsedResource(payload.resource);
+    if (!resource) {
+      return noStoreJson({ ok: false, error: "待保存资源未通过服务器校验。" }, { status: 400 });
+    }
+
     const data = await importResourceWithTags(resource);
-    return NextResponse.json({ ok: true, resourceId: data.id, slug: data.slug });
+    return noStoreJson({ ok: true, resourceId: data.id, slug: data.slug });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "保存资源失败。" },
-      { status: 400 }
-    );
+    if (error instanceof RequestValidationError) {
+      return noStoreJson({ ok: false, error: error.message }, { status: error.status });
+    }
+    console.error("[resource-import] request failed", error);
+    return noStoreJson({ ok: false, error: "保存资源失败。" }, { status: 500 });
   }
 }

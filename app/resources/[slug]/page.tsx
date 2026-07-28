@@ -6,6 +6,7 @@ import { riskLabels, typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import { getResourceBySlug, getResources } from "@/lib/resources";
 import { getLocalizedResourceDescription, getLocalizedUseCases } from "@/lib/resource-localization";
+import { getSafeExternalUrl } from "@/lib/resource-url";
 import { Button } from "@/components/ui/button";
 import type { RiskLevel } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export default async function ResourceDetailPage({
   const related = (await getResources())
     .filter((item) => item.id !== resource.id && (item.type === resource.type || item.tags.some((tag) => resource.tags.includes(tag))))
     .slice(0, 4);
+  const sourceUrl = getSafeExternalUrl(resource.repo_url);
 
   return (
     <div className="space-y-6 pb-10">
@@ -107,11 +109,13 @@ export default async function ResourceDetailPage({
               </div>
               {getRiskReason(resource)}
             </div>
-            <Button asChild variant="secondary" className="mt-4">
-              <Link href={resource.repo_url} target="_blank" rel="noreferrer">
-                打开来源 <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            {sourceUrl ? (
+              <Button asChild variant="secondary" className="mt-4">
+                <Link href={sourceUrl} target="_blank" rel="noopener noreferrer">
+                  打开来源 <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
           </Panel>
 
           <Panel title="推荐搭配资源">

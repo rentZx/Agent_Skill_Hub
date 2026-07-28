@@ -169,6 +169,16 @@ Stores all resource types in one unified table.
 - Generate a Codex-ready development prompt. Done.
 - Save recommendation records when Supabase is configured.
 
+### Milestone 6: Public Launch Security
+
+- Disable production admin and resource-write endpoints until administrator authentication exists. Done.
+- Add public API body, rate, and concurrency limits. Done for the analyze endpoint.
+- Restrict runtime PostgreSQL access to a non-superuser data role. Done on the production server.
+- Bind the Next.js process to localhost behind Nginx. Done in the PM2 ecosystem configuration.
+- Add browser security headers and external URL validation. Done.
+- Keep production dependency vulnerabilities at zero. Done.
+- Configure a domain, HTTPS, privacy notice, shared rate limiting, and monitoring before public launch.
+
 ## Acceptance Criteria
 
 V1.0 is acceptable when:

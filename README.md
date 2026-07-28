@@ -51,29 +51,44 @@ PostgreSQL is optional for the seed-backed MVP. When `DATABASE_URL` is configure
 
 ## Environment Variables
 
-Create a `.env.local` file when Supabase-backed reads are needed. Without these variables, the app falls back to the curated local seed data.
+Copy `.env.example` to `.env.local` for local development or configure the same values in the trusted server environment. Never commit real credentials. Without database variables, the app falls back to the curated local seed data.
 
 Expected variables:
 
 ```bash
+DATABASE_URL=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
 GITHUB_TOKEN=
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-chat
+ANALYZE_RATE_LIMIT=12
+ANALYZE_RATE_WINDOW_MS=300000
+ANALYZE_MAX_CONCURRENCY=4
 ```
 
 Variable usage:
 
+- `DATABASE_URL`: Server-only PostgreSQL connection for the restricted runtime database role.
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL used by the browser client.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key used by the browser client.
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-only key for admin jobs, imports, and trusted writes.
-- `OPENAI_API_KEY`: Optional server-side key for embeddings and recommendation generation.
 - `GITHUB_TOKEN`: Server-side GitHub token. It is optional for single-repository imports, but strongly recommended for catalog sync to avoid GitHub search API rate limits.
 - `DEEPSEEK_API_KEY`: Optional server-only key for AI project analysis and tag expansion. When absent, the rules engine remains available.
 - `DEEPSEEK_MODEL`: Optional DeepSeek model name; defaults to `deepseek-chat`.
+- `ANALYZE_RATE_LIMIT`: Maximum analyze requests allowed per client in one rate window.
+- `ANALYZE_RATE_WINDOW_MS`: Analyze rate-limit window in milliseconds.
+- `ANALYZE_MAX_CONCURRENCY`: Maximum analyze requests processed concurrently by one application process.
+
+## Production Security
+
+- Production `/admin`, GitHub parsing/search, and database import endpoints are disabled until administrator authentication is implemented.
+- The Next.js process must bind to `127.0.0.1:3003` and run behind Nginx.
+- Public deployment requires HTTPS before users submit project descriptions.
+- Project descriptions may be sent to DeepSeek, and capability search terms may be sent to GitHub. Publish a privacy notice before launch.
+- Run `npm audit --omit=dev` before deployment and keep production vulnerabilities at zero.
+- See `SECURITY.md` for the public-launch checklist and credential handling rules.
 
 ### Resource catalog sync
 
@@ -121,3 +136,4 @@ Planned:
 - Persistent cloud collections.
 - Production-grade admin editing.
 - AI API-backed semantic recommendation.
+- `DATABASE_URL`: Server-only PostgreSQL connection for the restricted runtime database role.

@@ -7,6 +7,13 @@ import {
   assessRiskLevel,
   parseGitHubRepoUrl
 } from "@/lib/github-import";
+import {
+  adminSurfaceUnavailable,
+  enforceRateLimit,
+  noStoreJson,
+  readJsonBody,
+  RequestValidationError
+} from "@/lib/server-security";
 
 type GitHubRepo = {
   name: string;
@@ -36,14 +43,23 @@ type GitHubCommit = {
 };
 
 export async function POST(request: Request) {
-  let payload: { url?: string };
+  const unavailable = adminSurfaceUnavailable();
+  if (unavailable) return unavailable;
+
+  const rateLimited = enforceRateLimit(request, "github-parse", 12, 10 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
+  let payload: { url?: unknown };
   try {
-    payload = (await request.json()) as { url?: string };
-  } catch {
-    return NextResponse.json({ ok: false, error: "请求体不是有效 JSON。" }, { status: 400 });
+    payload = await readJsonBody<{ url?: unknown }>(request, 4 * 1024);
+  } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return noStoreJson({ ok: false, error: error.message }, { status: error.status });
+    }
+    return noStoreJson({ ok: false, error: "请求无效。" }, { status: 400 });
   }
 
-  const { url } = payload;
+  const url = typeof payload.url === "string" && payload.url.length <= 500 ? payload.url : "";
   const parsed = url ? parseGitHubRepoUrl(url) : null;
 
   if (!parsed) {

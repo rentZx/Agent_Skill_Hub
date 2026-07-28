@@ -341,13 +341,13 @@ async function searchRepositories(query: string, perPage = 15): Promise<GitHubSe
       signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) {
-      console.warn(`GitHub discovery failed for query ${query}: ${response.status}`);
+      console.warn(`GitHub discovery search failed: ${response.status}`);
       return [];
     }
     const payload = (await response.json()) as { items?: GitHubSearchItem[] };
     return payload.items ?? [];
   } catch (error) {
-    console.warn(`GitHub discovery timed out for query ${query}.`, error);
+    console.warn("GitHub discovery search timed out.", error);
     return [];
   }
 }
