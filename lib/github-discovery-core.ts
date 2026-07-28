@@ -612,7 +612,7 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
     return imageTo3dDiscoveryProfile;
   }
-  if (/(做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
+  if (/(美食|餐饮|做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|food.discovery|food.content|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
     return recipeDiscoveryProfile;
   }
   if (/(配送|调度|车辆容量|时间窗|路线规划|路径优化|vehicle.routing|route.optimization|vrptw|fleet.routing)/i.test(source)) {

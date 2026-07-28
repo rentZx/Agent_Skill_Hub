@@ -86,6 +86,17 @@ const capabilityPatterns: Array<{
   resourceRoles: ResourceRole[];
 }> = [
   {
+    id: "food-content",
+    label: "美食领域内容与数据",
+    description: "评估可复用的菜谱、餐食或餐厅内容数据，并在产品方向确认后选择具体数据模型。",
+    terms: ["美食", "餐饮", "food discovery", "food content"],
+    keywords: ["food discovery", "food content", "recipe", "meal planning", "restaurant discovery"],
+    negativeKeywords: ["generic ai starter", "generic saas boilerplate"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill", "github_plugin"],
+    priority: "core",
+    resourceRoles: ["domain_data", "domain_system"]
+  },
+  {
     id: "inventory-management",
     label: "商品库存与库位管理",
     description: "管理商品档案、价格、库存数量、仓库或货架位置，并支持实时查询。",

@@ -6,6 +6,7 @@ import {
   type ResourceRole
 } from "../lib/capability-engine";
 import { buildProjectRecommendation } from "../lib/recommendation";
+import { assessRequirementClarity } from "../lib/requirement-clarity";
 import type { Resource, ResourceType } from "../lib/types";
 
 type BenchmarkCase = {
@@ -147,6 +148,37 @@ for (const benchmark of cases) {
     `${benchmark.name}: 推荐组合未覆盖任何核心或必需能力`
   );
 }
+
+const vagueFoodPrompt = "美食";
+const vagueFoodGraph = buildCapabilityGraph(vagueFoodPrompt, {
+  projectType: "美食相关产品（具体方向待确认）",
+  coreFeatures: ["美食内容浏览或搜索（具体业务流程待确认）"],
+  tags: ["food", "food-discovery"]
+});
+const vagueFoodRecommendation = buildProjectRecommendation(
+  vagueFoodPrompt,
+  [
+    resource("HowToCook", "template_repo", "Chinese recipes with ingredients and cooking steps", ["chinese-recipes", "recipe"]),
+    resource("Supabase pgvector Starter", "template_repo", "Generic vector search starter", ["pgvector", "supabase"]),
+    resource("Vercel AI SDK Starter", "template_repo", "Generic AI chat starter", ["ai-sdk", "vercel"])
+  ],
+  {
+    projectType: "美食相关产品（具体方向待确认）",
+    coreFeatures: ["美食内容浏览或搜索（具体业务流程待确认）"],
+    capabilityGraph: vagueFoodGraph
+  }
+);
+const vagueFoodNames = vagueFoodRecommendation.groups.flatMap((group) =>
+  group.items.map((item) => item.resource.name)
+);
+assert.equal(vagueFoodRecommendation.clarity.confidence, "low", "美食：应识别为低置信度主题");
+assert(vagueFoodNames.includes("HowToCook"), "美食：应召回领域候选 HowToCook");
+assert(!vagueFoodNames.includes("Supabase pgvector Starter"), "美食：不应因为推荐语义引入 pgvector");
+assert(!vagueFoodNames.includes("Vercel AI SDK Starter"), "美食：不应默认引入 AI SDK");
+assert(vagueFoodRecommendation.codexPrompt.includes("先输出需求澄清结果"), "美食：Prompt 应先澄清需求");
+assert(!vagueFoodRecommendation.codexPrompt.includes("严格遵循上面的推荐技术栈"), "美食：Prompt 不应锁死推测技术栈");
+assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
+assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
 
 console.log(`Recommendation benchmark passed: ${cases.length} cases.`);
 

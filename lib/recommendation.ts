@@ -6,6 +6,10 @@ import type {
 } from "@/lib/capability-engine";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
+import {
+  assessRequirementClarity,
+  type RequirementClarity
+} from "@/lib/requirement-clarity";
 
 export type ProjectUnderstanding = {
   projectType: string;
@@ -50,6 +54,7 @@ export type RecommendationGroup = {
 };
 
 export type ProjectRecommendation = {
+  clarity: RequirementClarity;
   understanding: ProjectUnderstanding;
   keywords: string[];
   modules: CapabilityModule[];
@@ -64,6 +69,7 @@ export type RecommendationContext = {
   coreFeatures?: string[];
   techStack?: string[];
   capabilityGraph?: CapabilityGraph;
+  clarity?: RequirementClarity;
 };
 
 const capabilityModules: CapabilityModule[] = [
@@ -334,10 +340,11 @@ export function detectCapabilityModules(input: string, keywords = extractProject
 }
 
 export function buildProjectRecommendation(input: string, resources: Resource[], context: RecommendationContext = {}): ProjectRecommendation {
+  const clarity = context.clarity ?? assessRequirementClarity(input);
   const keywords = extractProjectKeywords(input);
   const moduleInput = `${input} ${(context.coreFeatures ?? []).join(" ")}`;
   const dynamicModules = capabilityGraphToModules(context.capabilityGraph);
-  const detectedModules = detectCapabilityModules(moduleInput, keywords);
+  const detectedModules = detectCapabilityModules(moduleInput, keywords, clarity.confidence !== "low");
   const modules = dedupeModules([...dynamicModules, ...detectedModules]).slice(0, 10);
   const matchedModules = dedupeModules([
     ...dynamicModules,
@@ -346,7 +353,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
   const infrastructureModuleIds = new Set(["document-parsing", "database-storage", "ui-components", "automated-testing", "deployment", "agent-workflow"]);
   const domainModules = matchedModules.filter((module) => !infrastructureModuleIds.has(module.id));
   const scoringModules = domainModules.length > 0 ? domainModules : matchedModules.length > 0 ? matchedModules : modules;
-  const understanding = buildProjectUnderstanding(input, keywords, modules, context);
+  const understanding = buildProjectUnderstanding(input, keywords, modules, context, clarity);
   const scored = scoreResources(
     resources,
     [...keywords, ...(context.coreFeatures ?? [])],
@@ -363,6 +370,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => group.riskOnly ? item.resource.risk_level === "high" : item.resource.risk_level !== "high")
       .filter((item) => !selectedIds.has(item.resource.id))
+      .filter((item) => clarity.confidence !== "low" || item.matchedCapabilityIds.length > 0)
       .filter((item) => group.riskOnly || item.hasProjectSignal);
     const baseline = scored
       .filter(() => !context.capabilityGraph)
@@ -404,32 +412,43 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
   const gaps = buildGaps(groups, modules, context.capabilityGraph);
 
   return {
+    clarity,
     understanding,
     keywords,
     modules,
     groups,
     gaps,
-    codexPrompt: buildCodexPrompt(input, understanding, modules, groups, gaps)
+    codexPrompt: buildCodexPrompt(input, understanding, modules, groups, gaps, clarity)
   };
 }
 
-function buildProjectUnderstanding(input: string, keywords: string[], modules: CapabilityModule[], context: RecommendationContext): ProjectUnderstanding {
+function buildProjectUnderstanding(
+  input: string,
+  keywords: string[],
+  modules: CapabilityModule[],
+  context: RecommendationContext,
+  clarity: RequirementClarity
+): ProjectUnderstanding {
   const text = input.toLowerCase();
   const has = (values: string[]) => values.some((value) => text.includes(value.toLowerCase()) || input.includes(value));
   const recipeProject = has(["菜谱", "食谱", "做饭", "饭菜", "吃什么", "食材", "烹饪", "recipe", "food", "meal", "ingredients", "cooking"]);
+  const isLowConfidence = clarity.confidence === "low";
 
-  const projectType = context.projectType ?? (recipeProject ? "菜谱与用餐决策 Web 应用" :
+  const projectType = isLowConfidence ? `${input.trim() || "当前主题"}相关产品（具体形态待确认）` :
+    context.projectType ?? (recipeProject ? "菜谱与用餐决策 Web 应用" :
     has(["外贸", "客户", "线索", "获客", "lead"]) ? "获客/线索发现系统" :
     has(["知识库", "搜索", "文档", "问答"]) ? "知识库与搜索推荐系统" :
     has(["后台", "管理", "dashboard", "saas"]) ? "SaaS 工作台/管理后台" :
     "AI 辅助 Web 应用");
 
-  const targetUsers = context.targetUsers ?? (recipeProject ? "家庭用户、个人用户和需要快速决定吃什么的人" :
+  const targetUsers = isLowConfidence ? "待确认，不能仅根据主题推断目标用户" :
+    context.targetUsers ?? (recipeProject ? "家庭用户、个人用户和需要快速决定吃什么的人" :
     has(["销售", "外贸", "客户", "运营"]) ? "销售、运营或业务拓展团队" :
     has(["开发者", "agent", "codex"]) ? "开发者与 AI Agent 使用者" :
     "需要把业务需求转成可执行工作流的产品/运营用户");
 
-  const featureSet = context.coreFeatures?.length ? context.coreFeatures : recipeProject ? [
+  const featureSet = isLowConfidence ? clarity.confirmedRequirements :
+    context.coreFeatures?.length ? context.coreFeatures : recipeProject ? [
     "根据用餐人数推荐菜品",
     "随机推荐与条件筛选",
     "展示食材和备菜清单",
@@ -441,7 +460,9 @@ function buildProjectUnderstanding(input: string, keywords: string[], modules: C
     has(["导出", "excel", "csv", "报告"]) ? "结果导出与报告生成" : "结果保存与复用"
   ];
 
-  const dataSources = recipeProject ? [
+  const dataSources = isLowConfidence ? [
+    "待产品方向确认后，再确定菜谱、餐厅、商家、定位或用户内容等数据来源"
+  ] : recipeProject ? [
     "内置菜谱、食材、份量和制作步骤数据",
     "用户选择的用餐人数与偏好参数",
     "可选的官方菜谱 API 或公开数据源"
@@ -451,7 +472,9 @@ function buildProjectUnderstanding(input: string, keywords: string[], modules: C
     has(["文档", "pdf", "word", "excel"]) ? "上传文档、表格或报告" : "资源标签、评分和风险元数据"
   ];
 
-  const techStack = context.techStack?.length ? context.techStack : [
+  const techStack = isLowConfidence ? [
+    "暂不锁定技术栈；先确认产品方向、核心流程、数据来源和上线平台"
+  ] : context.techStack?.length ? context.techStack : [
     "Next.js + TypeScript",
     "Tailwind CSS + shadcn/ui",
     has(["数据库", "保存", "用户", "搜索", "推荐", "supabase"]) ? "Supabase/Postgres" : "本地数据层，后续可接 Supabase",
@@ -798,9 +821,13 @@ function buildCodexPrompt(
   understanding: ProjectUnderstanding,
   modules: CapabilityModule[],
   groups: RecommendationGroup[],
-  gaps: string[]
+  gaps: string[],
+  clarity: RequirementClarity
 ) {
-  const groupText = groups
+  const promptGroups = clarity.confidence === "low"
+    ? groups.filter((group) => group.items.length > 0)
+    : groups;
+  const groupText = promptGroups
     .map((group) => {
       if (group.items.length === 0) {
         return `${group.title}\n- 缺口：${group.gap}`;
@@ -814,19 +841,37 @@ function buildCodexPrompt(
         .join("\n");
       return `${group.title}\n${items}`;
     })
-    .join("\n\n");
+    .join("\n\n") || "当前没有足够证据推荐具体资源，待产品方向确认后重新检索。";
 
   const moduleText = modules.map((module) => `- ${module.label}: ${module.description}`).join("\n");
   const featureText = understanding.coreFeatures.map((feature) => `- ${feature}`).join("\n");
   const sourceText = understanding.dataSources.map((source) => `- ${source}`).join("\n");
   const stackText = understanding.techStack.map((item) => `- ${item}`).join("\n");
-  const gapText = gaps.length > 0 ? gaps.map((gap) => `- ${gap}`).join("\n") : "- 暂无关键缺口，先按推荐组合实现 MVP。";
+  const gapText = clarity.confidence === "low"
+    ? "- 产品方向、目标用户和核心流程尚未确认；确认后需要重新生成能力图谱与资源组合。"
+    : gaps.length > 0 ? gaps.map((gap) => `- ${gap}`).join("\n") : "- 暂无关键缺口，先按推荐组合实现 MVP。";
+  const assumptionsText = clarity.assumptions.length > 0
+    ? clarity.assumptions.map((item) => `- ${item}`).join("\n")
+    : "- 暂无额外推测。";
+  const questionsText = clarity.clarifyingQuestions.length > 0
+    ? clarity.clarifyingQuestions.map((item) => `- ${item}`).join("\n")
+    : "- 暂无阻塞性问题。";
+  const lowConfidenceInstruction = clarity.confidence === "low"
+    ? "当前输入不足以直接开发完整项目。先输出需求澄清结果和 2-3 个可选产品方向，等待用户确认后再创建代码、数据库 Schema 或部署配置。"
+    : "先核对用户明确需求与建议方案，再实现最小可运行版本。";
 
-  return `请作为 Codex 帮我开发以下项目，并按“项目开发能力组合方案”执行。\n\n项目原始描述：\n${input}\n\n1. 项目需求理解\n- 项目类型：${understanding.projectType}\n- 目标用户：${understanding.targetUsers}\n- 核心功能：\n${featureText}\n- 可能的数据来源：\n${sourceText}\n- 推荐技术栈：\n${stackText}\n\n2. 所需能力模块\n${moduleText}\n\n3. 推荐资源组合\n${groupText}\n\n4. 当前缺口\n${gapText}\n\n5. 开发要求\n- 先实现项目原始描述中的核心用户流程，再补充后台和增强能力。\n- 严格遵循上面的推荐技术栈，不要擅自把数据库或 ORM 切换成其他方案。\n- 优先使用低风险、高可信、适配度高的资源；高风险候选只用于人工复核，不能直接作为生产依赖。\n- 不要只堆资源列表，要把每个资源绑定到具体开发阶段，并先核对许可证、维护状态、权限和数据边界。\n- 每次修改后运行相关构建、lint 或页面验证，并报告失败原因。`;
+  return `请作为 Codex 处理以下项目需求，并按“项目开发能力组合方案”执行。\n\n项目原始描述：\n${input}\n\n0. 需求完整度\n- 置信度：${clarity.confidence === "high" ? "高" : clarity.confidence === "medium" ? "中" : "低"}\n- 判断：${clarity.summary}\n- 当前推测：\n${assumptionsText}\n- 待确认问题：\n${questionsText}\n\n1. 当前项目理解\n- 项目类型：${understanding.projectType}\n- 目标用户：${understanding.targetUsers}\n- 已确认或可安全提取的核心需求：\n${featureText}\n- 可能的数据来源：\n${sourceText}\n- 建议技术栈：\n${stackText}\n\n2. 所需能力模块\n${moduleText}\n\n3. 候选资源组合\n${groupText}\n\n4. 当前缺口\n${gapText}\n\n5. 执行要求\n- ${lowConfidenceInstruction}\n- 只把用户原始描述和明确约束视为硬需求；项目类型、目标用户、功能扩展和技术栈均为可调整建议。\n- 不要因为出现“推荐”就默认引入向量数据库，也不要在用户未要求 AI 功能时默认引入 AI SDK。\n- 优先使用低风险、高可信、适配度高的资源；高风险候选只用于人工复核，不能直接作为生产依赖。\n- 每个资源必须绑定到具体开发环节，并先核对许可证、维护状态、权限和数据边界。\n- 每次修改后运行相关构建、lint 或页面验证，并报告失败原因。`;
 }
 
 export function rebuildCodexPrompt(input: string, recommendation: ProjectRecommendation) {
-  return buildCodexPrompt(input, recommendation.understanding, recommendation.modules, recommendation.groups, recommendation.gaps);
+  return buildCodexPrompt(
+    input,
+    recommendation.understanding,
+    recommendation.modules,
+    recommendation.groups,
+    recommendation.gaps,
+    recommendation.clarity
+  );
 }
 
 function capabilityGraphToModules(capabilityGraph?: CapabilityGraph): CapabilityModule[] {

@@ -7,6 +7,7 @@ import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
+import { assessRequirementClarity } from "@/lib/requirement-clarity";
 import type { Resource } from "@/lib/types";
 
 type AnalyzerRuntimeResult = AnalyzerResult & {
@@ -16,11 +17,16 @@ type AnalyzerRuntimeResult = AnalyzerResult & {
 };
 
 export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerRuntimeResult> {
+  const clarity = assessRequirementClarity(input);
+  const isLowConfidence = clarity.confidence === "low";
   const initial = analyzeProject(input, resources);
+  const graphTags = isLowConfidence
+    ? initial.analysis.tags.filter((tag) => /(food|餐饮|美食)/i.test(tag))
+    : initial.analysis.tags;
   const preliminaryGraph = buildCapabilityGraph(input, {
     projectType: initial.analysis.projectType,
     coreFeatures: initial.analysis.coreFeatures,
-    tags: initial.analysis.tags
+    tags: graphTags
   });
   const [ai, preliminaryDiscovered] = await Promise.all([
     analyzeSafely(input),
@@ -28,20 +34,26 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
   ]);
 
   const capabilityGraph = buildCapabilityGraph(input, {
-    projectType: ai?.projectType ?? initial.analysis.projectType,
-    coreFeatures: ai?.coreFeatures?.length ? ai.coreFeatures : initial.analysis.coreFeatures,
-    tags: Array.from(new Set([...initial.analysis.tags, ...(ai?.tags ?? [])])),
-    capabilities: ai?.capabilities,
-    constraints: ai?.constraints,
-    searchQueries: ai?.searchQueries
+    projectType: isLowConfidence ? initial.analysis.projectType : ai?.projectType ?? initial.analysis.projectType,
+    coreFeatures: isLowConfidence
+      ? initial.analysis.coreFeatures
+      : ai?.coreFeatures?.length ? ai.coreFeatures : initial.analysis.coreFeatures,
+    tags: isLowConfidence
+      ? graphTags
+      : Array.from(new Set([...initial.analysis.tags, ...(ai?.tags ?? [])])),
+    capabilities: isLowConfidence ? undefined : ai?.capabilities,
+    constraints: isLowConfidence ? undefined : ai?.constraints,
+    searchQueries: isLowConfidence ? preliminaryGraph.searchQueries : ai?.searchQueries
   });
 
   let discovered = preliminaryDiscovered;
   if (ai && !preliminaryDiscovered.some((resource) => (resource.ai_recommendation_weight ?? 0) >= 100)) {
-    const discoveryTags = Array.from(new Set([
-      ...initial.analysis.tags,
-      ...(ai?.tags ?? [])
-    ]));
+    const discoveryTags = isLowConfidence
+      ? graphTags
+      : Array.from(new Set([
+          ...initial.analysis.tags,
+          ...(ai?.tags ?? [])
+        ]));
     discovered = await discoverSafely(input, discoveryTags, resources, capabilityGraph);
   }
 
@@ -62,26 +74,31 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
         selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
         recommendation: {
           ...recommendation,
-          codexPrompt: buildAnalyzerPrompt(input, fallback.analysis, recommendation.codexPrompt)
+          codexPrompt: buildAnalyzerPrompt(input, fallback.analysis, recommendation.codexPrompt, recommendation.clarity)
         }
       };
     }
-    const enriched = analyzeProject(input, candidateResources, {
-      industry: ai.industry,
-      projectType: ai.projectType,
-      platform: ai.platform,
-      targetUsers: ai.targetUsers,
-      coreFeatures: ai.coreFeatures,
-      frontend: ai.frontend,
-      backend: ai.backend,
-      database: ai.database,
-      orm: ai.orm,
-      deploy: ai.deploy,
-      difficulty: ai.difficulty,
-      tags: ai.tags
-    }, capabilityGraph);
+    const enriched = analyzeProject(input, candidateResources, isLowConfidence
+      ? {
+          industry: ai.industry,
+          tags: ai.tags
+        }
+      : {
+          industry: ai.industry,
+          projectType: ai.projectType,
+          platform: ai.platform,
+          targetUsers: ai.targetUsers,
+          coreFeatures: ai.coreFeatures,
+          frontend: ai.frontend,
+          backend: ai.backend,
+          database: ai.database,
+          orm: ai.orm,
+          deploy: ai.deploy,
+          difficulty: ai.difficulty,
+          tags: ai.tags
+        }, capabilityGraph);
     const reranked = await rerankRecommendation(input, enriched.recommendation);
-    const analysis = {
+    const analysis = isLowConfidence ? enriched.analysis : {
       ...enriched.analysis,
       ...(ai.industry ? { industry: ai.industry } : {}),
       ...(ai.projectType ? { projectType: ai.projectType } : {}),
@@ -107,7 +124,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
       recommendation: {
         ...recommendation,
-        codexPrompt: buildAnalyzerPrompt(input, analysis, recommendation.codexPrompt)
+        codexPrompt: buildAnalyzerPrompt(input, analysis, recommendation.codexPrompt, recommendation.clarity)
       },
       analysis
     };
@@ -249,7 +266,9 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
           : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
       };
     });
-    const groups = addFoundationalUiFallback(rerankedGroups, recommendation);
+    const groups = recommendation.clarity.confidence === "low"
+      ? rerankedGroups
+      : addFoundationalUiFallback(rerankedGroups, recommendation);
 
     return {
       ...recommendation,

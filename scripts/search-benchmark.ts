@@ -4,6 +4,12 @@ import type { Resource, ResourceType } from "../lib/types";
 
 const cases = [
   {
+    query: "美食",
+    relevant: resource("HowToCook", "template_repo", ["chinese-recipes", "cooking-steps"]),
+    secondary: resource("Mealie", "template_repo", ["recipe", "meal-planning"]),
+    irrelevant: resource("Generic AI Starter", "template_repo", ["ai", "starter"])
+  },
+  {
     query: "做饭",
     relevant: resource("HowToCook", "template_repo", ["chinese-recipes", "cooking-steps"]),
     irrelevant: resource("Generic Agent Starter", "template_repo", ["ai", "starter"])

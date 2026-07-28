@@ -16,6 +16,13 @@ const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
     { slug: "model-viewer", label: "3D Model Viewer", category: "workflow", weight: 7 },
     { slug: "model-export", label: "3D Model Export", category: "workflow", weight: 7 }
   ] },
+  { terms: ["美食", "餐饮"], tags: [
+    { slug: "food", label: "Food", category: "industry", weight: 10 },
+    { slug: "food-discovery", label: "Food Discovery", category: "domain", weight: 8 },
+    { slug: "food-content", label: "Food Content", category: "domain", weight: 7 },
+    { slug: "search", label: "Search", category: "workflow", weight: 6 },
+    { slug: "recommendation", label: "Recommendation", category: "workflow", weight: 6 }
+  ] },
   { terms: ["做饭", "菜谱", "食谱", "吃什么", "备菜", "烹饪", "饭菜", "料理"], tags: [
     { slug: "food", label: "Food", category: "industry", weight: 10 },
     { slug: "recipe", label: "Recipe", category: "domain", weight: 9 },

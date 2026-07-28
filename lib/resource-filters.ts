@@ -88,7 +88,7 @@ const searchSynonyms: Array<[string[], string[]]> = [
     ["finance", "financial", "fintech", "investment", "banking", "insurance", "trading", "stock", "market-data", "akshare", "qlib", "rqalpha", "金融", "财经", "投资"]
   ],
   [
-    ["做饭", "菜谱", "食材", "烹饪", "忌口", "餐食", "菜单"],
+    ["美食", "做饭", "菜谱", "食谱", "食材", "烹饪", "忌口", "餐食", "菜单", "料理"],
     ["recipe", "recipes", "cooking", "ingredient", "meal", "meal-planning", "nutrition", "dietary-restrictions", "howtocook", "mealie", "tandoor"]
   ],
   [
