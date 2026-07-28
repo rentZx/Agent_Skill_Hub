@@ -3,14 +3,19 @@
 import { useEffect, useState } from "react";
 import { Clipboard, GitBranch, Layers3, Radar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { analyzeProject } from "@/lib/project-analyzer";
+import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { getRiskReason } from "@/lib/risk";
-import type { Resource } from "@/lib/types";
 
-export function AnalyzeConsole({ resources }: { resources: Resource[] }) {
-  const [input, setInput] = useState("我要开发一个画室管理系统");
+export function AnalyzeConsole({
+  initialInput,
+  initialResult
+}: {
+  initialInput: string;
+  initialResult: AnalyzerResult;
+}) {
+  const [input, setInput] = useState(initialInput);
   const [copied, setCopied] = useState(false);
-  const [result, setResult] = useState(() => analyzeProject(input, resources));
+  const [result, setResult] = useState(initialResult);
   const [source, setSource] = useState<"deepseek" | "rules">("rules");
   const [discoveredCount, setDiscoveredCount] = useState(0);
   const [selectedDiscoveredCount, setSelectedDiscoveredCount] = useState(0);

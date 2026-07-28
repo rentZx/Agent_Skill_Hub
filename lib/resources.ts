@@ -1,7 +1,7 @@
 import "server-only";
 
 import { seedResources } from "@/data/seed-resources";
-import { listResources } from "@/lib/db/resources";
+import { getResourceById, listResources } from "@/lib/db/resources";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Resource } from "@/lib/types";
 
@@ -110,6 +110,14 @@ function getMetadataSyncTime(metadata: unknown) {
 }
 
 export async function getResourceBySlug(slug: string): Promise<Resource | null> {
+  if (process.env.DATABASE_URL) {
+    try {
+      return await getResourceById(slug);
+    } catch (error) {
+      console.warn("PostgreSQL resource detail read failed, falling back.", error);
+    }
+  }
+
   const resources = await getResources();
   return resources.find((resource) => resource.slug === slug || resource.id === slug) ?? null;
 }

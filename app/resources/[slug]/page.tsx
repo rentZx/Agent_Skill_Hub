@@ -5,8 +5,13 @@ import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, ShieldCheck, Term
 import { riskLabels, typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import { getResourceBySlug, getResources } from "@/lib/resources";
-import { getLocalizedResourceDescription, getLocalizedUseCases } from "@/lib/resource-localization";
+import {
+  getLocalizedResourceDescription,
+  getLocalizedUseCases,
+  getResourceEvidenceLabel
+} from "@/lib/resource-localization";
 import { getSafeExternalUrl } from "@/lib/resource-url";
+import { formatResourceDate } from "@/lib/resource-ranking";
 import { Button } from "@/components/ui/button";
 import type { RiskLevel } from "@/lib/types";
 
@@ -101,6 +106,11 @@ export default async function ResourceDetailPage({
               <Metric label="可信度" value={`${resource.trust_score}/100`} />
               <Metric label="适配度" value={`${resource.fit_score}/100`} accent />
               <Metric label="支持工具" value={resource.supported_agents.join(", ")} />
+              <Metric label="许可证" value={resource.license || "未检测到明确许可证"} />
+              <Metric label="GitHub Stars" value={(resource.github_stars ?? 0).toLocaleString("zh-CN")} />
+              <Metric label="源仓库更新" value={formatResourceDate(resource.last_updated)} />
+              <Metric label="目录同步" value={formatResourceDate(resource.last_synced_at)} />
+              <Metric label="类型证据" value={getResourceEvidenceLabel(resource)} />
             </div>
             <div className="mt-4 rounded-md border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-6 text-amber-50/90">
               <div className="mb-1 flex items-center gap-2 font-medium text-amber-100">

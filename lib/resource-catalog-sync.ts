@@ -209,6 +209,7 @@ function mapGitHubSkillFile(item: GitHubCodeSearchItem, query: string): CatalogC
     tags: Array.from(new Set([...repositoryCandidate.tags, ...pathTags])).slice(0, 20),
     install_command: `npx skills add ${item.repository.html_url} --skill ${skillName}`,
     readme_summary: `GitHub 仓库中的 ${skillName} 技能，来源文件：${item.path}`,
+    has_skill_md: true,
     metadata: {
       ...repositoryCandidate.metadata,
       source_kind: "github_skill_file",
@@ -229,7 +230,9 @@ function getSkillName(path: string, repositoryName: string) {
 
 function isRelevantGitHubRepository(repository: GitHubRepository, type: ResourceType) {
   const text = `${repository.name} ${repository.description ?? ""} ${(repository.topics ?? []).join(" ")}`.toLowerCase();
-  if (type === "agent_skill") return /(skill|agent|codex|claude|prompt|workflow)/.test(text);
+  if (type === "agent_skill") {
+    return /\b(agent[- ]?skills?|skill\.md|codex[- ]?skills?|claude(?: code)?[- ]?skills?)\b/.test(text);
+  }
   if (type === "github_plugin") return /(github|action|pull request|review|copilot|agent)/.test(text);
   if (type === "ui_component") return /(react|component|ui|tailwind|shadcn|radix|design system|frontend)/.test(text);
   return /(template|starter|boilerplate|next|fullstack|example)/.test(text);
@@ -345,6 +348,7 @@ function mapMcpServer(server: McpServer, official?: { status?: string; isLatest?
     license: null,
     latest_commit_at: null,
     readme_summary: description,
+    has_mcp_manifest: true,
     metadata: {
       source_kind: "mcp_registry",
       registry_name: server.name,
@@ -407,6 +411,7 @@ function mapNpmPackage(pkg: NpmPackage, config: { type: ResourceType; query: str
     license: null,
     latest_commit_at: null,
     readme_summary: pkg.description ?? `${pkg.name} npm package`,
+    has_package_json: true,
     metadata: {
       source_kind: "npm_registry",
       source_query: config.query,

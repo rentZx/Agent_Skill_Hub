@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
 import { riskLabels, typeLabels } from "@/lib/resource-types";
-import { getLocalizedResourceDescription } from "@/lib/resource-localization";
+import { getLocalizedResourceDescription, getResourceEvidenceLabel } from "@/lib/resource-localization";
 import { formatResourceDate } from "@/lib/resource-ranking";
 import { getSafeExternalUrl } from "@/lib/resource-url";
 
@@ -70,7 +70,10 @@ export function ResourceCard({ resource, headerAction }: { resource: Resource; h
         <code className="mt-1 block truncate text-xs leading-5 text-cyan-100">{resource.install_command}</code>
       </div>
 
-      <div className="mt-4 line-clamp-1 text-xs text-muted-foreground">支持工具：{resource.supported_agents.join(", ")}</div>
+      <div className="mt-4 space-y-1 text-xs text-muted-foreground">
+        <div className="line-clamp-1">支持工具：{resource.supported_agents.join(", ")}</div>
+        <div className="line-clamp-1">类型证据：{getResourceEvidenceLabel(resource)}</div>
+      </div>
 
       <div className="mt-auto flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1 text-xs text-muted-foreground">

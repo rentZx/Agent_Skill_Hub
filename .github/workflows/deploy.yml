@@ -31,6 +31,7 @@ jobs:
         run: |
           npm run lint
           npm run test:recommendation
+          npm run test:search
           npm run build
 
   deploy:

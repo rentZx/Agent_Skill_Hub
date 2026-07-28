@@ -15,9 +15,13 @@ export function selectDailyFeaturedSkills(
 ) {
   if (limit <= 0) return [];
 
-  const rankedSkills = rankFeaturedResources(
+  const allRankedSkills = rankFeaturedResources(
     resources.filter((resource) => resource.type === "agent_skill")
   );
+  const verifiedSkills = allRankedSkills.filter(
+    (resource) => resource.has_skill_md || resource.source === "curated_seed"
+  );
+  const rankedSkills = verifiedSkills.length >= limit ? verifiedSkills : allRankedSkills;
   const highQualitySkills = rankedSkills.filter(
     (resource) => resource.trust_score >= 70 && resource.fit_score >= 60
   );

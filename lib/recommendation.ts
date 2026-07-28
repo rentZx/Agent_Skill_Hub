@@ -488,6 +488,11 @@ function scoreResources(
   const scoringModuleTypes = modules.flatMap((module) => module.preferredTypes);
 
   return resources
+    .filter((resource) =>
+      resource.type !== "agent_skill" ||
+      resource.source !== "github_catalog" ||
+      resource.has_skill_md === true
+    )
     .map((resource) => {
       const haystack = [
         resource.name,

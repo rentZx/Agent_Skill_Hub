@@ -22,7 +22,7 @@ import { ResourceCard } from "@/components/resource-card";
 import { ResourceSearchBar } from "@/components/resource-search-bar";
 
 export const dynamic = "force-dynamic";
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 24;
 
 const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
   agent_skill: BrainCircuit,
@@ -86,7 +86,7 @@ export default async function ResourcesPage({
           const count = resources.filter((resource) => resource.type === type).length;
           const Icon = typeIcons[type];
           return (
-            <div key={type} className="group rounded-lg border border-white/10 bg-white/[0.04] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.065]">
+            <Link key={type} href={`/search?type=${type}`} className="group rounded-lg border border-white/10 bg-white/[0.04] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.065]">
               <div className="flex items-center justify-between">
                 <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950/60 text-cyan-100">
                   <Icon className="h-4 w-4" />
@@ -94,7 +94,7 @@ export default async function ResourcesPage({
                 <div className="text-2xl font-semibold">{count}</div>
               </div>
               <div className="mt-4 text-xs uppercase tracking-[0.16em] text-muted-foreground">{typeLabels[type]}</div>
-            </div>
+            </Link>
           );
         })}
       </section>
@@ -113,7 +113,7 @@ export default async function ResourcesPage({
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">
             <Filter className="h-3.5 w-3.5" />
-            来源：本地精选种子数据
+            来源：PostgreSQL、官方 Registry、GitHub 与 npm
           </div>
         </div>
 

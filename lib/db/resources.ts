@@ -1,6 +1,6 @@
 import "server-only";
 
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { resourceTags, resources, tags } from "@/lib/db/schema";
 import type { GitHubParsedResource } from "@/lib/github-import";
@@ -30,8 +30,24 @@ export async function listResources(): Promise<Resource[]> {
 }
 
 export async function getResourceById(id: string): Promise<Resource | null> {
-  const allResources = await listResources();
-  return allResources.find((resource) => resource.id === id || resource.slug === id) ?? null;
+  const db = getDb();
+  if (!db) throw new Error("DATABASE_URL is not configured.");
+
+  const condition = uuidPattern.test(id)
+    ? or(eq(resources.slug, id), eq(resources.id, id))
+    : eq(resources.slug, id);
+  const rows = await db
+    .select({
+      resource: resources,
+      tagSlug: tags.slug,
+      tagName: tags.name
+    })
+    .from(resources)
+    .leftJoin(resourceTags, eq(resourceTags.resourceId, resources.id))
+    .leftJoin(tags, eq(tags.id, resourceTags.tagId))
+    .where(condition);
+
+  return mapJoinedResources(rows)[0] ?? null;
 }
 
 export async function importResourceWithTags(resource: GitHubParsedResource) {
@@ -178,6 +194,13 @@ function mapJoinedResources(
         repo_url: row.resource.repoUrl,
         github_stars: row.resource.githubStars,
         github_forks: row.resource.githubForks,
+        license: row.resource.license,
+        latest_commit_at: row.resource.latestCommitAt?.toISOString() ?? null,
+        readme_summary: row.resource.readmeSummary ?? undefined,
+        has_skill_md: row.resource.hasSkillMd,
+        has_package_json: row.resource.hasPackageJson,
+        has_mcp_manifest: row.resource.hasMcpManifest,
+        evidence_summary: buildEvidenceSummary(row.resource),
         source: row.resource.source,
         last_updated: normalizeDate(row.resource.lastUpdated),
         last_synced_at: getMetadataSyncTime(row.resource.metadata) ?? normalizeDateTime(row.resource.updatedAt)
@@ -228,6 +251,20 @@ function getMetadataSyncTime(metadata: unknown) {
   const value = (metadata as { synced_at?: unknown }).synced_at;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
+
+function buildEvidenceSummary(resource: ResourceRow) {
+  const evidence = [
+    resource.hasSkillMd ? "已发现 SKILL.md" : "",
+    resource.hasMcpManifest ? "已发现 MCP Registry 或 Manifest" : "",
+    resource.hasPackageJson ? "已发现 npm/package.json 包信息" : "",
+    resource.license ? `许可证 ${resource.license}` : "",
+    resource.githubStars > 0 ? `GitHub Stars ${resource.githubStars}` : ""
+  ].filter(Boolean);
+
+  return evidence.length > 0 ? evidence.join("；") : undefined;
+}
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function slugifyResource(value: string) {
   return value

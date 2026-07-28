@@ -1,7 +1,21 @@
 import type { Resource, ResourceFilters } from "@/lib/types";
 
+export type ResourceSort = "relevance" | "trust" | "latest" | "stars";
+
 export function getResourceTags(resources: Resource[]) {
   return Array.from(new Set(resources.flatMap((resource) => resource.tags))).sort((a, b) => a.localeCompare(b));
+}
+
+export function getPopularResourceTags(resources: Resource[], limit = 100) {
+  const counts = new Map<string, number>();
+  resources.forEach((resource) => {
+    resource.tags.forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
+  });
+
+  return Array.from(counts)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, Math.max(0, limit))
+    .map(([tag]) => tag);
 }
 
 export function filterResources(resources: Resource[], filters: ResourceFilters) {
@@ -25,6 +39,23 @@ export function filterResources(resources: Resource[], filters: ResourceFilters)
       right.resource.fit_score + right.resource.trust_score - (left.resource.fit_score + left.resource.trust_score)
     )
     .map(({ resource }) => resource);
+}
+
+export function sortResources(resources: Resource[], sort: ResourceSort) {
+  if (sort === "relevance") return resources;
+
+  return [...resources].sort((left, right) => {
+    if (sort === "trust") {
+      return right.trust_score - left.trust_score || right.fit_score - left.fit_score;
+    }
+    if (sort === "stars") {
+      return (right.github_stars ?? 0) - (left.github_stars ?? 0) ||
+        right.trust_score - left.trust_score;
+    }
+
+    return getTimestamp(right.last_updated) - getTimestamp(left.last_updated) ||
+      right.trust_score - left.trust_score;
+  });
 }
 
 const searchSynonyms: Array<[string[], string[]]> = [
@@ -54,7 +85,31 @@ const searchSynonyms: Array<[string[], string[]]> = [
   ],
   [
     ["金融", "财经", "投资", "证券", "银行", "保险", "fintech"],
-    ["finance", "financial", "fintech", "investment", "banking", "insurance", "trading", "金融", "财经", "投资"]
+    ["finance", "financial", "fintech", "investment", "banking", "insurance", "trading", "stock", "market-data", "akshare", "qlib", "rqalpha", "金融", "财经", "投资"]
+  ],
+  [
+    ["做饭", "菜谱", "食材", "烹饪", "忌口", "餐食", "菜单"],
+    ["recipe", "recipes", "cooking", "ingredient", "meal", "meal-planning", "nutrition", "dietary-restrictions", "howtocook", "mealie", "tandoor"]
+  ],
+  [
+    ["2d转3d", "2d 转 3d", "二维转三维", "图像转三维", "三维模型"],
+    ["image-to-3d", "2d-to-3d", "depth-estimation", "mesh-generation", "threejs", "webgl", "img2threejs", "model-viewer"]
+  ],
+  [
+    ["超市", "库存", "货物", "商品", "仓库", "库位"],
+    ["inventory", "inventory-management", "stock-control", "warehouse", "warehouse-location", "item-pricing", "erp", "inventree", "erpnext"]
+  ],
+  [
+    ["语音", "语音聊天", "语音识别", "语音输入", "听写"],
+    ["speech-to-text", "speech-recognition", "asr", "chinese-asr", "streaming-asr", "funasr", "faster-whisper", "whisper"]
+  ],
+  [
+    ["宠物", "宠物医院", "兽医", "疫苗", "病历"],
+    ["veterinary", "pet-clinic", "medical-records", "vaccination", "appointment", "doctor-scheduling", "openvpms"]
+  ],
+  [
+    ["预测性维护", "设备维护", "故障预测", "传感器", "异常检测"],
+    ["predictive-maintenance", "condition-monitoring", "anomaly-detection", "time-series", "sensor-data", "pyod", "fault-detection"]
   ]
 ];
 
@@ -131,4 +186,9 @@ function getDescriptionScore(index: number, earlyScore: number, middleScore: num
   if (index < 240) return earlyScore;
   if (index < 800) return middleScore;
   return lateScore;
+}
+
+function getTimestamp(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
