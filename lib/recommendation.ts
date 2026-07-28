@@ -516,6 +516,7 @@ function scoreResources(
       resource.source !== "github_catalog" ||
       resource.has_skill_md === true
     )
+    .filter((resource) => !hasCapabilityDomainConflict(resource, capabilityGraph))
     .map((resource) => {
       const haystack = [
         resource.name,
@@ -535,8 +536,7 @@ function scoreResources(
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
       const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
       const matchedCapabilities = (capabilityGraph?.capabilities ?? []).filter((capability) =>
-        capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))
-        && !capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))
+        matchesCapabilityEvidence(haystack, capability, capabilityGraph)
       );
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
       const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];
@@ -634,6 +634,57 @@ function matchesScoringTerm(haystack: string, term: string) {
   const normalizedHaystack = haystack.replace(/[-_]+/g, " ");
   const normalizedTerm = normalized.replace(/[-_]+/g, " ");
   return haystack.includes(normalized) || normalizedHaystack.includes(normalizedTerm);
+}
+
+function matchesCapabilityEvidence(
+  haystack: string,
+  capability: CapabilityGraph["capabilities"][number],
+  capabilityGraph?: CapabilityGraph
+) {
+  if (capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
+  if (!capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
+  if (!isShortVideoGraph(capabilityGraph)) return true;
+
+  const capabilitySource = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+  if (/(short.video|text.to.video|视频生成|短视频生成)/i.test(capabilitySource)) {
+    return /(short[- ]video|text[- ]to[- ]video|ai[- ]video[- ]generator|video generation|generate.{0,24}video|视频生成|生成.{0,12}短视频)/i.test(haystack);
+  }
+  if (/(video.render|video.edit|video.composition|视频渲染|视频编辑|视频合成)/i.test(capabilitySource)) {
+    return /(video composition|video rendering|video editing|video encoding|moviepy video|remotion video|视频合成|视频渲染|视频编辑)/i.test(haystack);
+  }
+  if (/(auto.caption|subtitles|caption alignment|自动字幕|字幕对齐)/i.test(capabilitySource)) {
+    return /(automatic subtitles|video captions?|caption alignment|speech-to-text|automatic speech recognition|自动字幕|字幕对齐)/i.test(haystack);
+  }
+  if (/(voiceover|text.to.speech|speech synthesis|配音|语音合成)/i.test(capabilitySource)) {
+    return /(text-to-speech|\btts\b|voiceover|speech synthesis|配音|语音合成)/i.test(haystack);
+  }
+  if (/(video.template|pre-built video scenes|视频模板|预设场景)/i.test(capabilitySource)) {
+    return /(video templates?|short video templates?|pre-built video scenes?|vertical video templates?|视频模板|预设场景)/i.test(haystack);
+  }
+  if (/(workflow|automation|pipeline|agent tool|工具工作流)/i.test(capabilitySource)) {
+    return hasShortVideoEvidence(haystack);
+  }
+
+  return true;
+}
+
+function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: CapabilityGraph) {
+  if (!isShortVideoGraph(capabilityGraph) || resource.type === "ui_component") return false;
+  const source = `${resource.name} ${resource.description} ${resource.tags.join(" ")} ${resource.use_cases.join(" ")}`.toLowerCase();
+  if (hasShortVideoEvidence(source)) return false;
+  return /(\berp\b|erpnext|enterprise resource planning|inventory management|procurement|accounting|laravel agent|neuron-laravel|generic agent framework)/i.test(source);
+}
+
+function isShortVideoGraph(capabilityGraph?: CapabilityGraph) {
+  if (!capabilityGraph) return false;
+  const source = `${capabilityGraph.domain} ${capabilityGraph.capabilities
+    .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
+    .join(" ")}`.toLowerCase();
+  return /(short.video|text.to.video|ai.video.generator|video.generation|视频生成|短视频)/i.test(source);
+}
+
+function hasShortVideoEvidence(source: string) {
+  return /(short[- ]video|text[- ]to[- ]video|ai[- ]video[- ]generator|video generation|video composition|video rendering|video editing|moviepy video|remotion video|stock footage|automatic subtitles|video captions?|vertical video|视频生成|短视频|视频合成|视频渲染|视频编辑|视频素材|自动字幕)/i.test(source);
 }
 
 function selectDiverseCandidates<T extends {

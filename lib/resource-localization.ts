@@ -21,6 +21,21 @@ const typeLabels: Record<ResourceType, string> = {
 
 const topicRules: TopicRule[] = [
   {
+    terms: ["moneyprinterturbo", "moneyprinter", "ai-video-generator", "short-video", "text-to-video", "video-composition"],
+    label: "AI 短视频脚本、素材、配音、字幕与合成",
+    purpose: "用于把主题或文案转换为分镜脚本，组织图片或视频素材，生成配音和字幕，并合成可导出的竖屏短视频。"
+  },
+  {
+    terms: ["short-video-maker", "video mcp", "background-video"],
+    label: "短视频生成 MCP 与自动化接口",
+    purpose: "用于让 Agent 通过 MCP 或 API 调用短视频生成流程，组合背景视频、语音、字幕和音乐并返回成片。"
+  },
+  {
+    terms: ["openmontage", "remotion video", "video-rendering", "video-editing"],
+    label: "Agent 驱动的视频制作与渲染",
+    purpose: "用于编排脚本、素材、时间轴、配音和字幕，并通过 Remotion 或 FFmpeg 完成视频编辑与渲染。"
+  },
+  {
     terms: ["howtocook", "chinese-recipes", "chinese recipe"],
     label: "中文菜谱数据与标准化制作步骤",
     purpose: "用于提供中文菜名、食材用量、厨房准备和标准化制作步骤，可作为本地菜谱数据库的基础数据源。"

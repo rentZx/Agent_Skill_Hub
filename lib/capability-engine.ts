@@ -86,6 +86,61 @@ const capabilityPatterns: Array<{
   resourceRoles: ResourceRole[];
 }> = [
   {
+    id: "short-video-pipeline",
+    label: "AI 短视频生成流水线",
+    description: "把主题或文案转换为脚本、素材、配音、字幕和可导出的竖屏短视频。",
+    terms: ["短视频", "视频生成", "文生视频", "文本转视频", "ai视频", "ai 视频", "short video", "text-to-video", "video generation"],
+    keywords: ["ai short video generator", "short video generation", "text-to-video", "script generation", "stock footage", "video composition", "vertical video", "youtube shorts", "instagram reels", "tiktok video"],
+    negativeKeywords: ["erp", "enterprise resource planning", "inventory management", "accounting", "procurement", "generic agent framework", "laravel agent"],
+    preferredTypes: ["template_repo", "github_plugin", "agent_skill", "mcp_server"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_algorithm", "project_template"]
+  },
+  {
+    id: "video-rendering",
+    label: "视频编辑、合成与渲染",
+    description: "按照时间轴合成画面、配音、字幕和音乐，并编码导出目标视频格式。",
+    terms: ["视频合成", "视频编辑", "视频渲染", "时间轴", "ffmpeg", "moviepy", "remotion", "video composition", "video rendering"],
+    keywords: ["video composition", "video rendering", "video editing", "video encoding", "moviepy video", "remotion video", "ffmpeg video pipeline"],
+    negativeKeywords: ["speech recognition only", "transcription only", "erp", "inventory management", "asset accounting"],
+    preferredTypes: ["github_plugin", "template_repo", "mcp_server", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm", "developer_tool"]
+  },
+  {
+    id: "auto-caption",
+    label: "自动字幕与时间轴对齐",
+    description: "从音频生成字幕，并把文本与视频时间轴对齐。",
+    terms: ["字幕", "自动字幕", "caption", "subtitles", "speech-to-text"],
+    keywords: ["automatic subtitles", "video captions", "caption alignment", "speech-to-text", "automatic speech recognition"],
+    negativeKeywords: ["voice changer", "ai companion", "erp", "inventory management"],
+    preferredTypes: ["github_plugin", "template_repo", "mcp_server", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["speech_to_text", "domain_algorithm"]
+  },
+  {
+    id: "voiceover",
+    label: "智能配音与语音合成",
+    description: "把脚本文本转换为可配置音色、语速和语言的旁白音频。",
+    terms: ["配音", "语音合成", "旁白", "text-to-speech", "voiceover", "tts"],
+    keywords: ["text-to-speech", "voiceover generation", "speech synthesis", "neural tts"],
+    negativeKeywords: ["voice changer", "speech recognition only", "erp", "inventory management"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo"],
+    priority: "required",
+    resourceRoles: ["text_to_speech"]
+  },
+  {
+    id: "video-template-library",
+    label: "短视频模板与预设场景",
+    description: "复用竖屏视频模板、场景、字幕样式和转场预设。",
+    terms: ["视频模板", "模板库", "预设场景", "video template", "pre-built scene"],
+    keywords: ["video templates", "short video templates", "pre-built video scenes", "vertical video templates"],
+    negativeKeywords: ["saas boilerplate", "erp template", "admin dashboard", "inventory management"],
+    preferredTypes: ["template_repo", "ui_component", "github_plugin"],
+    priority: "required",
+    resourceRoles: ["project_template", "ui_library"]
+  },
+  {
     id: "food-content",
     label: "美食领域内容与数据",
     description: "评估可复用的菜谱、餐食或餐厅内容数据，并在产品方向确认后选择具体数据模型。",

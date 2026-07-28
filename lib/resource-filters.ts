@@ -60,6 +60,10 @@ export function sortResources(resources: Resource[], sort: ResourceSort) {
 
 const searchSynonyms: Array<[string[], string[]]> = [
   [
+    ["短视频", "视频生成", "文生视频", "文本转视频", "ai视频", "ai 视频", "视频合成", "自动字幕", "智能配音"],
+    ["moneyprinterturbo", "moneyprinter", "openmontage", "short-video-maker", "text-to-video", "ai-video-generator", "short-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition", "moviepy", "ffmpeg"]
+  ],
+  [
     ["文档", "文档解析", "解析", "pdf", "word", "表格", "文件", "markitdown"],
     ["pdf", "document", "documents", "docx", "word", "excel", "spreadsheet", "markdown", "markitdown", "解析", "文档"]
   ],

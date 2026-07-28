@@ -98,6 +98,10 @@ const githubQueries: GitHubCatalogConfig[] = [
 ];
 
 const curatedGitHubAnchors: CuratedGitHubAnchor[] = [
+  { repository: "harry0703/MoneyPrinterTurbo", type: "template_repo", tags: ["ai-video-generator", "short-video", "text-to-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition", "moviepy", "ffmpeg", "vertical-video"] },
+  { repository: "gyoridavid/short-video-maker", type: "mcp_server", tags: ["mcp-server", "short-video", "text-to-video", "text-to-speech", "captions", "background-video", "video-composition", "vertical-video"] },
+  { repository: "SamurAIGPT/Text-To-Video-AI", type: "template_repo", tags: ["text-to-video", "script-generation", "text-to-speech", "stock-footage", "captions", "vertical-video", "ffmpeg"] },
+  { repository: "FujiwaraChoki/MoneyPrinter", type: "template_repo", tags: ["ai-video-generator", "short-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition"] },
   { repository: "img2threejs/img2threejs", type: "agent_skill", tags: ["image-to-3d", "threejs", "webgl", "procedural-generation", "agent-skill"], hasSkillMd: true },
   { repository: "Stability-AI/stable-fast-3d", type: "github_plugin", tags: ["image-to-3d", "3d-reconstruction", "mesh-generation"] },
   { repository: "TencentARC/InstantMesh", type: "github_plugin", tags: ["image-to-3d", "3d-reconstruction", "mesh-generation"] },

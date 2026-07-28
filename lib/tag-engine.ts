@@ -6,6 +6,20 @@ export type ProjectTag = {
 };
 
 const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
+  { terms: ["短视频", "视频生成", "文生视频", "文本转视频", "ai视频", "ai 视频", "short video", "text-to-video", "video generation"], tags: [
+    { slug: "ai-video-generator", label: "AI Video Generator", category: "domain", weight: 10 },
+    { slug: "short-video", label: "Short Video", category: "industry", weight: 10 },
+    { slug: "text-to-video", label: "Text to Video", category: "workflow", weight: 9 },
+    { slug: "video-composition", label: "Video Composition", category: "workflow", weight: 9 },
+    { slug: "script-generation", label: "Script Generation", category: "workflow", weight: 8 },
+    { slug: "stock-footage", label: "Stock Footage", category: "domain", weight: 8 },
+    { slug: "text-to-speech", label: "Text to Speech", category: "technology", weight: 8 },
+    { slug: "subtitles", label: "Subtitles", category: "workflow", weight: 8 },
+    { slug: "ffmpeg", label: "FFmpeg", category: "technology", weight: 7 },
+    { slug: "moviepy", label: "MoviePy", category: "technology", weight: 7 },
+    { slug: "vertical-video", label: "Vertical Video", category: "domain", weight: 7 },
+    { slug: "content-creation", label: "Content Creation", category: "industry", weight: 7 }
+  ] },
   { terms: ["2d转3d", "2d 转 3d", "image-to-3d", "image to 3d", "img2threejs", "threejs", "three.js"], tags: [
     { slug: "image-to-3d", label: "Image to 3D", category: "domain", weight: 10 },
     { slug: "computer-graphics", label: "Computer Graphics", category: "industry", weight: 9 },

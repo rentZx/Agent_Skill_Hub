@@ -98,6 +98,63 @@ const cases: BenchmarkCase[] = [
       resource("AIRI", "template_repo", "AI companion and virtual character with voice chat", ["ai-companion", "voice-chat"]),
       resource("Next SaaS Starter", "template_repo", "Generic SaaS starter with billing and authentication", ["saas", "boilerplate"])
     ]
+  },
+  {
+    name: "AI 短视频生成",
+    prompt: "开发一站式 AI 短视频生成工具，从主题生成文案、素材、配音、字幕并合成竖屏视频",
+    projectType: "一站式 AI 短视频生成与编辑工具",
+    capabilities: [
+      capability(
+        "short-video-pipeline",
+        "AI 短视频生成流水线",
+        ["short video generation", "text-to-video", "video composition", "stock footage"],
+        "core",
+        ["domain_system", "domain_algorithm"]
+      ),
+      capability(
+        "video-rendering",
+        "视频编辑、合成与渲染",
+        ["video composition", "video rendering", "moviepy video", "remotion video"],
+        "required",
+        ["domain_algorithm", "developer_tool"]
+      ),
+      capability(
+        "auto-caption",
+        "自动字幕与时间轴对齐",
+        ["automatic subtitles", "video captions", "caption alignment"],
+        "required",
+        ["speech_to_text", "domain_algorithm"]
+      )
+    ],
+    expectedQuery: "short video generation",
+    relevant: [
+      resource(
+        "MoneyPrinterTurbo",
+        "template_repo",
+        "AI short video generator with script generation, stock footage, voiceover, subtitles and video composition",
+        ["ai-video-generator", "short-video", "text-to-video", "video-composition"]
+      ),
+      resource(
+        "short-video-maker",
+        "mcp_server",
+        "MCP short video generator with text-to-speech, automatic subtitles and video composition",
+        ["mcp-server", "short-video", "automatic-subtitles", "video-composition"]
+      )
+    ],
+    irrelevant: [
+      resource(
+        "ERPNext",
+        "template_repo",
+        "Enterprise resource planning with inventory, procurement, accounting and asset management",
+        ["erp", "inventory-management", "asset-management"]
+      ),
+      resource(
+        "neuron-tool-creator",
+        "agent_skill",
+        "Generic Laravel agent framework and tool creator",
+        ["laravel-agent", "agent-tool", "workflow"]
+      )
+    ]
   }
 ];
 

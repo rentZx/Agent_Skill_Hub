@@ -40,6 +40,40 @@ type DiscoveryProfile = {
   riskOverrides?: Record<string, { level: RiskLevel; reason: string; license?: string }>;
 };
 
+const shortVideoDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"AI short video generator\" subtitles voiceover in:name,description,readme archived:false fork:false",
+    "\"text to video\" FFmpeg MoviePy in:name,description,readme archived:false fork:false",
+    "\"automated video creation\" TTS captions in:name,description,readme archived:false fork:false",
+    "\"vertical video\" script footage subtitles in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "harry0703/MoneyPrinterTurbo",
+    "calesthio/OpenMontage",
+    "gyoridavid/short-video-maker",
+    "SamurAIGPT/Text-To-Video-AI",
+    "FujiwaraChoki/MoneyPrinter"
+  ],
+  relevanceTerms: [
+    "ai short video generator", "short video generation", "text-to-video", "script generation",
+    "stock footage", "text-to-speech", "automatic subtitles", "video composition", "vertical video"
+  ],
+  typeOverrides: {
+    "harry0703/moneyprinterturbo": "template_repo",
+    "calesthio/openmontage": "agent_skill",
+    "gyoridavid/short-video-maker": "mcp_server",
+    "samuraigpt/text-to-video-ai": "template_repo",
+    "fujiwarachoki/moneyprinter": "template_repo"
+  },
+  tagOverrides: {
+    "harry0703/moneyprinterturbo": ["ai-video-generator", "short-video", "text-to-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition", "moviepy", "ffmpeg", "vertical-video"],
+    "calesthio/openmontage": ["agent-skill", "short-video", "script-generation", "asset-generation", "text-to-speech", "captions", "video-editing", "video-rendering", "remotion", "ffmpeg"],
+    "gyoridavid/short-video-maker": ["mcp-server", "short-video", "text-to-video", "text-to-speech", "captions", "background-video", "video-composition", "vertical-video"],
+    "samuraigpt/text-to-video-ai": ["text-to-video", "script-generation", "text-to-speech", "stock-footage", "captions", "vertical-video", "ffmpeg"],
+    "fujiwarachoki/moneyprinter": ["ai-video-generator", "short-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition"]
+  }
+};
+
 const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"inventory management\" \"stock location\" in:name,description,readme archived:false fork:false",
@@ -603,6 +637,9 @@ function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[], prefe
 
 function getDiscoveryProfile(input: string, tags: string[]) {
   const source = `${input} ${tags.join(" ")}`.toLowerCase();
+  if (/(短视频|视频生成|文生视频|文本转视频|视频合成|ai.?视频|ai.?video|short.?video|text.to.video|video.generation)/i.test(source)) {
+    return shortVideoDiscoveryProfile;
+  }
   if (/(超市|货物|商品价格|库存|库位|货架|仓库|inventory.management|stock.control|warehouse.location)/i.test(source)) {
     return inventoryVoiceDiscoveryProfile;
   }

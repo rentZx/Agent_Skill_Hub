@@ -32,6 +32,13 @@ const cases = [
     additionalIrrelevant: resource("Next Enterprise Boilerplate", "template_repo", ["enterprise", "nextjs", "boilerplate"])
   },
   {
+    query: "一站式AI短视频生成工具",
+    relevant: resource("MoneyPrinterTurbo", "template_repo", ["ai-video-generator", "short-video", "video-composition"]),
+    secondary: resource("short-video-maker", "mcp_server", ["mcp-server", "short-video", "text-to-speech", "subtitles"]),
+    irrelevant: resource("ERPNext", "template_repo", ["erp", "inventory-management", "asset-management"]),
+    additionalIrrelevant: resource("neuron-tool-creator", "agent_skill", ["laravel-agent", "agent-tool", "workflow"])
+  },
+  {
     query: "宠物医院 疫苗 病历",
     relevant: resource("OpenVPMS", "template_repo", ["veterinary", "medical-records", "vaccination"]),
     irrelevant: resource("Hospital Landing Page", "template_repo", ["landing-page"])

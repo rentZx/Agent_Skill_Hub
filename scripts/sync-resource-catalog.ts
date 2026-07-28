@@ -4,7 +4,7 @@ dotenv.config({ path: ".env" });
 
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { syncResourceCatalog, type CatalogCandidate } from "../lib/resource-catalog-sync";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 
@@ -91,6 +91,8 @@ async function upsertCandidate(candidate: CatalogCandidate) {
     .returning({ id: resources.id });
 
   if (!savedResource) return;
+
+  await db.delete(resourceTags).where(eq(resourceTags.resourceId, savedResource.id));
 
   for (const tag of candidate.tags) {
     const [savedTag] = await db
