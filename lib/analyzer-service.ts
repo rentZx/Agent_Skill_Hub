@@ -9,7 +9,13 @@ import { rebuildCodexPrompt } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import type { Resource } from "@/lib/types";
 
-export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerResult & { source: "deepseek" | "rules"; discoveredCount: number }> {
+type AnalyzerRuntimeResult = AnalyzerResult & {
+  source: "deepseek" | "rules";
+  discoveredCount: number;
+  selectedDiscoveredCount: number;
+};
+
+export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerRuntimeResult> {
   const initial = analyzeProject(input, resources);
   const preliminaryGraph = buildCapabilityGraph(input, {
     projectType: initial.analysis.projectType,
@@ -53,6 +59,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
         ...fallback,
         source: "rules",
         discoveredCount: discovered.length,
+        selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
         recommendation: {
           ...recommendation,
           codexPrompt: buildAnalyzerPrompt(input, fallback.analysis, recommendation.codexPrompt)
@@ -97,6 +104,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       ...enriched,
       source: "deepseek",
       discoveredCount: discovered.length,
+      selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
       recommendation: {
         ...recommendation,
         codexPrompt: buildAnalyzerPrompt(input, analysis, recommendation.codexPrompt)
@@ -105,8 +113,27 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     };
   } catch (error) {
     console.warn("DeepSeek analysis failed, using rules fallback.", error);
-    return { ...fallback, source: "rules", discoveredCount: discovered.length };
+    return {
+      ...fallback,
+      source: "rules",
+      discoveredCount: discovered.length,
+      selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered)
+    };
   }
+}
+
+function countSelectedDiscoveredResources(
+  recommendation: AnalyzerResult["recommendation"],
+  discovered: Resource[]
+) {
+  const discoveredIds = new Set(discovered.map((resource) => resource.id));
+  const selectedIds = recommendation.groups
+    .filter((group) => group.id !== "risk-alerts")
+    .flatMap((group) => group.items)
+    .map((item) => item.resource.id)
+    .filter((id) => discoveredIds.has(id));
+
+  return new Set(selectedIds).size;
 }
 
 async function analyzeSafely(input: string) {
