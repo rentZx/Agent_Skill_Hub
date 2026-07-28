@@ -51,7 +51,8 @@ const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
     "frappe/erpnext",
     "inventree/InvenTree",
     "modelscope/FunASR",
-    "SYSTRAN/faster-whisper"
+    "SYSTRAN/faster-whisper",
+    "crystaldba/postgres-mcp"
   ],
   relevanceTerms: [
     "inventory management", "stock control", "warehouse location", "product catalog", "item pricing",
@@ -61,13 +62,15 @@ const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
     "frappe/erpnext": "template_repo",
     "inventree/inventree": "template_repo",
     "modelscope/funasr": "github_plugin",
-    "systran/faster-whisper": "github_plugin"
+    "systran/faster-whisper": "github_plugin",
+    "crystaldba/postgres-mcp": "mcp_server"
   },
   tagOverrides: {
     "frappe/erpnext": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "erp", "retail"],
     "inventree/inventree": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "inventory-api"],
     "modelscope/funasr": ["speech-to-text", "automatic-speech-recognition", "chinese-asr", "streaming-asr", "voice-transcription"],
-    "systran/faster-whisper": ["speech-to-text", "automatic-speech-recognition", "voice-transcription", "whisper"]
+    "systran/faster-whisper": ["speech-to-text", "automatic-speech-recognition", "voice-transcription", "whisper"],
+    "crystaldba/postgres-mcp": ["database-mcp", "postgres-mcp", "sql-tool", "natural-language-query", "database-analysis"]
   }
 };
 

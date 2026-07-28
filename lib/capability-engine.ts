@@ -112,7 +112,7 @@ const capabilityPatterns: Array<{
     label: "自然语言业务查询",
     description: "把自然语言问题转换为受约束的业务查询，并只返回有数据依据的结果。",
     terms: ["聊天的方式", "告诉我", "问答", "自然语言查询", "对话查询", "tool calling", "function calling"],
-    keywords: ["natural language query", "tool calling", "function calling", "structured query", "database question answering"],
+    keywords: ["natural language query", "tool calling", "function calling", "structured query", "database question answering", "database mcp", "postgres mcp", "sql tool"],
     negativeKeywords: ["ai companion", "roleplay", "virtual character"],
     preferredTypes: ["agent_skill", "mcp_server", "github_plugin", "template_repo"],
     priority: "required",
@@ -253,10 +253,14 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
   const seededRoles = (seed.resourceRoles ?? [])
     .filter((role): role is ResourceRole => resourceRoles.includes(role as ResourceRole));
   const inferredRoles = seededRoles.length > 0 ? seededRoles : inferResourceRoles(label, keywords, preferredTypes);
+  const capabilitySource = `${label} ${keywords.join(" ")}`.toLowerCase();
   const hasDomainRole = inferredRoles.some((role) =>
     role === "domain_system" || role === "domain_data" || role === "domain_algorithm"
   );
   if (priority === "core" && !hasDomainRole) priority = "required";
+  if (/(自然语言.*查询|natural language query|tool calling|function calling)/.test(capabilitySource)) {
+    priority = "required";
+  }
   if (inferredRoles.includes("text_to_speech")) priority = "optional";
 
   return {
@@ -360,16 +364,42 @@ function priorityWeight(priority: CapabilityPriority) {
 function capabilitiesOverlap(left: CapabilityRequirement, right: CapabilityRequirement) {
   if (normalizeTerm(left.label) === normalizeTerm(right.label)) return true;
   const leftTerms = new Set(left.keywords.map(normalizeTerm));
-  return right.keywords.some((keyword) => leftTerms.has(normalizeTerm(keyword)));
+  return right.keywords.some((keyword) => {
+    const normalized = normalizeTerm(keyword);
+    if (leftTerms.has(normalized)) return true;
+    return Array.from(leftTerms).some((leftTerm) =>
+      Math.min(leftTerm.length, normalized.length) >= 8
+      && (leftTerm.includes(normalized) || normalized.includes(leftTerm))
+    );
+  });
 }
 
 function dedupeCapabilities(capabilities: CapabilityRequirement[]) {
-  const unique = new Map<string, CapabilityRequirement>();
+  const unique: CapabilityRequirement[] = [];
   capabilities.forEach((capability) => {
-    const key = capability.id || slugify(capability.label);
-    if (!unique.has(key)) unique.set(key, capability);
+    const index = unique.findIndex((existing) =>
+      existing.id === capability.id || capabilitiesOverlap(existing, capability)
+    );
+    if (index < 0) {
+      unique.push(capability);
+      return;
+    }
+
+    const existing = unique[index];
+    const priority = priorityWeight(capability.priority) > priorityWeight(existing.priority)
+      ? capability.priority
+      : existing.priority;
+    unique[index] = {
+      ...existing,
+      required: priority !== "optional",
+      priority,
+      resourceRoles: Array.from(new Set([...existing.resourceRoles, ...capability.resourceRoles])),
+      keywords: cleanStrings([...existing.keywords, ...capability.keywords], 12),
+      negativeKeywords: cleanStrings([...existing.negativeKeywords, ...capability.negativeKeywords], 8),
+      preferredTypes: Array.from(new Set([...existing.preferredTypes, ...capability.preferredTypes]))
+    };
   });
-  return Array.from(unique.values());
+  return unique;
 }
 
 function removeCompositeCapabilities(capabilities: CapabilityRequirement[]) {
