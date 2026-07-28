@@ -80,8 +80,7 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     }
     const enriched = analyzeProject(input, candidateResources, isLowConfidence
       ? {
-          industry: ai.industry,
-          tags: ai.tags
+          industry: ai.industry
         }
       : {
           industry: ai.industry,
