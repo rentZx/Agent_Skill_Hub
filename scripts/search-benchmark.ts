@@ -22,7 +22,8 @@ const cases = [
     query: "超市 语音 库存",
     relevant: resource("InvenTree", "template_repo", ["inventory-management", "stock-control"]),
     secondary: resource("FunASR", "github_plugin", ["speech-to-text", "chinese-asr"]),
-    irrelevant: resource("Voice Companion", "template_repo", ["ai-companion", "voice-chat"])
+    irrelevant: resource("Voice Companion", "template_repo", ["ai-companion", "voice-chat"]),
+    additionalIrrelevant: resource("Next Enterprise Boilerplate", "template_repo", ["enterprise", "nextjs", "boilerplate"])
   },
   {
     query: "宠物医院 疫苗 病历",
@@ -35,7 +36,8 @@ for (const benchmark of cases) {
   const candidates = [
     benchmark.relevant,
     ...(benchmark.secondary ? [benchmark.secondary] : []),
-    benchmark.irrelevant
+    benchmark.irrelevant,
+    ...(benchmark.additionalIrrelevant ? [benchmark.additionalIrrelevant] : [])
   ];
   const results = filterResources(candidates, { query: benchmark.query });
   const names = results.map((item) => item.name);
@@ -45,6 +47,9 @@ for (const benchmark of cases) {
     assert(names.includes(benchmark.secondary.name), `${benchmark.query}: 未召回 ${benchmark.secondary.name}`);
   }
   assert(!names.includes(benchmark.irrelevant.name), `${benchmark.query}: 错误召回 ${benchmark.irrelevant.name}`);
+  if (benchmark.additionalIrrelevant) {
+    assert(!names.includes(benchmark.additionalIrrelevant.name), `${benchmark.query}: 错误召回 ${benchmark.additionalIrrelevant.name}`);
+  }
 }
 
 console.log(`Search benchmark passed: ${cases.length} cases.`);

@@ -63,7 +63,20 @@ export type CatalogSyncOptions = {
   sources?: Set<"github" | "mcp" | "npm">;
 };
 
-const githubQueries: Array<{ type: ResourceType; query: string; tags: string[] }> = [
+type GitHubCatalogConfig = {
+  type: ResourceType;
+  query: string;
+  tags: string[];
+  hasSkillMd?: boolean;
+  hasMcpManifest?: boolean;
+  hasPackageJson?: boolean;
+};
+
+type CuratedGitHubAnchor = Omit<GitHubCatalogConfig, "query"> & {
+  repository: string;
+};
+
+const githubQueries: GitHubCatalogConfig[] = [
   { type: "agent_skill", query: "skill.md in:name,description,readme", tags: ["skills", "agent-skill"] },
   { type: "agent_skill", query: "agent skill in:readme", tags: ["skills", "agent-skill"] },
   { type: "agent_skill", query: "codex skill in:name,description,readme", tags: ["codex", "skills"] },
@@ -82,6 +95,27 @@ const githubQueries: Array<{ type: ResourceType; query: string; tags: string[] }
   { type: "template_repo", query: "nextjs starter template", tags: ["nextjs", "starter", "template"] },
   { type: "template_repo", query: "nextjs boilerplate", tags: ["nextjs", "boilerplate", "template"] },
   { type: "template_repo", query: "org:vercel nextjs examples", tags: ["nextjs", "vercel", "examples"] }
+];
+
+const curatedGitHubAnchors: CuratedGitHubAnchor[] = [
+  { repository: "img2threejs/img2threejs", type: "agent_skill", tags: ["image-to-3d", "threejs", "webgl", "procedural-generation", "agent-skill"], hasSkillMd: true },
+  { repository: "Stability-AI/stable-fast-3d", type: "github_plugin", tags: ["image-to-3d", "3d-reconstruction", "mesh-generation"] },
+  { repository: "TencentARC/InstantMesh", type: "github_plugin", tags: ["image-to-3d", "3d-reconstruction", "mesh-generation"] },
+  { repository: "VAST-AI-Research/TripoSR", type: "github_plugin", tags: ["image-to-3d", "3d-reconstruction", "mesh-generation"] },
+  { repository: "Anduin2017/HowToCook", type: "template_repo", tags: ["chinese-recipes", "recipe", "ingredients", "cooking-steps", "recipe-dataset"] },
+  { repository: "worryzyy/HowToCook-mcp", type: "mcp_server", tags: ["recipe-mcp", "chinese-recipes", "recipe", "ingredients", "cooking-steps"], hasPackageJson: true },
+  { repository: "mealie-recipes/mealie", type: "template_repo", tags: ["recipe", "meal-planning", "shopping-list", "servings", "recipe-import"] },
+  { repository: "frappe/erpnext", type: "template_repo", tags: ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "erp", "retail"] },
+  { repository: "inventree/InvenTree", type: "template_repo", tags: ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "inventory-api"] },
+  { repository: "modelscope/FunASR", type: "github_plugin", tags: ["speech-to-text", "automatic-speech-recognition", "chinese-asr", "streaming-asr", "voice-transcription"] },
+  { repository: "SYSTRAN/faster-whisper", type: "github_plugin", tags: ["speech-to-text", "automatic-speech-recognition", "voice-transcription", "whisper"] },
+  { repository: "ZhuLinsen/daily_stock_analysis", type: "template_repo", tags: ["stock-market", "market-data", "real-time-quotes", "technical-analysis", "quantitative-trading"] },
+  { repository: "akfamily/akshare", type: "github_plugin", tags: ["financial-data", "a-share", "market-data", "stock-market"] },
+  { repository: "mootdx/mootdx", type: "github_plugin", tags: ["market-data", "real-time-quotes", "a-share", "tongdaxin"] },
+  { repository: "microsoft/qlib", type: "github_plugin", tags: ["quantitative-trading", "quant-research", "machine-learning", "backtesting"] },
+  { repository: "ricequant/rqalpha", type: "github_plugin", tags: ["backtesting", "algorithmic-trading", "a-share", "trading-strategy"] },
+  { repository: "hsliuping/TradingAgents-CN", type: "template_repo", tags: ["multi-agent-research", "stock-analysis", "quantitative-trading", "stock-market"] },
+  { repository: "tradingview/lightweight-charts", type: "ui_component", tags: ["financial-charts", "candlestick", "ui", "stock-market"] }
 ];
 
 const npmQueries: Array<{ type: ResourceType; query: string; tags: string[] }> = [
@@ -118,7 +152,7 @@ export async function syncResourceCatalog(options: CatalogSyncOptions = {}) {
 }
 
 async function syncGitHubCatalog(limit: number) {
-  const candidates: CatalogCandidate[] = [];
+  const candidates: CatalogCandidate[] = await syncCuratedGitHubAnchors();
 
   for (const config of githubQueries) {
     try {
@@ -131,6 +165,23 @@ async function syncGitHubCatalog(limit: number) {
   }
 
   return candidates;
+}
+
+async function syncCuratedGitHubAnchors() {
+  const results = await Promise.all(curatedGitHubAnchors.map(async (anchor) => {
+    try {
+      const repository = await fetchGitHubRepository(anchor.repository);
+      return mapGitHubRepository(repository, {
+        ...anchor,
+        query: `curated:${anchor.repository}`
+      });
+    } catch (error) {
+      console.warn(`Curated GitHub repository failed: ${anchor.repository}`, error);
+      return null;
+    }
+  }));
+
+  return results.filter((candidate): candidate is CatalogCandidate => Boolean(candidate));
 }
 
 async function syncGitHubSkillFiles(limit: number) {
@@ -244,7 +295,7 @@ async function fetchGitHubRepositories(query: string, limit: number) {
   return data.items ?? [];
 }
 
-function mapGitHubRepository(repository: GitHubRepository, config: { type: ResourceType; query: string; tags: string[] }): CatalogCandidate {
+function mapGitHubRepository(repository: GitHubRepository, config: GitHubCatalogConfig): CatalogCandidate {
   const risk = assessRiskLevel({
     stars: repository.stargazers_count,
     license: repository.license?.spdx_id ?? null,
@@ -279,6 +330,9 @@ function mapGitHubRepository(repository: GitHubRepository, config: { type: Resou
     license: repository.license?.spdx_id ?? null,
     latest_commit_at: repository.pushed_at,
     readme_summary: repository.description ?? `${repository.name} GitHub repository`,
+    has_skill_md: config.hasSkillMd,
+    has_mcp_manifest: config.hasMcpManifest,
+    has_package_json: config.hasPackageJson,
     metadata: {
       source_kind: "github_api",
       source_query: config.query,

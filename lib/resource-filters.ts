@@ -154,26 +154,26 @@ function getSearchScore(
 
   const primaryScore = query.primary.reduce((score, term) => {
     if (!term) return score;
-    const descriptionIndex = description.indexOf(term);
+    const descriptionIndex = findSearchTermIndex(description, term);
     return score +
-      (name === term ? 120 : name.includes(term) ? 90 : 0) +
-      (tags.includes(term) ? 70 : tags.some((tag) => tag.includes(term)) ? 52 : 0) +
-      (useCases.some((useCase) => useCase.includes(term)) ? 34 : 0) +
-      (agents.some((agent) => agent.includes(term)) ? 24 : 0) +
+      (name === term ? 120 : includesSearchTerm(name, term) ? 90 : 0) +
+      (tags.includes(term) ? 70 : tags.some((tag) => includesSearchTerm(tag, term)) ? 52 : 0) +
+      (useCases.some((useCase) => includesSearchTerm(useCase, term)) ? 34 : 0) +
+      (agents.some((agent) => includesSearchTerm(agent, term)) ? 24 : 0) +
       getDescriptionScore(descriptionIndex, 46, 28, 10);
   }, 0);
 
   const expandedMetadataScore = query.expanded.reduce((score, term) => {
     if (!term) return score;
     return score +
-      (name.includes(term) ? 34 : 0) +
-      (tags.includes(term) ? 30 : tags.some((tag) => tag.includes(term)) ? 22 : 0) +
-      (useCases.some((useCase) => useCase.includes(term)) ? 16 : 0);
+      (includesSearchTerm(name, term) ? 34 : 0) +
+      (tags.includes(term) ? 30 : tags.some((tag) => includesSearchTerm(tag, term)) ? 22 : 0) +
+      (useCases.some((useCase) => includesSearchTerm(useCase, term)) ? 16 : 0);
   }, 0);
   const expandedDescriptionScore = Math.min(
     18,
     query.expanded.reduce(
-      (score, term) => score + getDescriptionScore(description.indexOf(term), 18, 10, 3),
+      (score, term) => score + getDescriptionScore(findSearchTermIndex(description, term), 18, 10, 3),
       0
     )
   );
@@ -186,6 +186,24 @@ function getDescriptionScore(index: number, earlyScore: number, middleScore: num
   if (index < 240) return earlyScore;
   if (index < 800) return middleScore;
   return lateScore;
+}
+
+function includesSearchTerm(value: string, term: string) {
+  if (!term) return false;
+  if (term.length > 3 || /[^\x00-\x7f]/.test(term)) return value.includes(term);
+  return findSearchTermIndex(value, term) >= 0;
+}
+
+function findSearchTermIndex(value: string, term: string) {
+  if (!term) return -1;
+  if (term.length > 3 || /[^\x00-\x7f]/.test(term)) return value.indexOf(term);
+
+  const match = new RegExp(`(^|[^a-z0-9])${escapeRegExp(term)}(?=$|[^a-z0-9])`).exec(value);
+  return match ? match.index + match[1].length : -1;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getTimestamp(value: string) {
