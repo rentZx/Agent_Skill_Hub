@@ -8,6 +8,29 @@ export function rankFeaturedResources(resources: Resource[]) {
     .map(({ resource }) => resource);
 }
 
+export function selectDailyFeaturedSkills(
+  resources: Resource[],
+  date = new Date(),
+  limit = 6
+) {
+  if (limit <= 0) return [];
+
+  const rankedSkills = rankFeaturedResources(
+    resources.filter((resource) => resource.type === "agent_skill")
+  );
+  const highQualitySkills = rankedSkills.filter(
+    (resource) => resource.trust_score >= 70 && resource.fit_score >= 60
+  );
+  const eligibleSkills = highQualitySkills.length >= limit ? highQualitySkills : rankedSkills;
+  const candidatePool = eligibleSkills.slice(0, Math.max(limit, Math.min(30, eligibleSkills.length)));
+  const rankById = new Map(candidatePool.map((resource, index) => [resource.id, index]));
+  const selected = seededShuffle(candidatePool, getChinaDayKey(date)).slice(0, limit);
+
+  return selected.sort(
+    (a, b) => (rankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rankById.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+  );
+}
+
 export function getCoverageScore(resources: Resource[], type: ResourceType) {
   const typedResources = resources.filter((resource) => resource.type === type);
   if (typedResources.length === 0) return 0;
@@ -55,4 +78,30 @@ function getPopularityScore(stars: number) {
 
 function average(values: number[]) {
   return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function getChinaDayKey(date: Date) {
+  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function seededShuffle<T>(items: T[], seedValue: string) {
+  const shuffled = [...items];
+  let seed = hashString(seedValue);
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }

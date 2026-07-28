@@ -19,7 +19,7 @@ import { getResources } from "@/lib/resources";
 import { Button } from "@/components/ui/button";
 import { HomeAnalyzerForm } from "@/components/home-analyzer-form";
 import { getLocalizedResourceDescription } from "@/lib/resource-localization";
-import { getCoverageScore, rankFeaturedResources } from "@/lib/resource-ranking";
+import { getCoverageScore, selectDailyFeaturedSkills } from "@/lib/resource-ranking";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function HomePage() {
   const avgTrust = Math.round(resources.reduce((sum, item) => sum + item.trust_score, 0) / totalResources);
   const avgFit = Math.round(resources.reduce((sum, item) => sum + item.fit_score, 0) / totalResources);
   const lowRisk = resources.filter((item) => item.risk_level === "low").length;
-  const topResources = rankFeaturedResources(resources).slice(0, 6);
+  const topResources = selectDailyFeaturedSkills(resources);
   const coverageScores = Object.fromEntries(
     resourceTypes.map((type) => [type, getCoverageScore(resources, type)])
   ) as Record<ResourceType, number>;
@@ -156,10 +156,10 @@ export default async function HomePage() {
           <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">工作方式</div>
           <h2 className="mt-3 text-2xl font-semibold">从项目想法到 Codex 可执行方案。</h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            当前版本使用精选本地资源库，优先展示适配度、可信度和风险等级，让资源比较更快、更清楚。
+            每日从高质量 Agent Skills 候选池轮换 6 项，点击即可查看适用场景、安装方式和风险说明。
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-400">
-            精选排序：适配度 45%、可信度 30%、源仓库新鲜度 15%、社区热度 10%；高风险资源不会进入精选。
+            资源目录每天同步；候选池按适配度 45%、可信度 30%、源仓库新鲜度 15%、社区热度 10% 排序，高风险资源不会进入精选。
           </p>
           <Button asChild variant="secondary" className="mt-5">
             <Link href="/resources">
@@ -170,8 +170,10 @@ export default async function HomePage() {
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {topResources.map((resource) => (
-            <article
-              key={resource.name}
+            <Link
+              key={resource.id}
+              href={`/resources/${resource.slug}`}
+              aria-label={`查看 ${resource.name} 详情`}
               className="rounded-lg border border-white/10 bg-white/[0.045] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.07] hover:shadow-[0_14px_36px_rgba(34,211,238,0.08)]"
             >
               <div className="text-xs text-cyan-200">{typeLabels[resource.type]}</div>
@@ -181,7 +183,7 @@ export default async function HomePage() {
                 <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-slate-300">可信 {resource.trust_score}</span>
                 <span className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">适配 {resource.fit_score}</span>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       </section>
