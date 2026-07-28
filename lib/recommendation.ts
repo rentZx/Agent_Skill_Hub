@@ -1,5 +1,9 @@
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
-import type { CapabilityGraph } from "@/lib/capability-engine";
+import type {
+  CapabilityGraph,
+  CapabilityPriority,
+  ResourceRole
+} from "@/lib/capability-engine";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 
@@ -19,6 +23,8 @@ export type CapabilityModule = {
   preferredTags: string[];
   preferredTypes: ResourceType[];
   projectStage: string;
+  priority?: CapabilityPriority;
+  resourceRoles?: ResourceRole[];
 };
 
 export type RecommendedResource = {
@@ -32,6 +38,7 @@ export type RecommendedResource = {
   matchKind: "domain" | "baseline" | "risk";
   matchedCapabilityIds: string[];
   capabilityCoverage: number;
+  resourceRole?: ResourceRole;
 };
 
 export type RecommendationGroup = {
@@ -346,16 +353,19 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
     scoringModules,
     context.capabilityGraph
   );
+  const bundle = selectCapabilityBundle(scored, context.capabilityGraph);
   const selectedIds = new Set<string>();
 
   const groups = groupDefinitions.map((group) => {
     const matching = scored
+      .filter((item) => group.riskOnly ? bundle.riskIds.has(item.resource.id) : bundle.defaultIds.has(item.resource.id))
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => group.riskOnly ? item.resource.risk_level === "high" : item.resource.risk_level !== "high")
       .filter((item) => !selectedIds.has(item.resource.id))
       .filter((item) => group.riskOnly || item.hasProjectSignal);
     const baseline = scored
+      .filter(() => !context.capabilityGraph)
       .filter((item) => !group.riskOnly && !item.hasProjectSignal)
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => item.resource.risk_level !== "high")
@@ -391,7 +401,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
     };
   });
 
-  const gaps = buildGaps(groups, modules);
+  const gaps = buildGaps(groups, modules, context.capabilityGraph);
 
   return {
     understanding,
@@ -498,11 +508,14 @@ function scoreResources(
       const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
       const matchedCapabilities = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))
+        && !capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))
       );
-      const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.required) ?? [];
-      const requiredWeight = Math.max(1, requiredCapabilities.length);
-      const matchedRequired = matchedCapabilities.filter((capability) => capability.required).length;
-      const capabilityCoverage = matchedRequired / requiredWeight;
+      const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
+      const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];
+      const matchedCore = matchedCapabilities.filter((capability) => capability.priority === "core");
+      const matchedRequired = matchedCapabilities.filter((capability) => capability.priority === "required");
+      const capabilityWeight = Math.max(1, coreCapabilities.length * 2 + requiredCapabilities.length);
+      const capabilityCoverage = (matchedCore.length * 2 + matchedRequired.length) / capabilityWeight;
       const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
       const evidenceHits = matchedCapabilities.filter((capability) => inspectedCapabilityHits.has(capability.id)).length;
       const negativeHits = (capabilityGraph?.capabilities ?? []).flatMap((capability) =>
@@ -538,31 +551,42 @@ function scoreResources(
         || matchedCapabilities.length > 0
         || evidenceHits > 0
         || universalUiSignal;
+      const hasVerifiedCapability = matchedCore.length > 0 || matchedRequired.length > 0;
+      const resourceRole = inferResourceRole(resource, matchedCapabilities);
+      const genericTemplatePenalty = resource.type === "template_repo"
+        && resourceRole === "project_template"
+        && matchedCore.length === 0
+        ? 20
+        : 0;
       const score = Math.min(100,
-        keywordHits * 5 +
+        keywordHits * 3 +
         moduleKeywordHits * 2 +
-        tagHits * 6 +
-        typeBoost +
+        tagHits * 4 +
+        Math.min(typeBoost, 5) +
         curatedBoost +
-        capabilityCoverage * 30 +
-        evidenceHits * 6 -
-        negativeHits * 12 +
+        capabilityCoverage * 35 +
+        matchedCore.length * 18 +
+        matchedRequired.length * 10 +
+        evidenceHits * 8 -
+        negativeHits * 20 +
         foundationalUiBoost +
-        resource.fit_score * 0.28 +
-        resource.trust_score * 0.22 -
-        riskPenalty
+        resource.fit_score * 0.18 +
+        resource.trust_score * 0.15 -
+        riskPenalty -
+        genericTemplatePenalty
       );
 
       return {
         resource,
         score,
-        hasProjectSignal,
-        hasBaselineSignal,
+        hasProjectSignal: capabilityGraph ? hasVerifiedCapability || universalUiSignal : hasProjectSignal,
+        hasBaselineSignal: capabilityGraph ? universalUiSignal : hasBaselineSignal,
         matchedCapabilityIds: matchedCapabilities.map((capability) => capability.id),
-        capabilityCoverage
+        capabilityCoverage,
+        resourceRole
       };
     })
-    .filter((item) => item.score >= 52 && (item.hasProjectSignal || item.hasBaselineSignal))
+    .filter((item) => item.score >= 50 && (item.hasProjectSignal || item.hasBaselineSignal))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -579,7 +603,9 @@ function isOfficialShadcnUi(resource: Resource) {
 function matchesScoringTerm(haystack: string, term: string) {
   const normalized = term.toLowerCase().trim();
   if (normalized.length < 3) return false;
-  return haystack.includes(normalized) || haystack.includes(normalized.replace(/[-_]+/g, " "));
+  const normalizedHaystack = haystack.replace(/[-_]+/g, " ");
+  const normalizedTerm = normalized.replace(/[-_]+/g, " ");
+  return haystack.includes(normalized) || normalizedHaystack.includes(normalizedTerm);
 }
 
 function selectDiverseCandidates<T extends {
@@ -615,6 +641,85 @@ function selectDiverseCandidates<T extends {
   }
 
   return selected;
+}
+
+function selectCapabilityBundle<T extends {
+  resource: Resource;
+  score: number;
+  matchedCapabilityIds: string[];
+  resourceRole?: ResourceRole;
+}>(
+  scored: T[],
+  capabilityGraph?: CapabilityGraph
+) {
+  if (!capabilityGraph) {
+    return {
+      defaultIds: new Set(scored.filter((item) => item.resource.risk_level !== "high").map((item) => item.resource.id)),
+      riskIds: new Set(scored.filter((item) => item.resource.risk_level === "high").map((item) => item.resource.id))
+    };
+  }
+
+  const defaultIds = new Set<string>();
+  const importantCapabilities = capabilityGraph.capabilities
+    .filter((capability) => capability.priority !== "optional")
+    .sort((left, right) => priorityWeight(right.priority) - priorityWeight(left.priority));
+
+  importantCapabilities.forEach((capability) => {
+    const limit = capability.priority === "core" ? 2 : 2;
+    scored
+      .filter((item) => item.resource.risk_level !== "high")
+      .filter((item) => item.matchedCapabilityIds.includes(capability.id))
+      .slice(0, limit)
+      .forEach((item) => defaultIds.add(item.resource.id));
+  });
+
+  scored
+    .filter((item) => item.resource.risk_level !== "high")
+    .filter((item) => item.matchedCapabilityIds.length >= 2)
+    .slice(0, 3)
+    .forEach((item) => defaultIds.add(item.resource.id));
+
+  const foundationalUi = scored.find((item) =>
+    item.resource.risk_level !== "high" && isOfficialShadcnUi(item.resource)
+  );
+  if (foundationalUi) defaultIds.add(foundationalUi.resource.id);
+
+  const riskIds = new Set(
+    scored
+      .filter((item) => item.resource.risk_level === "high")
+      .filter((item) => item.matchedCapabilityIds.length > 0)
+      .slice(0, 4)
+      .map((item) => item.resource.id)
+  );
+
+  return { defaultIds, riskIds };
+}
+
+function inferResourceRole(
+  resource: Resource,
+  matchedCapabilities: CapabilityGraph["capabilities"]
+): ResourceRole {
+  const preferredRoles = matchedCapabilities.flatMap((capability) => capability.resourceRoles);
+  const source = `${resource.name} ${resource.description} ${resource.tags.join(" ")} ${resource.use_cases.join(" ")}`.toLowerCase();
+
+  if (preferredRoles.includes("speech_to_text") && /(speech-to-text|speech recognition|transcri|\basr\b|语音识别|语音转写)/.test(source)) {
+    return "speech_to_text";
+  }
+  if (preferredRoles.includes("text_to_speech") && /(text-to-speech|\btts\b|语音合成)/.test(source)) {
+    return "text_to_speech";
+  }
+  if (preferredRoles.includes("domain_system")) return "domain_system";
+  if (preferredRoles.includes("domain_data")) return "domain_data";
+  if (preferredRoles.includes("domain_algorithm")) return "domain_algorithm";
+  if (resource.type === "mcp_server") return "mcp_integration";
+  if (resource.type === "ui_component") return "ui_library";
+  if (resource.type === "template_repo") return "project_template";
+  if (preferredRoles.includes("agent_tool")) return "agent_tool";
+  return "developer_tool";
+}
+
+function priorityWeight(priority: CapabilityPriority) {
+  return priority === "core" ? 3 : priority === "required" ? 2 : 1;
 }
 
 function buildReason(resource: Resource, modules: CapabilityModule[], keywords: string[]) {
@@ -665,13 +770,23 @@ function buildGap(groupTitle: string, types: ResourceType[]) {
   return `${groupTitle} 暂无强匹配资源。资源库需要补充 ${types.map((type) => typeLabels[type]).join(" / ")} 类型的高可信条目。`;
 }
 
-function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[]) {
+function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], capabilityGraph?: CapabilityGraph) {
   const emptyGroupGaps = groups.flatMap((group) => group.gap ? [group.gap] : []);
   const moduleGaps = modules
     .filter((module) => module.id === "document-parsing")
     .map(() => "当前资源库缺少专门的 PDF/Word/Excel 文档解析 Skill 或 MCP Server，可后续补充 documents/spreadsheets/pdf 类资源。");
 
-  return Array.from(new Set([...emptyGroupGaps, ...moduleGaps]));
+  const coveredCapabilityIds = new Set(
+    groups.flatMap((group) => group.items.flatMap((item) => item.matchedCapabilityIds))
+  );
+  const capabilityGaps = (capabilityGraph?.capabilities ?? [])
+    .filter((capability) => capability.priority !== "optional")
+    .filter((capability) => !coveredCapabilityIds.has(capability.id))
+    .map((capability) =>
+      `${capability.priority === "core" ? "核心" : "必需"}能力“${capability.label}”暂无经证据验证的匹配资源。`
+    );
+
+  return Array.from(new Set([...capabilityGaps, ...emptyGroupGaps, ...moduleGaps]));
 }
 
 function buildCodexPrompt(
@@ -718,7 +833,9 @@ function capabilityGraphToModules(capabilityGraph?: CapabilityGraph): Capability
     keywords: capability.keywords,
     preferredTags: Array.from(new Set([capability.id, ...capability.keywords.map((keyword) => keyword.toLowerCase())])),
     preferredTypes: capability.preferredTypes,
-    projectStage: capability.description
+    projectStage: capability.description,
+    priority: capability.priority,
+    resourceRoles: capability.resourceRoles
   }));
 }
 

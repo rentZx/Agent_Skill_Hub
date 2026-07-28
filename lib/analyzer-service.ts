@@ -162,7 +162,10 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     description: item.resource.description,
     tags: item.resource.tags,
     evidence: item.resource.evidence_summary,
-    matchedCapabilities: item.resource.matched_capabilities,
+    matchedCapabilities: Array.from(new Set([
+      ...item.matchedCapabilityIds,
+      ...(item.resource.matched_capabilities ?? [])
+    ])),
     trust: item.resource.trust_score,
     fit: item.resource.fit_score,
     risk: item.resource.risk_level
@@ -176,8 +179,11 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
         input,
         batch,
         recommendation.modules.map((module) => ({
+          id: module.id,
           label: module.label,
-          description: module.description
+          description: module.description,
+          priority: module.priority ?? "optional",
+          resourceRoles: module.resourceRoles ?? []
         }))
       ))
     );
@@ -198,7 +204,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
         if (!rerank) return hasStrongRepositoryEvidence(item) ? [item] : [];
-        if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords)) return [];
+        if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords, recommendation.modules)) return [];
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
         return [{
@@ -255,13 +261,24 @@ function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]
 function shouldKeepRerankedItem(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number],
-  projectKeywords: string[]
+  projectKeywords: string[],
+  modules: AnalyzerResult["recommendation"]["modules"]
 ) {
-  const minimumScore = item.matchKind === "baseline" ? 55 : 50;
+  const minimumScore = item.matchKind === "baseline" ? 60 : 55;
   const negativeReason = /不建议使用|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力|缺少领域特定|缺少具体领域|仅.{0,8}通用/i.test(rerank.reason);
+  const importantIds = new Set(
+    modules
+      .filter((module) => module.priority === "core" || module.priority === "required")
+      .map((module) => module.id)
+  );
+  const deterministicMatches = new Set(item.matchedCapabilityIds);
+  const verifiedCoverage = rerank.coveredCapabilities.some((id) =>
+    importantIds.has(id) && deterministicMatches.has(id)
+  );
   return rerank.recommended
     && rerank.score >= minimumScore
     && !negativeReason
+    && verifiedCoverage
     && hasDirectDomainSignal(item, projectKeywords);
 }
 

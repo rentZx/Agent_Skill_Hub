@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { buildCapabilityGraph, type CapabilitySeed } from "../lib/capability-engine";
+import {
+  buildCapabilityGraph,
+  type CapabilityPriority,
+  type CapabilitySeed,
+  type ResourceRole
+} from "../lib/capability-engine";
 import { buildProjectRecommendation } from "../lib/recommendation";
 import type { Resource, ResourceType } from "../lib/types";
 
@@ -9,8 +14,8 @@ type BenchmarkCase = {
   projectType: string;
   capabilities: CapabilitySeed[];
   expectedQuery: string;
-  relevant: Resource;
-  irrelevant: Resource;
+  relevant: Resource[];
+  irrelevant: Resource[];
 };
 
 const cases: BenchmarkCase[] = [
@@ -23,8 +28,8 @@ const cases: BenchmarkCase[] = [
       capability("technical-analysis", "技术指标分析", ["technical analysis", "macd", "candlestick"])
     ],
     expectedQuery: "market data",
-    relevant: resource("AKShare", "template_repo", "A-share financial data and market data API", ["market-data", "a-share"]),
-    irrelevant: resource("Generic Agent Starter", "template_repo", "General AI agent starter template", ["ai", "template"])
+    relevant: [resource("AKShare", "template_repo", "A-share financial data and market data API", ["market-data", "a-share"])],
+    irrelevant: [resource("Generic Agent Starter", "template_repo", "General AI agent starter template", ["ai", "template"])]
   },
   {
     name: "个性化菜谱",
@@ -35,8 +40,8 @@ const cases: BenchmarkCase[] = [
       capability("nutrition", "年龄与营养约束", ["personalized nutrition", "dietary restrictions", "age-aware"])
     ],
     expectedQuery: "chinese recipes",
-    relevant: resource("HowToCook", "template_repo", "Chinese recipes with ingredients and cooking steps", ["chinese-recipes", "cooking-steps"]),
-    irrelevant: resource("Generic Dashboard", "template_repo", "General purpose admin dashboard", ["dashboard", "template"])
+    relevant: [resource("HowToCook", "template_repo", "Chinese recipes with ingredients and cooking steps", ["chinese-recipes", "cooking-steps"])],
+    irrelevant: [resource("Generic Dashboard", "template_repo", "General purpose admin dashboard", ["dashboard", "template"])]
   },
   {
     name: "2D 转 3D",
@@ -47,8 +52,8 @@ const cases: BenchmarkCase[] = [
       capability("model-viewer", "三维模型预览", ["three.js", "webgl", "model viewer"])
     ],
     expectedQuery: "image to 3d",
-    relevant: resource("img2threejs", "template_repo", "Generate a Three.js scene from an image with depth and mesh generation", ["image-to-3d", "threejs"]),
-    irrelevant: resource("AI Research Agent", "template_repo", "Autonomous general AI research workflow", ["ai", "research"])
+    relevant: [resource("img2threejs", "template_repo", "Generate a Three.js scene from an image with depth and mesh generation", ["image-to-3d", "threejs"])],
+    irrelevant: [resource("AI Research Agent", "template_repo", "Autonomous general AI research workflow", ["ai", "research"])]
   },
   {
     name: "陌生领域物流优化",
@@ -59,8 +64,39 @@ const cases: BenchmarkCase[] = [
       capability("geocoding", "地址解析与地理编码", ["geocoding", "maps api", "address normalization"])
     ],
     expectedQuery: "vehicle routing",
-    relevant: resource("OR-Tools Routing", "template_repo", "Vehicle routing and route optimization with time windows", ["vehicle-routing", "optimization"]),
-    irrelevant: resource("General SaaS Boilerplate", "template_repo", "Generic SaaS starter with authentication", ["saas", "boilerplate"])
+    relevant: [resource("OR-Tools Routing", "template_repo", "Vehicle routing and route optimization with time windows", ["vehicle-routing", "optimization"])],
+    irrelevant: [resource("General SaaS Boilerplate", "template_repo", "Generic SaaS starter with authentication", ["saas", "boilerplate"])]
+  },
+  {
+    name: "超市语音库存",
+    prompt: "我有一个超市，想开发货物管理系统，通过语音聊天查询物品价格、数量和所在位置",
+    projectType: "语音查询型商品库存管理系统",
+    capabilities: [
+      capability(
+        "inventory-management",
+        "商品库存与库位管理",
+        ["inventory management", "stock control", "warehouse location", "item pricing"],
+        "core",
+        ["domain_system", "domain_data"]
+      ),
+      capability(
+        "speech-to-text",
+        "中文语音识别",
+        ["speech-to-text", "automatic speech recognition", "chinese asr", "streaming asr"],
+        "required",
+        ["speech_to_text"],
+        ["ai companion", "virtual character", "voice changer"]
+      )
+    ],
+    expectedQuery: "inventory management",
+    relevant: [
+      resource("InvenTree", "template_repo", "Open source inventory management with stock control and warehouse location tracking", ["inventory-management", "stock-control"]),
+      resource("FunASR", "github_plugin", "Speech-to-text toolkit for Chinese ASR and streaming ASR", ["speech-to-text", "chinese-asr"])
+    ],
+    irrelevant: [
+      resource("AIRI", "template_repo", "AI companion and virtual character with voice chat", ["ai-companion", "voice-chat"]),
+      resource("Next SaaS Starter", "template_repo", "Generic SaaS starter with billing and authentication", ["saas", "boilerplate"])
+    ]
   }
 ];
 
@@ -77,7 +113,7 @@ for (const benchmark of cases) {
 
   const recommendation = buildProjectRecommendation(
     benchmark.prompt,
-    [benchmark.relevant, benchmark.irrelevant],
+    [...benchmark.relevant, ...benchmark.irrelevant],
     {
       projectType: benchmark.projectType,
       coreFeatures: benchmark.capabilities.map((item) => item.label ?? ""),
@@ -85,28 +121,52 @@ for (const benchmark of cases) {
     }
   );
   const recommendedNames = recommendation.groups.flatMap((group) => group.items.map((item) => item.resource.name));
-  assert(recommendedNames.includes(benchmark.relevant.name), `${benchmark.name}: 未召回相关资源 ${benchmark.relevant.name}`);
-  assert(
-    !recommendedNames.includes(benchmark.irrelevant.name),
-    `${benchmark.name}: 错误推荐通用资源 ${benchmark.irrelevant.name}；结果=${JSON.stringify(
+  benchmark.relevant.forEach((relevant) => {
+    assert(recommendedNames.includes(relevant.name), `${benchmark.name}: 未召回相关资源 ${relevant.name}`);
+  });
+  benchmark.irrelevant.forEach((irrelevant) => {
+    assert(
+      !recommendedNames.includes(irrelevant.name),
+      `${benchmark.name}: 错误推荐通用资源 ${irrelevant.name}；结果=${JSON.stringify(
       recommendation.groups.map((group) => ({
         id: group.id,
         items: group.items.map((item) => ({ name: item.resource.name, why: item.why, score: item.score }))
       }))
     )}`
+    );
+  });
+
+  const importantCapabilityIds = graph.capabilities
+    .filter((item) => item.priority !== "optional")
+    .map((item) => item.id);
+  const coveredIds = new Set(
+    recommendation.groups.flatMap((group) => group.items.flatMap((item) => item.matchedCapabilityIds))
+  );
+  assert(
+    importantCapabilityIds.some((id) => coveredIds.has(id)),
+    `${benchmark.name}: 推荐组合未覆盖任何核心或必需能力`
   );
 }
 
 console.log(`Recommendation benchmark passed: ${cases.length} cases.`);
 
-function capability(id: string, label: string, keywords: string[]): CapabilitySeed {
+function capability(
+  id: string,
+  label: string,
+  keywords: string[],
+  priority: CapabilityPriority = "core",
+  resourceRoles: ResourceRole[] = ["domain_system", "domain_data"],
+  negativeKeywords: string[] = ["generic starter"]
+): CapabilitySeed {
   return {
     id,
     label,
     description: `实现${label}`,
     required: true,
+    priority,
+    resourceRoles,
     keywords,
-    negativeKeywords: ["generic starter"],
+    negativeKeywords,
     preferredTypes: ["template_repo", "mcp_server", "agent_skill"]
   };
 }

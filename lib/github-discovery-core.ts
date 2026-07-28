@@ -40,6 +40,37 @@ type DiscoveryProfile = {
   riskOverrides?: Record<string, { level: RiskLevel; reason: string; license?: string }>;
 };
 
+const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"inventory management\" \"stock location\" in:name,description,readme archived:false fork:false",
+    "\"retail inventory\" \"item pricing\" in:name,description,readme archived:false fork:false",
+    "\"Chinese ASR\" streaming speech-to-text in:name,description,readme archived:false fork:false",
+    "\"speech recognition\" transcription in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "frappe/erpnext",
+    "inventree/InvenTree",
+    "modelscope/FunASR",
+    "SYSTRAN/faster-whisper"
+  ],
+  relevanceTerms: [
+    "inventory management", "stock control", "warehouse location", "product catalog", "item pricing",
+    "speech-to-text", "automatic speech recognition", "chinese asr", "streaming asr", "voice transcription"
+  ],
+  typeOverrides: {
+    "frappe/erpnext": "template_repo",
+    "inventree/inventree": "template_repo",
+    "modelscope/funasr": "github_plugin",
+    "systran/faster-whisper": "github_plugin"
+  },
+  tagOverrides: {
+    "frappe/erpnext": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "erp", "retail"],
+    "inventree/inventree": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "inventory-api"],
+    "modelscope/funasr": ["speech-to-text", "automatic-speech-recognition", "chinese-asr", "streaming-asr", "voice-transcription"],
+    "systran/faster-whisper": ["speech-to-text", "automatic-speech-recognition", "voice-transcription", "whisper"]
+  }
+};
+
 const stockDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"stock analysis\" \"market data\" in:name,description,readme archived:false fork:false",
@@ -364,6 +395,7 @@ async function inspectRepository(
   ].join(" ").toLowerCase();
   const matched = capabilities.filter((capability) =>
     capability.keywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
+    && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
   );
   const evidenceFiles = inspection.paths.filter((path) =>
     /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
@@ -442,7 +474,9 @@ async function fetchRepositoryReadme(fullName: string) {
 function matchesEvidenceTerm(source: string, term: string) {
   const normalized = term.toLowerCase().trim();
   if (normalized.length < 3) return false;
-  return source.includes(normalized) || source.includes(normalized.replace(/[-_]+/g, " "));
+  const normalizedSource = source.replace(/[-_]+/g, " ");
+  const normalizedTerm = normalized.replace(/[-_]+/g, " ");
+  return source.includes(normalized) || normalizedSource.includes(normalizedTerm);
 }
 
 function isAiPluginLike(item: GitHubSearchItem) {
@@ -566,6 +600,9 @@ function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[], prefe
 
 function getDiscoveryProfile(input: string, tags: string[]) {
   const source = `${input} ${tags.join(" ")}`.toLowerCase();
+  if (/(超市|货物|商品价格|库存|库位|货架|仓库|inventory.management|stock.control|warehouse.location)/i.test(source)) {
+    return inventoryVoiceDiscoveryProfile;
+  }
   if (/(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)) {
     return stockDiscoveryProfile;
   }
