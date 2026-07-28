@@ -173,7 +173,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
   if (candidates.length === 0) return recommendation;
 
   try {
-    const batches = chunk(candidates, 10);
+    const batches = chunk(candidates, 6);
     const results = await Promise.allSettled(
       batches.map((batch) => rerankWithDeepSeek(
         input,

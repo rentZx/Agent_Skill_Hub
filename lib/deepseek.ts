@@ -65,7 +65,7 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
   const payload = (await response.json()) as DeepSeekResponse;
   const content = payload.choices?.[0]?.message?.content;
   if (!content) return null;
-  const parsed = JSON.parse(content) as DeepSeekProjectAnalysis;
+  const parsed = parseJsonObject<DeepSeekProjectAnalysis>(content);
   return {
     ...parsed,
     coreFeatures: cleanList(parsed.coreFeatures, 8),
@@ -103,7 +103,7 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
     body: JSON.stringify({
       model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
       temperature: 0.1,
-      max_tokens: 2600,
+      max_tokens: 1800,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -121,7 +121,7 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
   const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = payload.choices?.[0]?.message?.content;
   if (!content) return [];
-  const parsed = JSON.parse(content) as { items?: Array<Partial<DeepSeekRerankItem>> };
+  const parsed = parseJsonObject<{ items?: Array<Partial<DeepSeekRerankItem>> }>(content);
   return (parsed.items ?? [])
     .filter((item): item is Partial<DeepSeekRerankItem> & { id: string; score: number } =>
       typeof item?.id === "string" && typeof item?.score === "number"
@@ -201,4 +201,23 @@ function cleanResourceRole(value: unknown): ResourceRole | undefined {
 
 function hasNegativeRecommendation(reason: string) {
   return /不建议使用|不推荐|无直接关系|没有直接关系|不相关|不匹配|不适合|不具备.+功能|缺少.+能力/i.test(reason);
+}
+
+function parseJsonObject<T>(content: string): T {
+  const cleaned = content
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (initialError) {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start < 0 || end <= start) throw initialError;
+    const objectText = cleaned
+      .slice(start, end + 1)
+      .replace(/,\s*([}\]])/g, "$1");
+    return JSON.parse(objectText) as T;
+  }
 }
