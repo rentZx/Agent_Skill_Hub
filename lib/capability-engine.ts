@@ -291,8 +291,11 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     .map((feature, index) => capabilityFromFeature(feature, index))
     .filter((capability) => ![...seeded, ...patterned].some((existing) => capabilitiesOverlap(existing, capability)));
 
-  const capabilities = removeCompositeCapabilities(
-    dedupeCapabilities([...seeded, ...patterned, ...featureCapabilities])
+  const capabilities = filterCapabilitiesForDomain(
+    removeCompositeCapabilities(
+      dedupeCapabilities([...seeded, ...patterned, ...featureCapabilities])
+    ),
+    input
   ).slice(0, 10);
   const searchQueries = buildSearchQueries(capabilities, details.searchQueries ?? []);
 
@@ -484,6 +487,17 @@ function removeCompositeCapabilities(capabilities: CapabilityRequirement[]) {
       /(语音|voice|speech)/.test(source)
       && /(查询|价格|库存|位置|query|lookup|price|inventory|location)/.test(source);
     return !combinesVoiceAndBusinessQuery;
+  });
+}
+
+function filterCapabilitiesForDomain(capabilities: CapabilityRequirement[], input: string) {
+  if (!/(短视频|视频生成|文生视频|文本转视频|视频合成|ai.?视频|ai.?video|short.?video|text.to.video|video.generation)/i.test(input)) {
+    return capabilities;
+  }
+
+  return capabilities.filter((capability) => {
+    const source = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+    return !/(conversational|chat|message.storage|real.time.communication|user.authentication|natural.language.query|tool.calling|function.calling)/i.test(source);
   });
 }
 

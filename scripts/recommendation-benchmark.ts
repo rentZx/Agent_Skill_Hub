@@ -236,6 +236,22 @@ assert(vagueFoodRecommendation.codexPrompt.includes("先输出需求澄清结果
 assert(!vagueFoodRecommendation.codexPrompt.includes("严格遵循上面的推荐技术栈"), "美食：Prompt 不应锁死推测技术栈");
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
+const shortVideoGraphWithNoisyAi = buildCapabilityGraph("一站式AI短视频生成工具", {
+  projectType: "AI应用",
+  coreFeatures: ["AI对话"],
+  capabilities: [
+    capability("conversational-ai", "AI 对话", ["conversational ai", "chat interface"]),
+    capability("message-storage", "消息存储", ["message storage", "chat history"])
+  ]
+});
+assert(
+  shortVideoGraphWithNoisyAi.capabilities.some((item) => item.id === "short-video-pipeline"),
+  "AI 短视频生成：模型误判时仍应保留本地短视频能力"
+);
+assert(
+  !shortVideoGraphWithNoisyAi.capabilities.some((item) => ["conversational-ai", "message-storage"].includes(item.id)),
+  "AI 短视频生成：不应保留模型臆造的聊天或消息能力"
+);
 
 console.log(`Recommendation benchmark passed: ${cases.length} cases.`);
 

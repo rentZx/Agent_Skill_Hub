@@ -28,10 +28,11 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     coreFeatures: initial.analysis.coreFeatures,
     tags: graphTags
   });
-  const [ai, preliminaryDiscovered] = await Promise.all([
+  const [rawAi, preliminaryDiscovered] = await Promise.all([
     analyzeSafely(input),
     discoverSafely(input, initial.analysis.tags, resources, preliminaryGraph)
   ]);
+  const ai = alignAiAnalysisWithKnownDomain(input, rawAi, initial.analysis);
 
   const capabilityGraph = buildCapabilityGraph(input, {
     projectType: isLowConfidence ? initial.analysis.projectType : ai?.projectType ?? initial.analysis.projectType,
@@ -159,6 +160,34 @@ async function analyzeSafely(input: string) {
     console.warn("DeepSeek analysis failed, using rules tags.", error);
     return null;
   }
+}
+
+function alignAiAnalysisWithKnownDomain(
+  input: string,
+  ai: Awaited<ReturnType<typeof analyzeWithDeepSeek>>,
+  ruleAnalysis: AnalyzerResult["analysis"]
+) {
+  if (!ai || !isShortVideoIntent(input)) return ai;
+  const videoSearchQueries = (ai.searchQueries ?? []).filter((query) =>
+    /(video|script|footage|voiceover|text.to.speech|subtitle|caption|ffmpeg|moviepy|remotion)/i.test(query)
+  );
+
+  return {
+    ...ai,
+    industry: ruleAnalysis.industry,
+    projectType: ruleAnalysis.projectType,
+    targetUsers: ruleAnalysis.targetUsers,
+    coreFeatures: ruleAnalysis.coreFeatures,
+    capabilities: (ai.capabilities ?? []).filter((capability) => {
+      const source = `${capability.id ?? ""} ${capability.label ?? ""} ${(capability.keywords ?? []).join(" ")}`.toLowerCase();
+      return !/(conversational|chat|message.storage|real.time.communication|user.authentication|natural.language.query|tool.calling|function.calling)/i.test(source);
+    }),
+    searchQueries: videoSearchQueries
+  };
+}
+
+function isShortVideoIntent(input: string) {
+  return /(短视频|视频生成|文生视频|文本转视频|视频合成|ai.?视频|ai.?video|short.?video|text.to.video|video.generation)/i.test(input);
 }
 
 async function discoverSafely(
