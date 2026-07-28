@@ -665,7 +665,7 @@ function selectCapabilityBundle<T extends {
     .sort((left, right) => priorityWeight(right.priority) - priorityWeight(left.priority));
 
   importantCapabilities.forEach((capability) => {
-    const limit = capability.priority === "core" ? 2 : 2;
+    const limit = capability.priority === "core" ? 3 : 2;
     scored
       .filter((item) => item.resource.risk_level !== "high")
       .filter((item) => item.matchedCapabilityIds.includes(capability.id))
@@ -771,7 +771,6 @@ function buildGap(groupTitle: string, types: ResourceType[]) {
 }
 
 function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], capabilityGraph?: CapabilityGraph) {
-  const emptyGroupGaps = groups.flatMap((group) => group.gap ? [group.gap] : []);
   const moduleGaps = modules
     .filter((module) => module.id === "document-parsing")
     .map(() => "当前资源库缺少专门的 PDF/Word/Excel 文档解析 Skill 或 MCP Server，可后续补充 documents/spreadsheets/pdf 类资源。");
@@ -786,7 +785,7 @@ function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], c
       `${capability.priority === "core" ? "核心" : "必需"}能力“${capability.label}”暂无经证据验证的匹配资源。`
     );
 
-  return Array.from(new Set([...capabilityGaps, ...emptyGroupGaps, ...moduleGaps]));
+  return Array.from(new Set([...capabilityGaps, ...moduleGaps]));
 }
 
 function buildCodexPrompt(

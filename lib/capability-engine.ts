@@ -125,7 +125,7 @@ const capabilityPatterns: Array<{
     terms: ["数据源", "行情", "菜谱", "食谱", "文档", "知识库", "catalog", "dataset", "market data", "recipe"],
     keywords: ["dataset", "data source", "api", "catalog", "database"],
     preferredTypes: ["mcp_server", "template_repo", "agent_skill"],
-    priority: "core",
+    priority: "required",
     resourceRoles: ["domain_data"]
   },
   {
@@ -196,7 +196,7 @@ const capabilityPatterns: Array<{
     terms: ["规则", "约束", "风险", "合规", "过敏", "权限", "validation", "compliance"],
     keywords: ["rules engine", "validation", "constraints", "policy", "compliance"],
     preferredTypes: ["agent_skill", "template_repo"],
-    priority: "core",
+    priority: "required",
     resourceRoles: ["domain_algorithm", "agent_tool"]
   }
 ];
@@ -225,7 +225,9 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     .map((feature, index) => capabilityFromFeature(feature, index))
     .filter((capability) => ![...seeded, ...patterned].some((existing) => capabilitiesOverlap(existing, capability)));
 
-  const capabilities = dedupeCapabilities([...seeded, ...patterned, ...featureCapabilities]).slice(0, 10);
+  const capabilities = removeCompositeCapabilities(
+    dedupeCapabilities([...seeded, ...patterned, ...featureCapabilities])
+  ).slice(0, 10);
   const searchQueries = buildSearchQueries(capabilities, details.searchQueries ?? []);
 
   return {
@@ -243,13 +245,19 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
 
   const preferredTypes = (seed.preferredTypes ?? [])
     .filter((type): type is ResourceType => resourceTypes.includes(type as ResourceType));
-  const priority = capabilityPriorities.includes(seed.priority as CapabilityPriority)
+  let priority = capabilityPriorities.includes(seed.priority as CapabilityPriority)
     ? seed.priority as CapabilityPriority
     : seed.required === false
       ? "optional"
       : "required";
   const seededRoles = (seed.resourceRoles ?? [])
     .filter((role): role is ResourceRole => resourceRoles.includes(role as ResourceRole));
+  const inferredRoles = seededRoles.length > 0 ? seededRoles : inferResourceRoles(label, keywords, preferredTypes);
+  const hasDomainRole = inferredRoles.some((role) =>
+    role === "domain_system" || role === "domain_data" || role === "domain_algorithm"
+  );
+  if (priority === "core" && !hasDomainRole) priority = "required";
+  if (inferredRoles.includes("text_to_speech")) priority = "optional";
 
   return {
     id: slugify(seed.id || label),
@@ -257,7 +265,7 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
     description: seed.description?.trim() || `实现${label}并验证其能力边界。`,
     required: priority !== "optional",
     priority,
-    resourceRoles: seededRoles.length > 0 ? seededRoles : inferResourceRoles(label, keywords, preferredTypes),
+    resourceRoles: inferredRoles,
     keywords,
     negativeKeywords: cleanStrings(seed.negativeKeywords ?? [], 8),
     preferredTypes: preferredTypes.length > 0 ? preferredTypes : ["agent_skill", "mcp_server", "template_repo"]
@@ -362,6 +370,25 @@ function dedupeCapabilities(capabilities: CapabilityRequirement[]) {
     if (!unique.has(key)) unique.set(key, capability);
   });
   return Array.from(unique.values());
+}
+
+function removeCompositeCapabilities(capabilities: CapabilityRequirement[]) {
+  const hasSpeechCapability = capabilities.some((capability) =>
+    capability.id === "speech-to-text" || capability.resourceRoles.includes("speech_to_text")
+  );
+  const hasDomainSystem = capabilities.some((capability) =>
+    capability.id === "inventory-management" || capability.resourceRoles.includes("domain_system")
+  );
+  if (!hasSpeechCapability || !hasDomainSystem) return capabilities;
+
+  return capabilities.filter((capability) => {
+    if (["speech-to-text", "conversational-query", "inventory-management"].includes(capability.id)) return true;
+    const source = `${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+    const combinesVoiceAndBusinessQuery =
+      /(语音|voice|speech)/.test(source)
+      && /(查询|价格|库存|位置|query|lookup|price|inventory|location)/.test(source);
+    return !combinesVoiceAndBusinessQuery;
+  });
 }
 
 function cleanStrings(values: string[], limit: number) {

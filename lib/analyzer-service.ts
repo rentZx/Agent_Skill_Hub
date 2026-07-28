@@ -227,10 +227,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     return {
       ...recommendation,
       groups,
-      gaps: Array.from(new Set([
-        ...retainedGaps,
-        ...groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
-      ]))
+      gaps: Array.from(new Set(retainedGaps))
     };
   } catch (error) {
     console.warn("DeepSeek rerank failed, keeping evidence-backed resources only.", error);
@@ -297,10 +294,7 @@ function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"])
   return {
     ...recommendation,
     groups,
-    gaps: Array.from(new Set([
-      ...recommendation.gaps,
-      ...groups.filter((group) => group.items.length === 0).map((group) => group.gap).filter(Boolean) as string[]
-    ]))
+    gaps: Array.from(new Set(recommendation.gaps))
   };
 }
 
