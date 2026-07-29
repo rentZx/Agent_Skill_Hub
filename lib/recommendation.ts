@@ -687,6 +687,10 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
 
+  if (/(education-management|student-records|course-scheduling|attendance-enrollment|tuition-billing|school management|student information|class scheduling|timetabling|画室|教务|排课|学生档案)/i.test(graph)) {
+    return /(school[- ]management|education[- ]management|school[- ]erp|student[- ]information|student[- ]management|student scheduling|course scheduling|class scheduling|teacher scheduling|timetabling|attendance system|student attendance|enrollment|tuition|school fee|fee management|parent portal|\blms\b|\bsis\b|教务|学生管理|排课|考勤)/i.test(haystack);
+  }
+
   if (/(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(graph)) {
     return /(recipe|recipes|ingredient|cooking|meal planning|servings|nutrition|菜谱|食材|烹饪)/i.test(haystack);
   }
@@ -707,8 +711,13 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
 }
 
 function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: CapabilityGraph) {
-  if (!capabilityGraph || resource.type === "ui_component") return false;
+  if (!capabilityGraph) return false;
   const source = `${resource.name} ${resource.description} ${resource.tags.join(" ")} ${resource.use_cases.join(" ")}`.toLowerCase();
+  if (resource.type === "ui_component") {
+    return isStrictKnownDomainGraph(capabilityGraph)
+      && !isOfficialShadcnUi(resource)
+      && !hasKnownDomainAnchor(source, capabilityGraph);
+  }
   if (isStrictKnownDomainGraph(capabilityGraph)) {
     return !hasKnownDomainAnchor(source, capabilityGraph);
   }
@@ -721,7 +730,8 @@ function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
   const source = `${capabilityGraph.domain} ${capabilityGraph.capabilities
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
-  return /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
+  return /(education-management|student-records|course-scheduling|attendance-enrollment|tuition-billing|school management|student information|class scheduling|timetabling|画室|教务|排课|学生档案)/i.test(source)
+    || /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
     || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
     || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)
     || /(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(source);

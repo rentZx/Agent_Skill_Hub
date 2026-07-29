@@ -226,6 +226,61 @@ const capabilityPatterns: Array<{
     resourceRoles: ["domain_data", "domain_system"]
   },
   {
+    id: "education-management",
+    label: "教育培训与教务管理",
+    description: "管理校区、课程、班级、教师、学生和家长档案，并支撑教育培训机构的日常教务流程。",
+    terms: ["画室", "美术培训", "教育培训", "教务", "学校管理", "school management", "education management"],
+    keywords: ["school management system", "education management", "school ERP", "student information system", "training center management"],
+    negativeKeywords: ["learning resources only", "course content only", "education blog", "generic dashboard"],
+    preferredTypes: ["template_repo", "github_plugin", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_system"]
+  },
+  {
+    id: "course-scheduling",
+    label: "课程、班级与教师排课",
+    description: "管理课程、班级、教室和教师时间，检测排课冲突并提供日历或课表视图。",
+    terms: ["画室", "排课", "课程与班级", "教师排课", "课表", "course scheduling", "class scheduling", "timetabling"],
+    keywords: ["course scheduling", "class scheduling", "student scheduling", "teacher scheduling", "timetabling", "class calendar"],
+    negativeKeywords: ["task scheduler", "job scheduler", "social media calendar", "generic calendar only"],
+    preferredTypes: ["template_repo", "github_plugin", "ui_component"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_algorithm", "ui_library"]
+  },
+  {
+    id: "student-records",
+    label: "学生、家长与报名档案",
+    description: "保存学生和家长信息、报名记录、班级关系与学习状态，形成可查询的学员档案。",
+    terms: ["画室", "学生档案", "家长", "报名", "学员", "student records", "enrollment"],
+    keywords: ["student management", "student records", "student information system", "parent portal", "enrollment management"],
+    negativeKeywords: ["student project", "learning tutorial", "portfolio template only"],
+    preferredTypes: ["template_repo", "github_plugin", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
+    id: "attendance-enrollment",
+    label: "报名、考勤与到课管理",
+    description: "跟踪报名、班级名额、签到、请假、补课和到课状态，并保留可审计记录。",
+    terms: ["画室", "考勤", "签到", "请假", "补课", "attendance", "enrollment"],
+    keywords: ["student attendance", "attendance system", "enrollment management", "class attendance", "student tracking"],
+    negativeKeywords: ["employee attendance only", "facial recognition demo only"],
+    preferredTypes: ["template_repo", "github_plugin"],
+    priority: "required",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
+    id: "tuition-billing",
+    label: "学费、缴费与欠费记录",
+    description: "记录课程定价、缴费、退款、优惠和欠费状态，并将账务记录关联到学生与班级。",
+    terms: ["画室", "缴费记录", "学费", "收费", "欠费", "tuition", "school fees"],
+    keywords: ["tuition management", "school fee management", "student billing", "payment tracking", "fee collection"],
+    negativeKeywords: ["generic pricing page", "crypto payment", "payment button only"],
+    preferredTypes: ["template_repo", "github_plugin"],
+    priority: "required",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
     id: "inventory-management",
     label: "商品库存与库位管理",
     description: "管理商品档案、价格、库存数量、仓库或货架位置，并支持实时查询。",
