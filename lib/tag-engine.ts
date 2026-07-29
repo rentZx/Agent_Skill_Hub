@@ -37,7 +37,7 @@ const tagRules: Array<{ terms: string[]; tags: ProjectTag[] }> = [
     { slug: "search", label: "Search", category: "workflow", weight: 6 },
     { slug: "recommendation", label: "Recommendation", category: "workflow", weight: 6 }
   ] },
-  { terms: ["做饭", "菜谱", "食谱", "吃什么", "备菜", "烹饪", "饭菜", "料理"], tags: [
+  { terms: ["做饭", "菜谱", "食谱", "食材", "菜品", "忌口", "吃什么", "备菜", "烹饪", "饭菜", "料理"], tags: [
     { slug: "food", label: "Food", category: "industry", weight: 10 },
     { slug: "recipe", label: "Recipe", category: "domain", weight: 9 },
     { slug: "chinese-recipes", label: "Chinese Recipes", category: "domain", weight: 9 },

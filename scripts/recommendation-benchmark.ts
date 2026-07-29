@@ -6,6 +6,7 @@ import {
   type ResourceRole
 } from "../lib/capability-engine";
 import { buildProjectRecommendation } from "../lib/recommendation";
+import { hasKnownProjectRule } from "../lib/project-analyzer";
 import { assessRequirementClarity } from "../lib/requirement-clarity";
 import type { Resource, ResourceType } from "../lib/types";
 
@@ -236,6 +237,14 @@ assert(vagueFoodRecommendation.codexPrompt.includes("先输出需求澄清结果
 assert(!vagueFoodRecommendation.codexPrompt.includes("严格遵循上面的推荐技术栈"), "美食：Prompt 不应锁死推测技术栈");
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
+assert(
+  hasKnownProjectRule("根据食材、人数、忌口和年龄推荐菜品及制作过程"),
+  "个性化菜谱：食材和忌口描述应命中高置信领域规则"
+);
+assert(
+  !hasKnownProjectRule("开发一个 AI 图片压缩工具"),
+  "未知 AI 工具：不应被宽泛 AI 规则锁定为 Agent 应用"
+);
 const recipeCapabilityGraph = buildCapabilityGraph("根据食材、人数、忌口和年龄推荐菜品及制作过程");
 assert(
   recipeCapabilityGraph.capabilities.some((item) => item.id === "recipe-data"),

@@ -8,7 +8,10 @@ import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import { assessRequirementClarity } from "@/lib/requirement-clarity";
-import { mergeCanonicalResources } from "@/lib/resource-verification";
+import {
+  getResourceVerification,
+  mergeCanonicalResources
+} from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
 type AnalyzerRuntimeResult = AnalyzerResult & {
@@ -275,8 +278,10 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     const rerankedGroups = recommendation.groups.map((group) => {
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
-        if (!rerank) return hasStrongRepositoryEvidence(item) ? [item] : [];
-        if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords, recommendation.modules)) return [];
+        if (!rerank) return hasStrongRepositoryEvidence(item, recommendation.modules) ? [item] : [];
+        if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords, recommendation.modules)) {
+          return hasStrongRepositoryEvidence(item, recommendation.modules) ? [item] : [];
+        }
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
         return [{
@@ -355,7 +360,9 @@ function shouldKeepRerankedItem(
 
 function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
   const groups = recommendation.groups.map((group) => {
-    const items = group.items.filter(hasStrongRepositoryEvidence);
+    const items = group.items.filter((item) =>
+      hasStrongRepositoryEvidence(item, recommendation.modules)
+    );
     return {
       ...group,
       items,
@@ -373,17 +380,26 @@ function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"])
 }
 
 function hasStrongRepositoryEvidence(
-  item: AnalyzerResult["recommendation"]["groups"][number]["items"][number]
+  item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
+  modules: AnalyzerResult["recommendation"]["modules"]
 ) {
-  return item.matchKind !== "baseline"
-    && (
-      (item.resource.ai_recommendation_weight ?? 0) >= 100
-      || (
-        (item.resource.ai_recommendation_weight ?? 0) >= 95
-        && Boolean(item.resource.evidence_summary)
-        && (item.resource.matched_capabilities?.length ?? 0) > 0
-      )
-    );
+  if (item.matchKind === "baseline" || item.resource.risk_level === "high") return false;
+  const verification = getResourceVerification(item.resource);
+  const importantIds = new Set(
+    modules
+      .filter((module) => module.priority === "core" || module.priority === "required")
+      .map((module) => module.id)
+  );
+  const deterministicCoverage = item.matchedCapabilityIds.some((id) => importantIds.has(id));
+  const curatedLiveEvidence = verification.recommendationEligible
+    && item.matchKind === "domain"
+    && item.score >= 65
+    && deterministicCoverage;
+  const inspectedLiveEvidence = (item.resource.ai_recommendation_weight ?? 0) >= 95
+    && Boolean(item.resource.evidence_summary)
+    && (item.resource.matched_capabilities?.length ?? 0) > 0;
+
+  return curatedLiveEvidence || inspectedLiveEvidence;
 }
 
 function addFoundationalUiFallback(
