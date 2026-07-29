@@ -630,6 +630,9 @@ function matchesScoringTerm(haystack: string, term: string) {
   if (normalized.length < 3) return false;
   const normalizedHaystack = haystack.replace(/[-_]+/g, " ");
   const normalizedTerm = normalized.replace(/[-_]+/g, " ");
+  if (/^[a-z0-9]+$/.test(normalizedTerm) && normalizedTerm.length <= 3) {
+    return normalizedHaystack.split(/[^a-z0-9]+/).includes(normalizedTerm);
+  }
   return haystack.includes(normalized) || normalizedHaystack.includes(normalizedTerm);
 }
 
@@ -640,6 +643,9 @@ function matchesCapabilityEvidence(
 ) {
   if (capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
   if (!capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
+  if (requiresKnownDomainAnchor(capability.id) && !hasKnownDomainAnchor(haystack, capabilityGraph)) {
+    return false;
+  }
   if (!isShortVideoGraph(capabilityGraph)) return true;
 
   const capabilitySource = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
@@ -660,6 +666,41 @@ function matchesCapabilityEvidence(
   }
   if (/(workflow|automation|pipeline|agent tool|工具工作流)/i.test(capabilitySource)) {
     return hasShortVideoEvidence(haystack);
+  }
+
+  return true;
+}
+
+function requiresKnownDomainAnchor(capabilityId: string) {
+  return [
+    "domain-data",
+    "real-time-integration",
+    "workflow-automation",
+    "domain-rules",
+    "ingredient-matching"
+  ].includes(capabilityId);
+}
+
+function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGraph) {
+  if (!capabilityGraph) return true;
+  const graph = `${capabilityGraph.domain} ${capabilityGraph.capabilities
+    .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
+    .join(" ")}`.toLowerCase();
+
+  if (/(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(graph)) {
+    return /(recipe|recipes|ingredient|cooking|meal planning|servings|nutrition|菜谱|食材|烹饪)/i.test(haystack);
+  }
+  if (/(stock|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(graph)) {
+    return /(stock[- ]market|stock[- ]analysis|stock[- ]trading|market[- ]data|a-share|financial|finance|trading|quant|backtesting|candlestick|股票|行情|量化)/i.test(haystack);
+  }
+  if (/(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(graph)) {
+    return /(inventory|stock control|warehouse|item pricing|product catalog|erp|库存|仓库|货架)/i.test(haystack);
+  }
+  if (isShortVideoGraph(capabilityGraph)) {
+    return hasShortVideoEvidence(haystack);
+  }
+  if (/(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(graph)) {
+    return /(three\.js|threejs|webgl|mesh|image.to.3d|3d reconstruction|glb|obj|stl|三维)/i.test(haystack);
   }
 
   return true;

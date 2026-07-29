@@ -69,6 +69,21 @@ const awesomeList = buildResourceModelV2(resource({
 assert.equal(awesomeList.artifact.kind, "awesome_list");
 assert.equal(awesomeList.artifact.verificationStatus, "pending");
 
+const libraryWithDatasetTopic = buildResourceModelV2(resource({
+  name: "Quant Library",
+  slug: "quant-library",
+  type: "github_plugin",
+  repoUrl: "https://github.com/example/quant-library",
+  description: "Quantitative investment platform and machine learning framework",
+  isCurated: true,
+  tags: ["quant-dataset", "machine-learning", "platform"]
+}));
+assert.notEqual(
+  libraryWithDatasetTopic.artifact.kind,
+  "dataset",
+  "A dataset topic alone must not classify a repository as a dataset artifact."
+);
+
 const githubAppQueryResult = buildResourceModelV2(resource({
   name: "Repository found by GitHub App query",
   slug: "github-app-query-result",

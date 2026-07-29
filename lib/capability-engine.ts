@@ -86,6 +86,25 @@ const capabilityPatterns: Array<{
   resourceRoles: ResourceRole[];
 }> = [
   {
+    id: "image-to-3d",
+    label: "2D 图像转 3D 模型",
+    description: "从二维图像估计几何、深度和材质，生成可预览或导出的三维模型。",
+    terms: ["2d 转 3d", "2d转3d", "2d-to-3d", "image-to-3d", "image to 3d", "二维图片", "三维模型"],
+    keywords: [
+      "image-to-3d",
+      "single image to 3d",
+      "3d reconstruction",
+      "mesh generation",
+      "depth estimation",
+      "three.js",
+      "webgl"
+    ],
+    negativeKeywords: ["3d icon", "css transform", "chart only"],
+    preferredTypes: ["agent_skill", "github_plugin", "template_repo", "ui_component"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "developer_tool"]
+  },
+  {
     id: "recipe-data",
     label: "菜谱、食材与制作步骤数据",
     description: "提供可检索的菜谱、食材用量和分步制作过程，作为推荐系统的领域数据基础。",

@@ -54,6 +54,7 @@ export type LegacyResourceModelInput = {
   hasProjectManifest?: boolean;
   hasGithubAction?: boolean;
   hasGithubApp?: boolean;
+  hasDatasetManifest?: boolean;
   isCurated?: boolean;
   tags: string[];
   supportedAgents?: string[];
@@ -227,6 +228,7 @@ function collectSignals(input: LegacyResourceModelInput, metadata: Record<string
     hasProjectManifest: input.hasProjectManifest ?? getBoolean(metadata, "has_project_manifest") ?? false,
     hasGithubAction: input.hasGithubAction ?? getBoolean(metadata, "has_github_action") ?? false,
     hasGithubApp: input.hasGithubApp ?? getBoolean(metadata, "has_github_app") ?? false,
+    hasDatasetManifest: input.hasDatasetManifest ?? getBoolean(metadata, "has_dataset_manifest") ?? false,
     isCurated: input.isCurated
       ?? getBoolean(metadata, "is_curated_anchor")
       ?? (input.source === "curated_seed"),
@@ -251,7 +253,7 @@ function classifyArtifactKind(
   if (signals.hasGithubAction) return "github_action";
   if (signals.hasGithubApp) return "github_app";
   if (/\bawesome(?:[- ]list)?\b/.test(signals.text)) return "awesome_list";
-  if (/\b(dataset|corpus|数据集|语料库)\b/.test(signals.text)) return "dataset";
+  if (signals.hasDatasetManifest) return "dataset";
   if (/\b(application|platform|system|web app|desktop app|应用|平台|系统)\b/.test(signals.text)) {
     return "application";
   }

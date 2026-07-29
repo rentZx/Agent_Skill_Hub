@@ -55,5 +55,9 @@ jobs:
             git reset --hard origin/main
             npm ci --no-audit --no-fund
             npm run build
+            set -a
+            . ./.env.local
+            set +a
+            npm run test:recommendation:v2
             pm2 startOrReload ecosystem.config.cjs --update-env
             pm2 save

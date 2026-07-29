@@ -157,6 +157,7 @@ V2 keeps `resources` as the compatibility read model and separates source identi
 - AI analysis may enrich or rerank candidates, but cannot bypass the evidence-backed verification status.
 
 The V2 migration is additive and idempotent. Existing pages and seed fallback continue to use `resources` until the recommendation read path is intentionally migrated.
+Set `RESOURCE_READ_MODEL=v2` to route server-side resource reads through verified V2 artifacts. The default remains `v1` until shadow recommendation validation is accepted.
 
 ## Development Milestones
 

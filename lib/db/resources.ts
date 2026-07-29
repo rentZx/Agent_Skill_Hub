@@ -3,6 +3,7 @@ import "server-only";
 import { desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { resourceTags, resources, tags } from "@/lib/db/schema";
+import { listVerifiedResourceArtifacts } from "@/lib/db/resource-model-v2-read";
 import { upsertResourceModelV2 } from "@/lib/db/resource-model-v2-write";
 import type { GitHubParsedResource } from "@/lib/github-import";
 import { buildResourceModelV2 } from "@/lib/resource-model-v2";
@@ -29,6 +30,12 @@ export async function listResources(): Promise<Resource[]> {
     .orderBy(desc(resources.fitScore), desc(resources.trustScore));
 
   return mapJoinedResources(rows);
+}
+
+export async function listResourcesV2(): Promise<Resource[]> {
+  const db = getDb();
+  if (!db) throw new Error("DATABASE_URL is not configured.");
+  return listVerifiedResourceArtifacts(db);
 }
 
 export async function getResourceById(id: string): Promise<Resource | null> {

@@ -65,6 +65,7 @@ async function main() {
       hasProjectManifest: getBoolean(metadata, "has_project_manifest"),
       hasGithubAction: getBoolean(metadata, "has_github_action"),
       hasGithubApp: getBoolean(metadata, "has_github_app"),
+      hasDatasetManifest: getBoolean(metadata, "has_dataset_manifest"),
       isCurated: resource.source === "curated_seed"
         || resource.source === "benchmark"
         || getBoolean(metadata, "is_curated_anchor") === true,

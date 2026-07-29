@@ -1,7 +1,7 @@
 import "server-only";
 
 import { seedResources } from "@/data/seed-resources";
-import { getResourceById, listResources } from "@/lib/db/resources";
+import { getResourceById, listResources, listResourcesV2 } from "@/lib/db/resources";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mergeCanonicalResources } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
@@ -38,7 +38,10 @@ export function getSeedResources(): Resource[] {
 export async function getResources(): Promise<Resource[]> {
   if (process.env.DATABASE_URL) {
     try {
-      return mergeCanonicalResources(await listResources());
+      const resources = process.env.RESOURCE_READ_MODEL === "v2"
+        ? await listResourcesV2()
+        : await listResources();
+      return mergeCanonicalResources(resources);
     } catch (error) {
       console.warn("PostgreSQL resource read failed, falling back.", error);
     }

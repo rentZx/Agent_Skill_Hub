@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../lib/db/schema";
+import { buildCapabilityGraph } from "../lib/capability-engine";
 import { listVerifiedResourceArtifacts } from "../lib/db/resource-model-v2-read";
 import { analyzeProject } from "../lib/project-analyzer";
 
@@ -18,11 +19,11 @@ const db = drizzle(client, { schema });
 const cases = [
   {
     name: "2D 转 3D",
-    prompt: "把二维图片转换成可以在网页预览的三维模型",
+    prompt: "2D 转 3D，把二维图片转换成可以在网页预览的三维模型",
     mustInclude: ["img2threejs"],
     targetPool: ["stable-fast-3d", "InstantMesh", "TripoSR"],
     minTargetMatches: 1,
-    forbidden: ["Auto-claude-code-research-in-sleep", "mediapipe"]
+    forbidden: ["Auto-claude-code-research-in-sleep", "mediapipe", "ARIS"]
   },
   {
     name: "股票行情分析",
@@ -30,7 +31,7 @@ const cases = [
     mustInclude: [],
     targetPool: ["daily_stock_analysis", "akshare", "mootdx", "qlib", "rqalpha", "TradingAgents-CN"],
     minTargetMatches: 2,
-    forbidden: ["Generic Agent Starter"]
+    forbidden: ["Generic Agent Starter", "PuroAir", "FunASR"]
   },
   {
     name: "个性化菜谱",
@@ -38,7 +39,14 @@ const cases = [
     mustInclude: ["HowToCook"],
     targetPool: ["HowToCook-mcp", "mealie", "recipes", "grocy", "Recipe-AI-Easy-Recipes"],
     minTargetMatches: 1,
-    forbidden: ["Supabase pgvector Starter", "Vercel AI SDK Starter"]
+    forbidden: [
+      "Supabase pgvector Starter",
+      "Vercel AI SDK Starter",
+      "Taxonomy Template for Agent Resources",
+      "FunASR",
+      "MCP Server: Playwright",
+      "BlueNexus Universal MCP"
+    ]
   },
   {
     name: "超市语音库存",
@@ -46,7 +54,7 @@ const cases = [
     mustInclude: ["InvenTree"],
     targetPool: ["FunASR", "faster-whisper", "Agentic Shelf", "erpnext"],
     minTargetMatches: 1,
-    forbidden: ["AIRI", "next-saas-starter"]
+    forbidden: ["AIRI", "next-saas-starter", "react-responsive-overflow-list"]
   },
   {
     name: "AI 短视频",
@@ -54,7 +62,7 @@ const cases = [
     mustInclude: ["MoneyPrinterTurbo"],
     targetPool: ["short-video-maker", "MoneyPrinter", "Text-To-Video-AI"],
     minTargetMatches: 1,
-    forbidden: ["erpnext", "neuron-tool-creator"]
+    forbidden: ["erpnext", "neuron-tool-creator", "img2threejs"]
   }
 ];
 
@@ -62,7 +70,13 @@ async function main() {
   const resources = await listVerifiedResourceArtifacts(db);
   const failures: string[] = [];
   const reports = cases.map((testCase) => {
-    const result = analyzeProject(testCase.prompt, resources);
+    const initial = analyzeProject(testCase.prompt, resources);
+    const capabilityGraph = buildCapabilityGraph(testCase.prompt, {
+      projectType: initial.analysis.projectType,
+      coreFeatures: initial.analysis.coreFeatures,
+      tags: initial.analysis.tags
+    });
+    const result = analyzeProject(testCase.prompt, resources, {}, capabilityGraph);
     const items = result.recommendation.groups.flatMap((group) =>
       group.items.map((item) => ({
         group: group.id,
@@ -88,6 +102,7 @@ async function main() {
     return {
       name: testCase.name,
       projectType: result.analysis.projectType,
+      capabilities: capabilityGraph.capabilities.map((capability) => capability.id),
       targetMatches,
       missing,
       forbiddenMatches,
