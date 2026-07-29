@@ -314,6 +314,28 @@ const capabilityPatterns: Array<{
     resourceRoles: ["agent_tool", "mcp_integration"]
   },
   {
+    id: "stock-market-data",
+    label: "股票市场与实时行情数据",
+    description: "获取股票、指数、板块、分钟线、K 线、财务和资金流等市场数据。",
+    terms: ["炒股", "股票", "股市", "证券行情", "A股", "stock market", "market data", "real-time quotes"],
+    keywords: ["stock market data", "stock data quotes", "a-share", "real-time quotes", "financial data"],
+    negativeKeywords: ["inventory stock", "stock footage", "warehouse stock"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_data", "mcp_integration"]
+  },
+  {
+    id: "technical-analysis",
+    label: "股票走势与技术分析",
+    description: "计算 K 线、均线、MACD、RSI、布林带等指标，并支持因子研究、回测或走势分析。",
+    terms: ["走势分析", "技术分析", "K线", "均线", "MACD", "RSI", "量化", "technical analysis", "backtesting"],
+    keywords: ["technical analysis", "candlestick indicator", "macd rsi", "quantitative backtesting"],
+    negativeKeywords: ["generic chart only", "inventory analytics"],
+    preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "domain_system"]
+  },
+  {
     id: "weather-forecast-data",
     label: "实时天气与预报数据",
     description: "获取当前位置或指定城市的实时天气、小时预报、逐日预报和气象变量。",
