@@ -278,9 +278,11 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     const rerankedGroups = recommendation.groups.map((group) => {
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
-        if (!rerank) return hasStrongRepositoryEvidence(item, recommendation.modules) ? [item] : [];
+        if (!rerank) {
+          return hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords) ? [item] : [];
+        }
         if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords, recommendation.modules)) {
-          return hasStrongRepositoryEvidence(item, recommendation.modules) ? [item] : [];
+          return hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords) ? [item] : [];
         }
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
@@ -361,7 +363,7 @@ function shouldKeepRerankedItem(
 function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
   const groups = recommendation.groups.map((group) => {
     const items = group.items.filter((item) =>
-      hasStrongRepositoryEvidence(item, recommendation.modules)
+      hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords)
     );
     return {
       ...group,
@@ -381,20 +383,22 @@ function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"])
 
 function hasStrongRepositoryEvidence(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
-  modules: AnalyzerResult["recommendation"]["modules"]
+  modules: AnalyzerResult["recommendation"]["modules"],
+  projectKeywords: string[]
 ) {
   if (item.matchKind === "baseline" || item.resource.risk_level === "high") return false;
   const verification = getResourceVerification(item.resource);
-  const importantIds = new Set(
+  const coreIds = new Set(
     modules
-      .filter((module) => module.priority === "core" || module.priority === "required")
+      .filter((module) => module.priority === "core")
       .map((module) => module.id)
   );
-  const deterministicCoverage = item.matchedCapabilityIds.some((id) => importantIds.has(id));
+  const deterministicCoverage = item.matchedCapabilityIds.some((id) => coreIds.has(id));
   const curatedLiveEvidence = verification.recommendationEligible
     && item.matchKind === "domain"
     && item.score >= 65
-    && deterministicCoverage;
+    && deterministicCoverage
+    && hasDirectDomainSignal(item, projectKeywords, true);
   const inspectedLiveEvidence = (item.resource.ai_recommendation_weight ?? 0) >= 95
     && Boolean(item.resource.evidence_summary)
     && (item.resource.matched_capabilities?.length ?? 0) > 0;
@@ -467,7 +471,8 @@ const genericProjectKeywords = new Set([
 
 function hasDirectDomainSignal(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
-  projectKeywords: string[]
+  projectKeywords: string[],
+  requireProjectKeyword = false
 ) {
   const haystack = [
     item.resource.name,
@@ -490,6 +495,7 @@ function hasDirectDomainSignal(
       || item.resource.repo_url.toLowerCase().replace(/\/+$/, "").endsWith("github.com/shadcn-ui/ui")
       || hasProjectKeyword;
   }
+  if (requireProjectKeyword) return hasProjectKeyword;
   if ((item.resource.ai_recommendation_weight ?? 0) >= 100) return true;
 
   const capabilityIds = new Set([
