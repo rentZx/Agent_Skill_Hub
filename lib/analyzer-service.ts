@@ -102,6 +102,19 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
           tags: ai.tags
         }, capabilityGraph);
     const reranked = await rerankRecommendation(input, enriched.recommendation);
+    const catalogRecommendation = analyzeProject(
+      input,
+      resources,
+      {},
+      capabilityGraph
+    ).recommendation;
+    const groundedRecommendation = {
+      ...reranked,
+      groups: preserveEvidenceBackedCoreItems(
+        reranked.groups,
+        catalogRecommendation
+      )
+    };
     const analysis = isLowConfidence ? enriched.analysis : {
       ...enriched.analysis,
       ...(ai.industry ? { industry: ai.industry } : {}),
@@ -118,8 +131,8 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       tags: Array.from(new Set([...enriched.analysis.tags, ...(ai.tags ?? [])]))
     };
     const recommendation = {
-      ...reranked,
-      codexPrompt: rebuildCodexPrompt(input, reranked)
+      ...groundedRecommendation,
+      codexPrompt: rebuildCodexPrompt(input, groundedRecommendation)
     };
     return {
       ...enriched,
