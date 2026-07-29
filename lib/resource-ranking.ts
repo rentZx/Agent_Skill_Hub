@@ -1,8 +1,10 @@
 import type { Resource, ResourceType } from "@/lib/types";
+import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 
 export function rankFeaturedResources(resources: Resource[]) {
   return resources
     .filter((resource) => resource.risk_level !== "high")
+    .filter(isResourceRecommendationEligible)
     .map((resource) => ({ resource, score: featuredScore(resource) }))
     .sort((a, b) => b.score - a.score || b.resource.fit_score - a.resource.fit_score)
     .map(({ resource }) => resource);
@@ -18,10 +20,7 @@ export function selectDailyFeaturedSkills(
   const allRankedSkills = rankFeaturedResources(
     resources.filter((resource) => resource.type === "agent_skill")
   );
-  const verifiedSkills = allRankedSkills.filter(
-    (resource) => resource.has_skill_md || resource.source === "curated_seed"
-  );
-  const rankedSkills = verifiedSkills.length >= limit ? verifiedSkills : allRankedSkills;
+  const rankedSkills = allRankedSkills;
   const highQualitySkills = rankedSkills.filter(
     (resource) => resource.trust_score >= 70 && resource.fit_score >= 60
   );
@@ -36,7 +35,9 @@ export function selectDailyFeaturedSkills(
 }
 
 export function getCoverageScore(resources: Resource[], type: ResourceType) {
-  const typedResources = resources.filter((resource) => resource.type === type);
+  const typedResources = resources.filter(
+    (resource) => resource.type === type && isResourceRecommendationEligible(resource)
+  );
   if (typedResources.length === 0) return 0;
 
   const averageFit = average(typedResources.map((resource) => resource.fit_score));

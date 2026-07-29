@@ -3,10 +3,18 @@ import "server-only";
 import { seedResources } from "@/data/seed-resources";
 import { getResourceById, listResources } from "@/lib/db/resources";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { mergeCanonicalResources } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
 type ResourceQueryRow = Resource & {
-  metadata?: { risk_reason?: unknown; synced_at?: unknown };
+  metadata?: {
+    risk_reason?: unknown;
+    synced_at?: unknown;
+    skill_path?: unknown;
+    is_curated_anchor?: unknown;
+    has_project_manifest?: unknown;
+    has_github_action?: unknown;
+  };
   resource_tags?: Array<{
     tags: { name: string; slug: string } | null;
   }>;
@@ -20,17 +28,17 @@ export function slugify(value: string) {
 }
 
 export function getSeedResources(): Resource[] {
-  return seedResources.map((resource, index) => ({
+  return mergeCanonicalResources(seedResources.map((resource, index) => ({
     ...resource,
     id: `seed-${index + 1}`,
     slug: slugify(resource.name)
-  }));
+  })));
 }
 
 export async function getResources(): Promise<Resource[]> {
   if (process.env.DATABASE_URL) {
     try {
-      return await listResources();
+      return mergeCanonicalResources(await listResources());
     } catch (error) {
       console.warn("PostgreSQL resource read failed, falling back.", error);
     }
@@ -60,6 +68,9 @@ export async function getResources(): Promise<Resource[]> {
       repo_url,
       github_stars,
       github_forks,
+      has_skill_md,
+      has_package_json,
+      has_mcp_manifest,
       source,
       last_updated,
       metadata,
@@ -73,7 +84,7 @@ export async function getResources(): Promise<Resource[]> {
     return getSeedResources();
   }
 
-  return (data as unknown as ResourceQueryRow[]).map((resource) => {
+  return mergeCanonicalResources((data as unknown as ResourceQueryRow[]).map((resource) => {
     const tagRows = resource.resource_tags ?? [];
 
     return {
@@ -92,12 +103,19 @@ export async function getResources(): Promise<Resource[]> {
       repo_url: resource.repo_url,
       github_stars: resource.github_stars,
       github_forks: resource.github_forks,
+      has_skill_md: resource.has_skill_md,
+      has_package_json: resource.has_package_json,
+      has_mcp_manifest: resource.has_mcp_manifest,
+      has_project_manifest: getMetadataBoolean(resource.metadata, "has_project_manifest"),
+      has_github_action: getMetadataBoolean(resource.metadata, "has_github_action"),
+      artifact_path: getMetadataString(resource.metadata, "skill_path"),
+      is_curated: getMetadataBoolean(resource.metadata, "is_curated_anchor"),
       source: resource.source,
       last_updated: resource.last_updated,
       last_synced_at: getMetadataSyncTime(resource.metadata),
       risk_reason: typeof resource.metadata?.risk_reason === "string" ? resource.metadata.risk_reason : undefined
     };
-  });
+  }));
 }
 
 function getMetadataSyncTime(metadata: unknown) {
@@ -107,6 +125,18 @@ function getMetadataSyncTime(metadata: unknown) {
 
   const value = (metadata as { synced_at?: unknown }).synced_at;
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getMetadataString(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getMetadataBoolean(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "boolean" ? value : undefined;
 }
 
 export async function getResourceBySlug(slug: string): Promise<Resource | null> {

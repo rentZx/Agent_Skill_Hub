@@ -68,7 +68,7 @@ export default async function ResourcesPage({
             面向 AI Agent 项目的资源雷达。
           </h1>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
-            这里汇总 Skills、MCP Servers、GitHub 插件、UI 组件库和模板仓库，用适配度、可信度和风险等级帮助你快速选型。
+            这里汇总 Skills、MCP Servers、GitHub 插件、UI 组件库和模板仓库，用基础质量、可信度和风险等级帮助你快速选型。
           </p>
           <ResourceSearchBar />
           </div>
@@ -77,7 +77,7 @@ export default async function ResourcesPage({
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           <MetricCard icon={<Layers3 className="h-4 w-4" />} label="资源总数" value={totalResources.toString()} />
           <MetricCard icon={<ShieldCheck className="h-4 w-4" />} label="平均可信度" value={`${averageTrust}/100`} />
-          <MetricCard icon={<Gauge className="h-4 w-4" />} label="平均适配度" value={`${averageFit}/100`} />
+          <MetricCard icon={<Gauge className="h-4 w-4" />} label="平均基础质量" value={`${averageFit}/100`} />
         </div>
       </section>
 

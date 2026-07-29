@@ -13,6 +13,7 @@ import { riskLabels, typeLabels } from "@/lib/resource-types";
 import { getLocalizedResourceDescription, getResourceEvidenceLabel } from "@/lib/resource-localization";
 import { formatResourceDate } from "@/lib/resource-ranking";
 import { getSafeExternalUrl } from "@/lib/resource-url";
+import { getResourceVerification } from "@/lib/resource-verification";
 
 const riskClassNames: Record<RiskLevel, string> = {
   low: "border-emerald-300/30 bg-emerald-300/[0.12] text-emerald-100",
@@ -31,6 +32,7 @@ const typeIcons: Record<ResourceType, ComponentType<{ className?: string }>> = {
 export function ResourceCard({ resource, headerAction }: { resource: Resource; headerAction?: ReactNode }) {
   const Icon = typeIcons[resource.type];
   const sourceUrl = getSafeExternalUrl(resource.repo_url);
+  const verification = getResourceVerification(resource);
 
   return (
     <article className="group flex min-h-[340px] flex-col rounded-lg border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.032))] p-4 shadow-glass backdrop-blur-xl transition duration-300 ease-out hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.07] hover:shadow-[0_18px_46px_rgba(34,211,238,0.10)] sm:p-5">
@@ -39,6 +41,7 @@ export function ResourceCard({ resource, headerAction }: { resource: Resource; h
           <div className="inline-flex items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-xs font-medium text-cyan-100">
             <Icon className="h-3.5 w-3.5" />
             {typeLabels[resource.type]}
+            {verification.status === "unverified" ? " · 待验证" : ""}
           </div>
           <h3 className="mt-3 text-lg font-semibold leading-6 text-slate-50">{resource.name}</h3>
         </div>
@@ -62,7 +65,7 @@ export function ResourceCard({ resource, headerAction }: { resource: Resource; h
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Score label="可信度" value={resource.trust_score} tone="neutral" />
-        <Score label="适配度" value={resource.fit_score} tone="accent" />
+        <Score label="基础质量" value={resource.fit_score} tone="accent" />
       </div>
 
       <div className="mt-4 rounded-md border border-cyan-300/15 bg-black/30 p-3">

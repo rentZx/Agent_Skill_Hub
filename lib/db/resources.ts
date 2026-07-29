@@ -200,6 +200,10 @@ function mapJoinedResources(
         has_skill_md: row.resource.hasSkillMd,
         has_package_json: row.resource.hasPackageJson,
         has_mcp_manifest: row.resource.hasMcpManifest,
+        has_project_manifest: getMetadataBoolean(row.resource.metadata, "has_project_manifest"),
+        has_github_action: getMetadataBoolean(row.resource.metadata, "has_github_action"),
+        artifact_path: getMetadataString(row.resource.metadata, "skill_path"),
+        is_curated: getMetadataBoolean(row.resource.metadata, "is_curated_anchor"),
         evidence_summary: buildEvidenceSummary(row.resource),
         source: row.resource.source,
         last_updated: normalizeDate(row.resource.lastUpdated),
@@ -250,6 +254,18 @@ function getMetadataSyncTime(metadata: unknown) {
 
   const value = (metadata as { synced_at?: unknown }).synced_at;
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getMetadataString(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getMetadataBoolean(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function buildEvidenceSummary(resource: ResourceRow) {

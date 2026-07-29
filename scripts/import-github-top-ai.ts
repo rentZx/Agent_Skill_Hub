@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
 import { discoverTopAiResources } from "../lib/github-discovery-core";
+import { isResourceRecommendationEligible } from "../lib/resource-verification";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -14,7 +15,8 @@ const client = postgres(databaseUrl);
 const db = drizzle(client);
 
 async function main() {
-  const discovered = await discoverTopAiResources(30);
+  const candidates = await discoverTopAiResources(30);
+  const discovered = candidates.filter(isResourceRecommendationEligible);
 
   for (const resource of discovered) {
   const [saved] = await db.insert(resources).values({
@@ -34,6 +36,9 @@ async function main() {
     license: resource.license ?? null,
     latestCommitAt: resource.latest_commit_at ? new Date(resource.latest_commit_at) : null,
     readmeSummary: resource.readme_summary ?? resource.description,
+    hasSkillMd: resource.has_skill_md ?? false,
+    hasPackageJson: resource.has_package_json ?? false,
+    hasMcpManifest: resource.has_mcp_manifest ?? false,
     source: resource.source,
     lastUpdated: resource.last_updated,
     metadata: { imported_by: "github_top_ai", risk_reason: resource.risk_reason, imported_at: new Date().toISOString() }
@@ -50,6 +55,9 @@ async function main() {
       githubForks: resource.github_forks ?? 0,
       license: resource.license ?? null,
       latestCommitAt: resource.latest_commit_at ? new Date(resource.latest_commit_at) : null,
+      hasSkillMd: resource.has_skill_md ?? false,
+      hasPackageJson: resource.has_package_json ?? false,
+      hasMcpManifest: resource.has_mcp_manifest ?? false,
       source: resource.source,
       lastUpdated: resource.last_updated,
       metadata: { imported_by: "github_top_ai", risk_reason: resource.risk_reason, imported_at: new Date().toISOString() },
@@ -66,7 +74,7 @@ async function main() {
   }
 
   await client.end();
-  console.log(`Imported ${discovered.length} top AI GitHub resources.`);
+  console.log(`Imported ${discovered.length} verified top AI resources; quarantined ${candidates.length - discovered.length} unverified candidates.`);
 }
 
 void main().catch(async (error) => {

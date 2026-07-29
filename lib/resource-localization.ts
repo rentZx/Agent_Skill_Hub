@@ -1,4 +1,5 @@
 import type { Resource, ResourceType } from "@/lib/types";
+import { getResourceVerification } from "@/lib/resource-verification";
 
 type LocalizableResource = Pick<
   Resource,
@@ -161,15 +162,9 @@ export function getLocalizedUseCases(resource: LocalizableResource) {
   return Array.from(new Set([topicCase, ...typeCases[resource.type]])).slice(0, 3);
 }
 
-export function getResourceEvidenceLabel(resource: Pick<
-  Resource,
-  "source" | "has_skill_md" | "has_mcp_manifest" | "has_package_json"
->) {
-  if (resource.has_skill_md) return "已定位 SKILL.md";
-  if (resource.has_mcp_manifest) return "已发现 MCP Registry 或 Manifest";
-  if (resource.has_package_json) return "已发现 npm/package.json 包信息";
-  if (resource.source === "curated_seed") return "人工精选资源";
-  return "自动发现，尚需人工复核类型";
+export function getResourceEvidenceLabel(resource: Resource) {
+  const verification = getResourceVerification(resource);
+  return `${verification.label}：${verification.reason}`;
 }
 
 export function getLocalizedRecommendationReason(

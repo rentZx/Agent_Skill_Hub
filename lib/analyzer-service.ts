@@ -8,6 +8,7 @@ import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import { assessRequirementClarity } from "@/lib/requirement-clarity";
+import { mergeCanonicalResources } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
 type AnalyzerRuntimeResult = AnalyzerResult & {
@@ -208,15 +209,9 @@ async function discoverSafely(
 }
 
 function mergeResources(catalog: Resource[], discovered: Resource[]) {
-  const merged = new Map(catalog.map((resource) => {
-    const normalized = normalizeOfficialResourceName(resource);
-    return [normalized.repo_url || normalized.id, normalized];
-  }));
-  discovered.forEach((resource) => {
-    const normalized = normalizeOfficialResourceName(resource);
-    merged.set(normalized.repo_url || normalized.id, normalized);
-  });
-  return Array.from(merged.values());
+  return mergeCanonicalResources(
+    [...catalog, ...discovered].map(normalizeOfficialResourceName)
+  );
 }
 
 function normalizeOfficialResourceName(resource: Resource): Resource {

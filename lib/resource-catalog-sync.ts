@@ -342,6 +342,8 @@ function mapGitHubRepository(repository: GitHubRepository, config: GitHubCatalog
       source_query: config.query,
       source_url: repository.html_url,
       default_branch: repository.default_branch,
+      is_curated_anchor: config.query.startsWith("curated:"),
+      type_verified: config.query.startsWith("curated:") || config.hasSkillMd === true || config.hasMcpManifest === true,
       synced_at: new Date().toISOString()
     }
   };
@@ -415,6 +417,7 @@ function mapMcpServer(server: McpServer, official?: { status?: string; isLatest?
       remotes: server.remotes,
       official_status: official?.status,
       is_latest: official?.isLatest,
+      type_verified: true,
       synced_at: new Date().toISOString()
     }
   };
@@ -477,6 +480,7 @@ function mapNpmPackage(pkg: NpmPackage, config: { type: ResourceType; query: str
       version: pkg.version,
       npm_url: pkg.links?.npm ?? `https://www.npmjs.com/package/${pkg.name}`,
       published_at: publishedAt,
+      type_verified: true,
       synced_at: new Date().toISOString()
     }
   };

@@ -114,7 +114,7 @@ export default async function HomePage() {
                 </div>
               </div>
               <p className="mb-4 text-xs leading-5 text-muted-foreground">
-                按资源数量、平均适配度、平均可信度和低风险占比计算，不代表单次推荐成功率。
+                按已验证资源数量、平均基础质量、平均可信度和低风险占比计算，不代表单次推荐成功率。
               </p>
               <div className="space-y-4">
                 {resourceTypes.map((type) => (
@@ -125,7 +125,7 @@ export default async function HomePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <GlassTile icon={TerminalSquare} label="Codex 可交接" value="生成可复制开发提示词" />
-              <GlassTile icon={ShieldCheck} label="风险可见" value={`平均适配度 ${avgFit}/100`} />
+              <GlassTile icon={ShieldCheck} label="风险可见" value={`平均基础质量 ${avgFit}/100`} />
             </div>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default async function HomePage() {
             每日从高质量 Agent Skills 候选池轮换 6 项，点击即可查看适用场景、安装方式和风险说明。
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-400">
-            资源目录每天同步；候选池按适配度 45%、可信度 30%、源仓库新鲜度 15%、社区热度 10% 排序，高风险资源不会进入精选。
+            资源目录每天同步；候选池按基础质量 45%、可信度 30%、源仓库新鲜度 15%、社区热度 10% 排序，高风险或类型未验证资源不会进入精选。
           </p>
           <Button asChild variant="secondary" className="mt-5">
             <Link href="/resources">
@@ -181,7 +181,7 @@ export default async function HomePage() {
               <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{getLocalizedResourceDescription(resource)}</p>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                 <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-slate-300">可信 {resource.trust_score}</span>
-                <span className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">适配 {resource.fit_score}</span>
+                <span className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-cyan-100">基础质量 {resource.fit_score}</span>
               </div>
             </Link>
           ))}

@@ -104,7 +104,7 @@ export default async function ResourceDetailPage({
             <div className="grid gap-3">
               <Metric label="风险等级" value={riskLabels[resource.risk_level]} highlight={riskClassName[resource.risk_level]} />
               <Metric label="可信度" value={`${resource.trust_score}/100`} />
-              <Metric label="适配度" value={`${resource.fit_score}/100`} accent />
+              <Metric label="基础质量" value={`${resource.fit_score}/100`} accent />
               <Metric label="支持工具" value={resource.supported_agents.join(", ")} />
               <Metric label="许可证" value={resource.license || "未检测到明确许可证"} />
               <Metric label="GitHub Stars" value={(resource.github_stars ?? 0).toLocaleString("zh-CN")} />

@@ -26,6 +26,8 @@ type RepositoryEvidence = {
   hasSkillMd: boolean;
   hasMcpManifest: boolean;
   hasPackageJson: boolean;
+  hasProjectManifest: boolean;
+  hasGitHubAction: boolean;
   matchedCapabilities: string[];
   evidenceFiles: string[];
   summary: string;
@@ -420,9 +422,19 @@ async function inspectRepository(
   const normalizedPaths = inspection.paths.map((path) => path.toLowerCase());
   const hasSkillMd = normalizedPaths.some((path) => /(^|\/)skill\.md$/.test(path));
   const hasPackageJson = normalizedPaths.some((path) => /(^|\/)package\.json$/.test(path));
+  const hasProjectManifest = normalizedPaths.some((path) =>
+    /(^|\/)(package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json)$/.test(path)
+  );
+  const hasGitHubAction = normalizedPaths.some((path) =>
+    /(^|\/)action\.ya?ml$/.test(path) || /^\.github\/actions\/[^/]+\/action\.ya?ml$/.test(path)
+  );
+  const mcpReadme = inspection.readme.slice(0, 12000);
   const hasMcpManifest = normalizedPaths.some((path) =>
     /(^|\/)(mcp\.json|\.mcp\.json|mcp-server\.json|server\.json)$/.test(path)
-  ) || /\b(model context protocol|mcp server)\b/i.test(inspection.readme);
+  ) || (
+    /\b(model context protocol|mcp server)\b/i.test(mcpReadme)
+    && /\b(mcpservers|stdio|tools\/list|npx|uvx|server transport)\b/i.test(mcpReadme)
+  );
   const evidenceSource = [
     item.name,
     item.description ?? "",
@@ -435,12 +447,14 @@ async function inspectRepository(
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
   );
   const evidenceFiles = inspection.paths.filter((path) =>
-    /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
+    /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
   ).slice(0, 8);
   const signals = [
     hasSkillMd ? "检测到 SKILL.md" : "",
     hasMcpManifest ? "检测到 MCP Server 或配置清单" : "",
     hasPackageJson ? "检测到 package.json" : "",
+    hasProjectManifest && !hasPackageJson ? "检测到项目清单" : "",
+    hasGitHubAction ? "检测到 GitHub Action" : "",
     matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : ""
   ].filter(Boolean);
 
@@ -448,6 +462,8 @@ async function inspectRepository(
     hasSkillMd,
     hasMcpManifest,
     hasPackageJson,
+    hasProjectManifest,
+    hasGitHubAction,
     matchedCapabilities: matched.map((capability) => capability.id),
     evidenceFiles,
     summary: signals.length > 0 ? `仓库证据：${signals.join("；")}。` : "仓库证据：未检测到明确的 Skill、MCP 或核心能力文件信号。"
@@ -582,6 +598,8 @@ function toResource(
     has_skill_md: overrides.evidence?.hasSkillMd,
     has_mcp_manifest: overrides.evidence?.hasMcpManifest,
     has_package_json: overrides.evidence?.hasPackageJson,
+    has_project_manifest: overrides.evidence?.hasProjectManifest,
+    has_github_action: overrides.evidence?.hasGitHubAction,
     matched_capabilities: overrides.evidence?.matchedCapabilities,
     evidence_summary: overrides.evidence?.summary,
     source: "github_live",
@@ -601,6 +619,7 @@ function inferDiscoveredType(text: string): ResourceType {
 function inferEvidenceType(fallback: ResourceType, evidence?: RepositoryEvidence): ResourceType {
   if (evidence?.hasSkillMd) return "agent_skill";
   if (evidence?.hasMcpManifest) return "mcp_server";
+  if (evidence?.hasGitHubAction) return "github_plugin";
   return fallback;
 }
 
