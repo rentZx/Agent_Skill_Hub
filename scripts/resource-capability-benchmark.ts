@@ -51,6 +51,36 @@ const cases = [
     },
     expected: [],
     forbidden: ["weather-forecast-data", "historical-weather"]
+  },
+  {
+    name: "Pl@ntNet API identifies plant species",
+    input: {
+      name: "my.plantnet",
+      description: "Official PlantNet API examples for plant identification from local or remote images.",
+      tags: ["plant-identification", "plant-identification-api", "species-classification"]
+    },
+    expected: ["plant-species-identification", "plant-identification-api"],
+    forbidden: ["plant-disease-detection"]
+  },
+  {
+    name: "PlantNet-300K is a species dataset",
+    input: {
+      name: "PlantNet-300K",
+      description: "A plant image dataset for plant species classification.",
+      tags: ["plant-species-dataset", "plant-species-recognition"]
+    },
+    expected: ["plant-species-identification", "plant-species-dataset"],
+    forbidden: ["plant-disease-detection"]
+  },
+  {
+    name: "PlantVillage is disease-specific",
+    input: {
+      name: "PlantVillage Dataset",
+      description: "Plant disease dataset for crop leaf disease classification.",
+      tags: ["plant-disease-detection", "plant-disease-dataset", "leaf-disease"]
+    },
+    expected: ["plant-disease-detection"],
+    forbidden: ["plant-species-identification", "plant-species-dataset"]
   }
 ] as const;
 

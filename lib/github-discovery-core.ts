@@ -195,6 +195,56 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
+const plantIdentificationDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"plant identification\" species image API in:name,description,readme archived:false fork:false",
+    "\"plant species recognition\" image classification in:name,description,readme archived:false fork:false",
+    "\"Pl@ntNet API\" plant identification in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "plantnet/my.plantnet",
+    "plantnet/ai-taxonomist-webcomponent",
+    "plantnet/PlantNet-300K",
+    "danielbrendel/hortusfox-web"
+  ],
+  relevanceTerms: [
+    "plant identification", "plant species recognition", "plant image classification",
+    "species classification", "plantnet api", "ai taxonomist", "plant image dataset"
+  ],
+  typeOverrides: {
+    "plantnet/my.plantnet": "github_plugin",
+    "plantnet/ai-taxonomist-webcomponent": "ui_component",
+    "plantnet/plantnet-300k": "github_plugin",
+    "danielbrendel/hortusfox-web": "template_repo"
+  },
+  tagOverrides: {
+    "plantnet/my.plantnet": ["plant-identification", "plant-species-recognition", "plant-identification-api", "plantnet-api", "image-upload", "species-classification"],
+    "plantnet/ai-taxonomist-webcomponent": ["plant-identification", "plant-species-recognition", "plant-identification-api", "ai-taxonomist", "web-component", "image-upload", "species-classification", "ui"],
+    "plantnet/plantnet-300k": ["plant-identification", "plant-species-recognition", "plant-image-dataset", "plant-species-dataset", "species-classification", "deep-learning", "pytorch"],
+    "danielbrendel/hortusfox-web": ["plant-management", "plant-identification", "plantnet-api", "plant-care", "self-hosted", "project-template"]
+  }
+};
+
+const plantDiseaseDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"plant disease detection\" leaf image classification in:name,description,readme archived:false fork:false",
+    "\"crop disease\" PlantVillage model in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "spMohanty/PlantVillage-Dataset"
+  ],
+  relevanceTerms: [
+    "plant disease detection", "leaf disease classification", "crop disease recognition",
+    "plant pathology", "plant disease dataset", "plantvillage"
+  ],
+  typeOverrides: {
+    "spmohanty/plantvillage-dataset": "github_plugin"
+  },
+  tagOverrides: {
+    "spmohanty/plantvillage-dataset": ["plant-disease-detection", "plant-disease-dataset", "leaf-disease", "crop-disease", "plant-pathology", "image-classification"]
+  }
+};
+
 const weatherDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"weather API\" forecast historical in:name,description,readme archived:false fork:false",
@@ -740,6 +790,12 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   }
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
     return imageTo3dDiscoveryProfile;
+  }
+  if (/(植物病害|病虫害|叶片疾病|病斑|植物健康诊断|plant.disease|leaf.disease|crop.disease|plant.pathology)/i.test(source)) {
+    return plantDiseaseDiscoveryProfile;
+  }
+  if (/(植物识别|识别植物|拍照识花|拍照识植物|花草识别|植物种类|plant.identification|plant.identifier|plant.species.recognition|species.classification)/i.test(source)) {
+    return plantIdentificationDiscoveryProfile;
   }
   if (/(天气|天气预报|气象|weather.forecast|weather.api|historical.weather)/i.test(source)) {
     return weatherDiscoveryProfile;

@@ -167,7 +167,7 @@ function hasMcpSignal(resource: Resource) {
 }
 
 function hasUiLibrarySignal(resource: Resource) {
-  return /\b(component library|components|design system|shadcn|radix|tailwind ui|react ui|vue ui|ui library)\b/i.test(
+  return /\b(component library|components|web[- ]?component|webcomponent|design system|shadcn|radix|tailwind ui|react ui|vue ui|ui library)\b/i.test(
     resourceText(resource)
   );
 }

@@ -87,6 +87,21 @@ export const resourceCapabilityDefinitions: ResourceCapabilityDefinition[] = [
   ]),
   capability("body-measurements", "体重与身体指标", "跟踪体重、围度、身体测量和进度变化。", "fitness", "domain_data", [
     ["body weight", "measurements"], ["weight tracker"], ["body measurements"], ["fitness progress"]
+  ]),
+  capability("plant-species-identification", "植物物种识别", "根据植物照片识别候选物种，并返回学名、常用名和置信度。", "plant", "domain_algorithm", [
+    ["plant identification"], ["plants identification"], ["plant species", "recognition"], ["plant species", "classification"],
+    ["ai taxonomist"], ["plantnet", "identify"]
+  ], ["plant disease only", "leaf disease only", "crop disease only"]),
+  capability("plant-identification-api", "植物识别 API", "通过可调用 API 上传植物照片并获取物种识别候选结果。", "plant", "domain_data", [
+    ["plant identification", "api"], ["plantnet api"], ["plant identification", "webcomponent"],
+    ["ai taxonomist", "api"]
+  ], ["plant disease api only"]),
+  capability("plant-species-dataset", "植物物种图像数据集", "提供带物种标签的植物图像，用于训练、评估或微调识别模型。", "plant", "domain_data", [
+    ["plant image", "dataset"], ["plant species", "dataset"], ["plantnet 300k"], ["plant dataset", "classification"]
+  ], ["plant disease dataset", "leaf disease dataset"]),
+  capability("plant-disease-detection", "植物病害识别", "根据叶片或植株图像识别病害类别、健康状态或病斑。", "plant-health", "domain_algorithm", [
+    ["plant disease", "detection"], ["plant disease", "classification"], ["crop disease", "detection"],
+    ["leaf disease", "classification"], ["plant pathology", "image"]
   ])
 ];
 

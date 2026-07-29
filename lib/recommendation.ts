@@ -709,6 +709,15 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
   if (/(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(graph)) {
     return /(three\.js|threejs|webgl|mesh|image.to.3d|3d reconstruction|glb|obj|stl|三维)/i.test(haystack);
   }
+  if (/(plant.disease|leaf.disease|crop.disease|plant.pathology|植物病害|病虫害|叶片疾病)/i.test(graph)) {
+    return /(plant[- ]disease|leaf[- ]disease|crop[- ]disease|plant pathology|plantvillage|植物病害|病虫害|叶片疾病)/i.test(haystack);
+  }
+  if (/(plant.species|plant.identification|species.classification|plantnet|植物识别|拍照识花|物种识别)/i.test(graph)) {
+    const hasSpeciesIdentification = /(plant[- ]identification|plants[- ]identification|plant[- ]species|species[- ]classification|plantnet|ai[- ]taxonomist|植物识别|物种识别)/i.test(haystack);
+    const diseaseOnly = /(plant[- ]disease|leaf[- ]disease|crop[- ]disease|plantvillage|植物病害|叶片疾病)/i.test(haystack)
+      && !hasSpeciesIdentification;
+    return hasSpeciesIdentification && !diseaseOnly;
+  }
 
   return true;
 }
@@ -737,7 +746,8 @@ function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
     || /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
     || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
     || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)
-    || /(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(source);
+    || /(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(source)
+    || /(plant.species|plant.identification|species.classification|plantnet|植物识别|拍照识花|物种识别|plant.disease|leaf.disease|crop.disease|植物病害|叶片疾病)/i.test(source);
 }
 
 function isShortVideoGraph(capabilityGraph?: CapabilityGraph) {
@@ -810,10 +820,10 @@ function selectCapabilityBundle<T extends {
 
   importantCapabilities.forEach((capability) => {
     const limit = capability.priority === "core" ? 3 : 2;
-    scored
+    const candidates = scored
       .filter((item) => item.resource.risk_level !== "high")
-      .filter((item) => item.matchedCapabilityIds.includes(capability.id))
-      .slice(0, limit)
+      .filter((item) => item.matchedCapabilityIds.includes(capability.id));
+    selectBestResourceTypes(candidates, limit)
       .forEach((item) => defaultIds.add(item.resource.id));
   });
 
@@ -837,6 +847,29 @@ function selectCapabilityBundle<T extends {
   );
 
   return { defaultIds, riskIds };
+}
+
+function selectBestResourceTypes<T extends {
+  resource: Resource;
+  score: number;
+}>(candidates: T[], limit: number) {
+  const selected: T[] = [];
+  const selectedTypes = new Set<ResourceType>();
+
+  for (const candidate of candidates) {
+    if (selectedTypes.has(candidate.resource.type)) continue;
+    selected.push(candidate);
+    selectedTypes.add(candidate.resource.type);
+    if (selected.length >= limit) return selected;
+  }
+
+  for (const candidate of candidates) {
+    if (selected.includes(candidate)) continue;
+    selected.push(candidate);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
 }
 
 function inferResourceRole(

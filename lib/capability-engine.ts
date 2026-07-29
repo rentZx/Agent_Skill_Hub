@@ -336,6 +336,77 @@ const capabilityPatterns: Array<{
     resourceRoles: ["domain_algorithm", "domain_system"]
   },
   {
+    id: "plant-species-identification",
+    label: "植物拍照与物种识别",
+    description: "接收相机或相册中的植物照片，返回候选物种、学名、常用名、置信度和可追溯的识别依据。",
+    terms: [
+      "植物识别", "识别植物", "拍照识花", "拍照识植物", "花草识别", "植物种类",
+      "plant identification", "plant identifier", "plant species recognition", "species classification"
+    ],
+    keywords: [
+      "plant identification", "plant species recognition", "plant image classification",
+      "species classification", "plantnet api", "ai taxonomist"
+    ],
+    negativeKeywords: [
+      "plant disease only", "leaf disease only", "crop disease only",
+      "plant management only", "gardening tracker only"
+    ],
+    preferredTypes: ["github_plugin", "ui_component", "template_repo", "agent_skill", "mcp_server"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
+    id: "plant-identification-api",
+    label: "植物识别服务接入",
+    description: "通过服务端代理安全调用植物识别 API，上传图片并规范化物种候选、置信度和错误结果。",
+    terms: [
+      "植物识别", "识别植物", "拍照识花", "拍照识植物",
+      "plant identification", "plant identifier", "plantnet"
+    ],
+    keywords: [
+      "plant identification api", "plantnet api", "plant image api",
+      "species identification api", "ai taxonomist"
+    ],
+    negativeKeywords: ["plant disease api only", "static plant database only"],
+    preferredTypes: ["github_plugin", "ui_component", "mcp_server", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_data", "mcp_integration", "domain_algorithm"]
+  },
+  {
+    id: "plant-species-dataset",
+    label: "植物物种图像与分类数据",
+    description: "准备带物种标签的植物图像数据，用于模型训练、离线评估和识别质量基准。",
+    terms: [
+      "植物识别", "植物种类", "物种分类", "训练植物识别",
+      "plant identification", "plant species recognition", "species classification"
+    ],
+    keywords: [
+      "plant image dataset", "plant species dataset", "plantnet-300k",
+      "plant classification dataset", "botanical image dataset"
+    ],
+    negativeKeywords: ["plant disease dataset", "leaf disease dataset", "crop disease dataset"],
+    preferredTypes: ["github_plugin", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_data"]
+  },
+  {
+    id: "plant-disease-detection",
+    label: "植物病害与叶片健康识别",
+    description: "在需求明确包含病害、病斑或叶片健康时，识别植物疾病并返回类别和置信度。",
+    terms: [
+      "植物病害", "病虫害识别", "叶片疾病", "病斑识别", "植物健康诊断",
+      "plant disease", "leaf disease", "crop disease", "plant pathology"
+    ],
+    keywords: [
+      "plant disease detection", "leaf disease classification",
+      "crop disease recognition", "plant pathology image"
+    ],
+    negativeKeywords: ["species identification only", "plant taxonomy only"],
+    preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
     id: "weather-forecast-data",
     label: "实时天气与预报数据",
     description: "获取当前位置或指定城市的实时天气、小时预报、逐日预报和气象变量。",
@@ -565,6 +636,10 @@ function isSeededCapabilityCompatible(capability: CapabilityRequirement, source:
     {
       capability: /(workout|fitness.tracker|exercise.log|body.measurements)/,
       intent: /(健身|训练|运动记录|体重|workout|fitness|exercise)/
+    },
+    {
+      capability: /(plant.disease|leaf.disease|crop.disease|plant.pathology)/,
+      intent: /(植物病害|病虫害|叶片疾病|病斑|植物健康|plant.disease|leaf.disease|crop.disease|plant.pathology)/
     }
   ];
 
