@@ -6,13 +6,16 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
 import { syncResourceCatalog, type CatalogCandidate } from "../lib/resource-catalog-sync";
+import { upsertResourceModelV2 } from "../lib/db/resource-model-v2-write";
+import * as schema from "../lib/db/schema";
 import { resourceTags, resources, tags } from "../lib/db/schema";
+import { buildResourceModelV2 } from "../lib/resource-model-v2";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required.");
 
 const client = postgres(databaseUrl);
-const db = drizzle(client);
+const db = drizzle(client, { schema });
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
@@ -107,6 +110,40 @@ async function upsertCandidate(candidate: CatalogCandidate) {
       .values({ resourceId: savedResource.id, tagId: savedTag.id })
       .onConflictDoNothing({ target: [resourceTags.resourceId, resourceTags.tagId] });
   }
+
+  const observedAt = typeof metadata.synced_at === "string" ? metadata.synced_at : new Date().toISOString();
+  await upsertResourceModelV2(db, buildResourceModelV2({
+    legacyResourceId: savedResource.id,
+    slug: candidate.slug,
+    name: candidate.name,
+    type: candidate.type,
+    description: candidate.description,
+    repoUrl: candidate.repo_url,
+    installCommand: candidate.install_command,
+    source: candidate.source,
+    riskLevel: candidate.risk_level,
+    trustScore: candidate.trust_score,
+    fitScore: candidate.fit_score,
+    githubStars: candidate.github_stars ?? 0,
+    githubForks: candidate.github_forks ?? 0,
+    license: candidate.license,
+    latestCommitAt: candidate.latest_commit_at,
+    artifactPath: candidate.artifact_path ?? getMetadataString(metadata, "skill_path"),
+    packageName: getMetadataString(metadata, "package_name"),
+    hasSkillMd: candidate.has_skill_md,
+    hasMcpManifest: candidate.has_mcp_manifest,
+    hasPackageJson: candidate.has_package_json,
+    hasProjectManifest: candidate.has_project_manifest ?? getMetadataBoolean(metadata, "has_project_manifest"),
+    hasGithubAction: candidate.has_github_action ?? getMetadataBoolean(metadata, "has_github_action"),
+    isCurated: candidate.is_curated
+      ?? getMetadataBoolean(metadata, "is_curated_anchor")
+      ?? candidate.source === "curated_seed",
+    tags: candidate.tags,
+    metadata,
+    observedAt,
+    runKey: `resource-model-v2-catalog-sync:${savedResource.id}:${observedAt}`,
+    runSource: candidate.source
+  }));
 }
 
 function parseOptions(args: string[]) {
@@ -129,6 +166,16 @@ function clamp(value: number, min: number, max: number) {
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-+|-+$/g, "") || value;
+}
+
+function getMetadataString(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function getMetadataBoolean(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return typeof value === "boolean" ? value : undefined;
 }
 
 void main().catch(async (error) => {

@@ -3,7 +3,9 @@ import "server-only";
 import { desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { resourceTags, resources, tags } from "@/lib/db/schema";
+import { upsertResourceModelV2 } from "@/lib/db/resource-model-v2-write";
 import type { GitHubParsedResource } from "@/lib/github-import";
+import { buildResourceModelV2 } from "@/lib/resource-model-v2";
 import type { Resource, ResourceType, RiskLevel } from "@/lib/types";
 
 type ResourceRow = typeof resources.$inferSelect;
@@ -58,8 +60,15 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
   }
 
   const slug = slugifyResource(resource.name);
+  const importedAt = new Date();
+  const metadata = {
+    github: resource.github,
+    risk_reason: resource.risk_reason,
+    imported_at: importedAt.toISOString(),
+    default_branch: resource.github.default_branch
+  };
 
-  return db.transaction(async (tx) => {
+  const savedResource = await db.transaction(async (tx) => {
     const [savedResource] = await tx
       .insert(resources)
       .values({
@@ -84,11 +93,7 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
         hasMcpManifest: resource.github.has_mcp_manifest,
         source: resource.source,
         lastUpdated: resource.last_updated,
-        metadata: {
-          github: resource.github,
-          risk_reason: resource.risk_reason,
-          imported_at: new Date().toISOString()
-        }
+        metadata
       })
       .onConflictDoUpdate({
         target: resources.slug,
@@ -113,11 +118,7 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
           hasMcpManifest: resource.github.has_mcp_manifest,
           source: resource.source,
           lastUpdated: resource.last_updated,
-          metadata: {
-            github: resource.github,
-            risk_reason: resource.risk_reason,
-            imported_at: new Date().toISOString()
-          },
+          metadata,
           updatedAt: sql`now()`
         }
       })
@@ -162,6 +163,34 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
 
     return savedResource;
   });
+
+  await upsertResourceModelV2(db, buildResourceModelV2({
+    legacyResourceId: savedResource.id,
+    slug: savedResource.slug,
+    name: resource.name,
+    type: resource.type,
+    description: resource.description,
+    repoUrl: resource.repo_url,
+    installCommand: resource.install_command,
+    source: resource.source,
+    riskLevel: resource.risk_level,
+    trustScore: resource.trust_score,
+    fitScore: resource.fit_score,
+    githubStars: resource.github.stars,
+    githubForks: resource.github.forks,
+    license: resource.github.license,
+    latestCommitAt: resource.github.latest_commit_time,
+    hasSkillMd: resource.github.has_skill_md,
+    hasMcpManifest: resource.github.has_mcp_manifest,
+    hasPackageJson: resource.github.has_package_json,
+    tags: resource.tags,
+    metadata,
+    observedAt: importedAt,
+    runKey: `resource-model-v2-github-import:${savedResource.id}:${importedAt.toISOString()}`,
+    runSource: "github_import"
+  }));
+
+  return savedResource;
 }
 
 function mapJoinedResources(

@@ -130,6 +130,34 @@ Stores all resource types in one unified table.
 - `signals jsonb default '{}'`
 - `created_at timestamptz default now()`
 
+### Resource Model V2
+
+V2 keeps `resources` as the compatibility read model and separates source identity from verified artifacts.
+
+#### resource_repositories
+
+- One row per canonical GitHub, npm, MCP Registry, or manually curated source.
+- Stores ownership, repository URL, license, popularity, maintenance, and synchronization metadata.
+
+#### resource_artifacts
+
+- One row per reusable artifact inside a repository.
+- Supports multiple `SKILL.md` files from the same repository without overwriting each other.
+- Uses evidence-based kinds: Skill, MCP Server, GitHub Action/App, UI library, project template, library, application, dataset, Awesome List, or developer tool.
+- New or weakly classified artifacts remain `pending`; only verified artifacts are publishable.
+
+#### resource_evidence
+
+- Stores the manifest, package, license, maintenance, popularity, and manual-review evidence used to classify an artifact.
+- Evidence has a confidence score, source URL/path, observation time, and structured payload.
+
+#### resource_verification_runs
+
+- Stores every deterministic classifier run and its checks.
+- AI analysis may enrich or rerank candidates, but cannot bypass the evidence-backed verification status.
+
+The V2 migration is additive and idempotent. Existing pages and seed fallback continue to use `resources` until the recommendation read path is intentionally migrated.
+
 ## Development Milestones
 
 ### Milestone 1: Stabilize the App Shell
