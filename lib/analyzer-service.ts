@@ -394,11 +394,17 @@ function hasStrongRepositoryEvidence(
       .map((module) => module.id)
   );
   const deterministicCoverage = item.matchedCapabilityIds.some((id) => coreIds.has(id));
+  const specificDeterministicCoverage = item.matchedCapabilityIds.some((id) =>
+    coreIds.has(id) && !broadCapabilityIds.has(id)
+  );
   const curatedLiveEvidence = verification.recommendationEligible
     && item.matchKind === "domain"
     && item.score >= 65
     && deterministicCoverage
-    && hasDirectDomainSignal(item, projectKeywords, true);
+    && (
+      specificDeterministicCoverage
+      || hasDirectDomainSignal(item, projectKeywords, true)
+    );
   const inspectedLiveEvidence = (item.resource.ai_recommendation_weight ?? 0) >= 95
     && Boolean(item.resource.evidence_summary)
     && (item.resource.matched_capabilities?.length ?? 0) > 0;
