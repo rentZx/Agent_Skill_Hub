@@ -690,11 +690,11 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
   if (/(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(graph)) {
     return /(recipe|recipes|ingredient|cooking|meal planning|servings|nutrition|菜谱|食材|烹饪)/i.test(haystack);
   }
-  if (/(stock|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(graph)) {
-    return /(stock[- ]market|stock[- ]analysis|stock[- ]trading|market[- ]data|a-share|financial|finance|trading|quant|backtesting|candlestick|股票|行情|量化)/i.test(haystack);
-  }
   if (/(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(graph)) {
-    return /(inventory|stock control|warehouse|item pricing|product catalog|erp|库存|仓库|货架)/i.test(haystack);
+    return /(inventory|stock control|warehouse|item pricing|product catalog|erp|库存|仓库|货架|speech-to-text|speech recognition|chinese asr|voice transcription|postgres|database|sql)/i.test(haystack);
+  }
+  if (/(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(graph)) {
+    return /(stock[- ]market|stock[- ]analysis|stock[- ]trading|market[- ]data|a-share|financial|finance|trading|quant|backtesting|candlestick|股票|行情|量化)/i.test(haystack);
   }
   if (isShortVideoGraph(capabilityGraph)) {
     return hasShortVideoEvidence(haystack);
@@ -707,10 +707,24 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
 }
 
 function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: CapabilityGraph) {
-  if (!isShortVideoGraph(capabilityGraph) || resource.type === "ui_component") return false;
+  if (!capabilityGraph || resource.type === "ui_component") return false;
   const source = `${resource.name} ${resource.description} ${resource.tags.join(" ")} ${resource.use_cases.join(" ")}`.toLowerCase();
+  if (isStrictKnownDomainGraph(capabilityGraph)) {
+    return !hasKnownDomainAnchor(source, capabilityGraph);
+  }
+  if (!isShortVideoGraph(capabilityGraph)) return false;
   if (hasShortVideoEvidence(source)) return false;
   return /(\berp\b|erpnext|enterprise resource planning|inventory management|procurement|accounting|laravel agent|neuron-laravel|generic agent framework)/i.test(source);
+}
+
+function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
+  const source = `${capabilityGraph.domain} ${capabilityGraph.capabilities
+    .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
+    .join(" ")}`.toLowerCase();
+  return /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
+    || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
+    || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)
+    || /(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(source);
 }
 
 function isShortVideoGraph(capabilityGraph?: CapabilityGraph) {
