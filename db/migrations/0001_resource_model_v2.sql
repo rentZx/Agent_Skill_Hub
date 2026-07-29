@@ -78,6 +78,7 @@ create table if not exists public.resource_artifacts (
   id uuid primary key default gen_random_uuid(),
   repository_id uuid not null references public.resource_repositories(id) on delete cascade,
   legacy_resource_id uuid references public.resources(id) on delete set null,
+  legacy_resource_ids uuid[] not null default '{}',
   artifact_key text not null,
   kind public.resource_artifact_kind not null,
   name text not null,
@@ -96,6 +97,13 @@ create table if not exists public.resource_artifacts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.resource_artifacts
+  add column if not exists legacy_resource_ids uuid[] not null default '{}';
+update public.resource_artifacts
+set legacy_resource_ids = array[legacy_resource_id]
+where legacy_resource_id is not null
+  and not (legacy_resource_id = any(legacy_resource_ids));
 
 create table if not exists public.resource_evidence (
   id uuid primary key default gen_random_uuid(),
@@ -136,6 +144,8 @@ create index if not exists resource_repositories_latest_commit_idx
   on public.resource_repositories(latest_commit_at desc);
 create index if not exists resource_artifacts_legacy_resource_idx
   on public.resource_artifacts(legacy_resource_id);
+create index if not exists resource_artifacts_legacy_resource_ids_idx
+  on public.resource_artifacts using gin(legacy_resource_ids);
 create unique index if not exists resource_artifacts_repository_key_idx
   on public.resource_artifacts(repository_id, artifact_key);
 create index if not exists resource_artifacts_kind_status_idx

@@ -64,6 +64,7 @@ async function main() {
       hasPackageJson: resource.hasPackageJson,
       hasProjectManifest: getBoolean(metadata, "has_project_manifest"),
       hasGithubAction: getBoolean(metadata, "has_github_action"),
+      hasGithubApp: getBoolean(metadata, "has_github_app"),
       isCurated: resource.source === "curated_seed"
         || resource.source === "benchmark"
         || getBoolean(metadata, "is_curated_anchor") === true,

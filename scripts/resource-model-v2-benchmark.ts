@@ -25,6 +25,7 @@ const unverifiedPlugin = buildResourceModelV2(resource({
 assert.equal(unverifiedPlugin.artifact.kind, "developer_tool");
 assert.equal(unverifiedPlugin.artifact.verificationStatus, "pending");
 assert.equal(unverifiedPlugin.verificationRun.status, "partial");
+assert.deepEqual(unverifiedPlugin.artifact.legacyResourceIds, ["popular-ai-repository-legacy-id"]);
 
 const mcpServer = buildResourceModelV2(resource({
   name: "Recipe MCP",
@@ -67,6 +68,20 @@ const awesomeList = buildResourceModelV2(resource({
 }));
 assert.equal(awesomeList.artifact.kind, "awesome_list");
 assert.equal(awesomeList.artifact.verificationStatus, "pending");
+
+const githubAppQueryResult = buildResourceModelV2(resource({
+  name: "Repository found by GitHub App query",
+  slug: "github-app-query-result",
+  type: "github_plugin",
+  repoUrl: "https://github.com/example/query-result",
+  hasProjectManifest: true,
+  tags: ["github-app", "review"]
+}));
+assert.notEqual(
+  githubAppQueryResult.artifact.kind,
+  "github_app",
+  "A discovery query tag must not count as GitHub App evidence."
+);
 
 console.log("Resource model V2 benchmark passed.");
 

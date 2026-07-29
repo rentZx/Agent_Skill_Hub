@@ -53,6 +53,13 @@ export async function upsertResourceModelV2(
       target: [resourceArtifacts.repositoryId, resourceArtifacts.artifactKey],
       set: {
         legacyResourceId: model.artifact.legacyResourceId,
+        legacyResourceIds: sql`(
+          select array_agg(distinct legacy_id)
+          from unnest(
+            coalesce(${resourceArtifacts.legacyResourceIds}, '{}'::uuid[])
+            || excluded.legacy_resource_ids
+          ) as legacy_id
+        )`,
         kind: model.artifact.kind,
         name: model.artifact.name,
         description: model.artifact.description,

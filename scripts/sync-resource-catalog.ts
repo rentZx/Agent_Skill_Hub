@@ -135,6 +135,7 @@ async function upsertCandidate(candidate: CatalogCandidate) {
     hasPackageJson: candidate.has_package_json,
     hasProjectManifest: candidate.has_project_manifest ?? getMetadataBoolean(metadata, "has_project_manifest"),
     hasGithubAction: candidate.has_github_action ?? getMetadataBoolean(metadata, "has_github_action"),
+    hasGithubApp: getMetadataBoolean(metadata, "has_github_app"),
     isCurated: candidate.is_curated
       ?? getMetadataBoolean(metadata, "is_curated_anchor")
       ?? candidate.source === "curated_seed",

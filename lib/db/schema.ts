@@ -246,6 +246,7 @@ export const resourceArtifacts = pgTable(
       .references(() => resourceRepositories.id, { onDelete: "cascade" }),
     legacyResourceId: uuid("legacy_resource_id")
       .references(() => resources.id, { onDelete: "set null" }),
+    legacyResourceIds: uuid("legacy_resource_ids").array().notNull().default(sql`'{}'::uuid[]`),
     artifactKey: text("artifact_key").notNull(),
     kind: resourceArtifactKindEnum("kind").notNull(),
     name: text("name").notNull(),
@@ -270,6 +271,10 @@ export const resourceArtifacts = pgTable(
       table.artifactKey
     ),
     legacyResourceIdx: index("resource_artifacts_legacy_resource_idx").on(table.legacyResourceId),
+    legacyResourceIdsIdx: index("resource_artifacts_legacy_resource_ids_idx").using(
+      "gin",
+      table.legacyResourceIds
+    ),
     kindStatusIdx: index("resource_artifacts_kind_status_idx").on(table.kind, table.verificationStatus),
     qualityIdx: index("resource_artifacts_quality_idx").on(table.qualityScore)
   })

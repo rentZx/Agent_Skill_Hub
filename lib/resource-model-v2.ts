@@ -53,6 +53,7 @@ export type LegacyResourceModelInput = {
   hasPackageJson?: boolean;
   hasProjectManifest?: boolean;
   hasGithubAction?: boolean;
+  hasGithubApp?: boolean;
   isCurated?: boolean;
   tags: string[];
   metadata?: Record<string, unknown>;
@@ -80,6 +81,7 @@ export type ResourceModelV2 = {
   };
   artifact: {
     legacyResourceId: string;
+    legacyResourceIds: string[];
     artifactKey: string;
     kind: ResourceArtifactKind;
     name: string;
@@ -131,6 +133,7 @@ export function buildResourceModelV2(input: LegacyResourceModelInput): ResourceM
     repository,
     artifact: {
       legacyResourceId: input.legacyResourceId,
+      legacyResourceIds: [input.legacyResourceId],
       artifactKey: buildArtifactKey(input, kind, metadata),
       kind,
       name: input.name,
@@ -218,6 +221,7 @@ function collectSignals(input: LegacyResourceModelInput, metadata: Record<string
     hasPackageJson: input.hasPackageJson ?? getBoolean(metadata, "has_package_json") ?? false,
     hasProjectManifest: input.hasProjectManifest ?? getBoolean(metadata, "has_project_manifest") ?? false,
     hasGithubAction: input.hasGithubAction ?? getBoolean(metadata, "has_github_action") ?? false,
+    hasGithubApp: input.hasGithubApp ?? getBoolean(metadata, "has_github_app") ?? false,
     isCurated: input.isCurated
       ?? getBoolean(metadata, "is_curated_anchor")
       ?? (input.source === "curated_seed"),
@@ -240,7 +244,7 @@ function classifyArtifactKind(
   if (input.type === "ui_component") return "ui_library";
   if (input.type === "template_repo") return "project_template";
   if (signals.hasGithubAction) return "github_action";
-  if (/\bgithub[ -]?app\b/.test(signals.text)) return "github_app";
+  if (signals.hasGithubApp) return "github_app";
   if (/\bawesome(?:[- ]list)?\b/.test(signals.text)) return "awesome_list";
   if (/\b(dataset|corpus|数据集|语料库)\b/.test(signals.text)) return "dataset";
   if (/\b(application|platform|system|web app|desktop app|应用|平台|系统)\b/.test(signals.text)) {
@@ -269,8 +273,11 @@ function classifyVerification(
   if (kind === "mcp_server" && signals.hasPackageJson && /\bmcp\b|model context protocol/.test(signals.text)) {
     return { status: "verified" as const, confidence: 88, directEvidence: "package_manifest" };
   }
-  if ((kind === "github_action" || kind === "github_app") && signals.hasGithubAction) {
+  if (kind === "github_action" && signals.hasGithubAction) {
     return { status: "verified" as const, confidence: 96, directEvidence: "github_action" };
+  }
+  if (kind === "github_app" && signals.hasGithubApp) {
+    return { status: "verified" as const, confidence: 96, directEvidence: "github_app" };
   }
   if (kind === "ui_library" && signals.hasPackageJson && /\b(ui|component|design system|组件)\b/.test(signals.text)) {
     return { status: "verified" as const, confidence: 86, directEvidence: "package_manifest" };
@@ -295,9 +302,9 @@ function buildArtifactKey(
   const packageName = input.packageName
     ?? getString(metadata, "package_name")
     ?? extractPackageName(input.installCommand);
-  if (packageName) return `${kind}:${packageName.toLowerCase()}`;
+  if (packageName) return `package:${packageName.toLowerCase()}`;
 
-  return `${kind}:root`;
+  return "root";
 }
 
 function buildEvidence(
@@ -342,7 +349,10 @@ function buildEvidence(
     add("project-manifest", "project_manifest", "已检测到可运行项目清单。", 82);
   }
   if (signals.hasGithubAction) {
-    add("github-action", "github_action", "已检测到 GitHub Action 或 GitHub App 配置。", 96);
+    add("github-action", "github_action", "已检测到 GitHub Action 配置。", 96);
+  }
+  if (signals.hasGithubApp) {
+    add("github-app", "github_app", "已检测到 GitHub App 配置。", 96);
   }
   if (signals.isCurated) {
     add("manual-review", "manual_review", "该资源属于人工精选或领域锚点。", 95);
