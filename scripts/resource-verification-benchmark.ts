@@ -69,6 +69,26 @@ const mergedUi = mergeCanonicalResources([unverifiedUi, curatedUi]);
 assert.equal(mergedUi.length, 1);
 assert.equal(mergedUi[0]?.name, "shadcn/ui", "人工精选版本应覆盖未验证重复项");
 
+const verifiedV2 = resource("FunASR", "github_plugin", "https://github.com/modelscope/FunASR", {
+  source: "resource_model_v2",
+  verification_status: "verified",
+  artifact_kind: "library",
+  tags: ["speech-to-text", "chinese-asr"]
+});
+const noisyLiveDuplicate = resource("FunASR Live", "github_plugin", "https://github.com/modelscope/FunASR", {
+  source: "github_live",
+  has_project_manifest: true,
+  matched_capabilities: ["domain-data"],
+  tags: ["stock-market", "real-time"]
+});
+const mergedV2 = mergeCanonicalResources([noisyLiveDuplicate, verifiedV2]);
+assert.equal(mergedV2.length, 1);
+assert.equal(
+  mergedV2[0]?.source,
+  "resource_model_v2",
+  "联网发现不得覆盖同仓库的 V2 已验证证据。"
+);
+
 console.log("Resource verification benchmark passed.");
 
 function resource(

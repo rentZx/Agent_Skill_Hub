@@ -152,6 +152,7 @@ function typeEvidenceWeight(resource: Resource) {
 }
 
 function sourceWeight(resource: Resource) {
+  if (resource.source === "resource_model_v2" && resource.verification_status === "verified") return 7;
   if (resource.source === "github_live") return 6;
   if (resource.source === "mcp_registry") return 5;
   if (resource.source === "curated_seed" || resource.is_curated) return 5;
