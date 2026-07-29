@@ -516,7 +516,8 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
 
   const seeded = (details.capabilities ?? [])
     .map(normalizeCapabilitySeed)
-    .filter((capability): capability is CapabilityRequirement => Boolean(capability));
+    .filter((capability): capability is CapabilityRequirement => Boolean(capability))
+    .filter((capability) => isSeededCapabilityCompatible(capability, source));
 
   const patterned = capabilityPatterns
     .filter((pattern) => pattern.terms.some((term) => source.includes(term.toLowerCase())))
@@ -532,7 +533,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
 
   const capabilities = filterCapabilitiesForDomain(
     removeCompositeCapabilities(
-      dedupeCapabilities([...seeded, ...patterned, ...featureCapabilities])
+      dedupeCapabilities([...patterned, ...seeded, ...featureCapabilities])
     ),
     input
   ).slice(0, 10);
@@ -544,6 +545,32 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     constraints: cleanStrings(details.constraints ?? [], 10),
     searchQueries
   };
+}
+
+function isSeededCapabilityCompatible(capability: CapabilityRequirement, source: string) {
+  const capabilitySource = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+  const domainChecks = [
+    {
+      capability: /(stock.market|technical.analysis|candlestick|macd|quantitative.backtesting)/,
+      intent: /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/
+    },
+    {
+      capability: /(weather.forecast|historical.weather|current.weather|climate.data)/,
+      intent: /(天气|天气预报|气象|weather|forecast|climate)/
+    },
+    {
+      capability: /(food.diary|nutrition.database|calorie.tracker|barcode.food)/,
+      intent: /(饮食|营养|热量|卡路里|食品|food|nutrition|calorie)/
+    },
+    {
+      capability: /(workout|fitness.tracker|exercise.log|body.measurements)/,
+      intent: /(健身|训练|运动记录|体重|workout|fitness|exercise)/
+    }
+  ];
+
+  return !domainChecks.some((check) =>
+    check.capability.test(capabilitySource) && !check.intent.test(source)
+  );
 }
 
 function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | null {

@@ -38,7 +38,7 @@ export function getSeedResources(): Resource[] {
 export async function getResources(): Promise<Resource[]> {
   if (process.env.DATABASE_URL) {
     try {
-      const resources = process.env.RESOURCE_READ_MODEL === "v2"
+      const resources = (process.env.RESOURCE_READ_MODEL ?? "v2") === "v2"
         ? await listResourcesV2()
         : await listResources();
       return mergeCanonicalResources(resources);

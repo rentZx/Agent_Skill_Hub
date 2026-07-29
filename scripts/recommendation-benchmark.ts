@@ -235,6 +235,24 @@ assert(!vagueFoodNames.includes("Supabase pgvector Starter"), "美食：不应�
 assert(!vagueFoodNames.includes("Vercel AI SDK Starter"), "美食：不应默认引入 AI SDK");
 assert(vagueFoodRecommendation.codexPrompt.includes("先输出需求澄清结果"), "美食：Prompt 应先澄清需求");
 assert(!vagueFoodRecommendation.codexPrompt.includes("严格遵循上面的推荐技术栈"), "美食：Prompt 不应锁死推测技术栈");
+
+const weatherGraphWithAiSeeds = buildCapabilityGraph(
+  "天气记录系统，显示实时天气、未来七天预报并保存历史天气趋势",
+  {
+    projectType: "天气记录系统",
+    coreFeatures: ["显示实时天气", "显示未来七天预报", "保存历史天气趋势"],
+    capabilities: [
+      capability("real-time-weather", "实时天气", ["current weather", "weather API"]),
+      capability("history-trend-storage", "历史趋势存储", ["weather history", "trend analysis"]),
+      capability("technical-analysis", "技术分析", ["technical analysis", "candlestick indicator"])
+    ]
+  }
+);
+const weatherCapabilityIds = new Set(weatherGraphWithAiSeeds.capabilities.map((item) => item.id));
+assert(weatherCapabilityIds.has("weather-forecast-data"), "天气：规则能力 ID 不应被 AI 自定义 ID 覆盖");
+assert(weatherCapabilityIds.has("historical-weather"), "天气：应保留历史天气能力");
+assert(!weatherCapabilityIds.has("technical-analysis"), "天气：不应接受股票技术分析能力");
+
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
 assert(

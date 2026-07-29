@@ -163,8 +163,8 @@ V2 keeps `resources` as the compatibility read model and separates source identi
 - Recommendation matching reads verified capability IDs; broad catalog tags cannot impersonate implemented capabilities.
 - The pending-resource verifier may reclassify repositories, reject unsupported claims, or mark archived resources stale while preserving high-risk resources for explicit review.
 
-The V2 migration is additive and idempotent. Existing pages and seed fallback continue to use `resources` until the recommendation read path is intentionally migrated.
-Set `RESOURCE_READ_MODEL=v2` to route server-side resource reads through verified V2 artifacts. The default remains `v1` until shadow recommendation validation is accepted.
+The V2 migration is additive and idempotent. Existing pages remain compatible with the legacy `resources` table, and seed fallback remains available when database reads fail.
+`RESOURCE_READ_MODEL=v2` is now the accepted default after the nine-case shadow recommendation suite passed; set it to `v1` only for emergency rollback.
 
 ## Development Milestones
 
