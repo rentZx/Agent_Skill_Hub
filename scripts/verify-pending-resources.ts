@@ -4,7 +4,7 @@ dotenv.config({ path: ".env.sync" });
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -76,6 +76,14 @@ async function main() {
   const options = parseOptions(process.argv.slice(2));
   await syncCapabilityDefinitions(db);
 
+  const filters = [
+    eq(resourceArtifacts.verificationStatus, options.status),
+    eq(resourceRepositories.provider, "github")
+  ];
+  if (options.onlyAutomated) {
+    filters.push(sql`${resourceArtifacts.metadata}->'validation'->>'classifier_version' = 'resource-verifier-v1'`);
+  }
+
   const rows = await db
     .select({
       artifact: resourceArtifacts,
@@ -83,10 +91,7 @@ async function main() {
     })
     .from(resourceArtifacts)
     .innerJoin(resourceRepositories, eq(resourceRepositories.id, resourceArtifacts.repositoryId))
-    .where(and(
-      eq(resourceArtifacts.verificationStatus, options.status),
-      eq(resourceRepositories.provider, "github")
-    ))
+    .where(and(...filters))
     .orderBy(asc(resourceArtifacts.createdAt))
     .limit(options.limit);
 
@@ -174,57 +179,93 @@ function classifyArtifact(
   snapshot: RepositorySnapshot
 ): Classification {
   const paths = snapshot.paths.map((path) => path.toLowerCase());
-  const text = normalize([
+  const repositoryIdentity = normalize([
     snapshot.repository.name,
     snapshot.repository.description ?? "",
     ...(snapshot.repository.topics ?? []),
-    snapshot.readme.slice(0, 20000)
+    snapshot.readme.slice(0, 3000)
   ].join(" "));
+  const readmeLead = normalize(snapshot.readme.slice(0, 1200));
+  const repositoryName = normalize(snapshot.repository.name);
+  const description = normalize(snapshot.repository.description ?? "");
+  const topics = new Set((snapshot.repository.topics ?? []).map(normalize));
   const artifactPath = artifact.artifactPath?.toLowerCase() ?? "";
   const skillPaths = paths.filter((path) => path.endsWith("skill.md"));
   const hasRootSkill = skillPaths.includes("skill.md");
   const hasSpecificSkill = artifactPath.endsWith("skill.md") || hasRootSkill;
-  const hasGitHubAction = paths.some((path) => /(^|\/)action\.ya?ml$/.test(path));
-  const isCollection = /\bawesome\b|curated list|resource list|skill collection|skills collection/.test(text);
+  const hasRootGitHubAction = paths.some((path) => /^action\.ya?ml$/.test(path));
+  const isCollection = repositoryName.startsWith("awesome ")
+    || topics.has("awesome")
+    || /\bawesome list\b|\bcurated (?:list|collection)\b|\bresource list\b|\bskills collection\b/.test(description)
+    || (/^#?\s*awesome\b/.test(readmeLead) && /\b(list|collection|resources)\b/.test(readmeLead));
+  const isMcpIdentity = /\bmcp\b/.test(repositoryName)
+    || topics.has("mcp")
+    || topics.has("mcp-server")
+    || topics.has("model-context-protocol")
+    || /\bmcp server\b|\bmodel context protocol server\b/.test(description)
+    || /^#?\s*.+\bmcp server\b/.test(readmeLead);
+  const isGitHubActionIdentity = hasRootGitHubAction
+    && (
+      /\baction\b|\breviewer\b|\bpull request\b|\bpr\b/.test(repositoryName)
+      || topics.has("github-actions")
+      || /\bgithub action\b|\bactions marketplace\b/.test(description)
+      || /\bgithub action\b|\bactions marketplace\b/.test(readmeLead)
+    );
+  const isUiIdentity = topics.has("component-library")
+    || topics.has("design-system")
+    || /\bcomponent library\b|\bui library\b|\bdesign system\b/.test(description)
+    || /\bcomponent library\b|\bui library\b|\bdesign system\b/.test(readmeLead);
+  const isTemplateIdentity = topics.has("template")
+    || topics.has("starter")
+    || topics.has("boilerplate")
+    || /\bstarter\b|\bboilerplate\b|\btemplate\b|reference implementation/.test(repositoryName)
+    || /\bstarter\b|\bboilerplate\b|\btemplate\b|reference implementation/.test(description);
+  const isApplicationIdentity = topics.has("self-hosted")
+    || /\bself-hosted\b|\bmanagement system\b|\bplatform\b|\bweb application\b|\btracker\b|\berp\b/.test(description)
+    || /\bself-hosted\b|\bmanagement system\b|\bweb application\b/.test(readmeLead);
+  const isLibraryIdentity = topics.has("library")
+    || topics.has("sdk")
+    || /\blibrary\b|\bsdk\b|\bframework\b|\bapi client\b|\bpython package\b|\bjavascript package\b/.test(description)
+    || /^#?\s*.+\b(library|sdk|framework|api client)\b/.test(readmeLead);
 
   if (hasSpecificSkill) {
     return classified("agent_skill", 96, "检测到当前资源对应的 SKILL.md。");
   }
-  if (hasGitHubAction && /\bgithub action\b|\bactions marketplace\b/.test(text)) {
+  if (isGitHubActionIdentity) {
     return classified("github_action", 95, "检测到 GitHub Action 清单与用途声明。");
   }
-  if (isCollection && (skillPaths.length > 1 || /\blist\b|collection/.test(text))) {
+  if (isCollection) {
     return classified("awesome_list", 92, "README 表明这是资源集合，不是可直接安装的单一插件。");
   }
   if (
-    /\bmodel context protocol\b|\bmcp server\b|\bmcp-server\b/.test(text)
+    isMcpIdentity
     && paths.some((path) => isProjectManifest(path) || /(^|\/)(mcp|server)\.json$/.test(path))
   ) {
     return classified("mcp_server", 92, "README 和项目清单共同声明 MCP Server。");
   }
   if (
-    /\bcomponent library\b|\bui library\b|\bdesign system\b|\breact components\b|\bvue components\b/.test(text)
+    isUiIdentity
     && paths.some(isProjectManifest)
   ) {
     return classified("ui_library", 90, "README 声明 UI 组件库或设计系统，并存在项目清单。");
   }
   if (
-    /\bdataset\b|data set|open data|training data/.test(text)
+    /\bdataset\b|data set|open data|training data/.test(repositoryIdentity)
     && paths.some((path) => /\.(csv|parquet|jsonl|arrow)$/.test(path))
   ) {
     return classified("dataset", 88, "README 与仓库文件共同表明这是数据集。");
   }
-  if (/\bstarter\b|\bboilerplate\b|\btemplate\b|reference implementation/.test(text) && paths.some(isProjectManifest)) {
+  if (isTemplateIdentity && paths.some(isProjectManifest)) {
     return classified("project_template", 86, "README 声明模板、脚手架或参考实现。");
   }
   if (
-    /\bself-hosted\b|\bmanagement system\b|\bplatform\b|\bweb application\b|\btracker\b|\berp\b/.test(text)
+    isApplicationIdentity
     && paths.some(isProjectManifest)
   ) {
     return classified("application", 84, "README 声明可运行应用或业务系统。");
   }
   if (
-    /\blibrary\b|\bsdk\b|\bframework\b|\bapi client\b|\bpython package\b|\bjavascript package\b/.test(text)
+    isLibraryIdentity
     && paths.some(isProjectManifest)
   ) {
     return classified("library", 82, "README 声明库、SDK、框架或 API 客户端。");
@@ -595,7 +636,8 @@ function parseOptions(args: string[]) {
     limit,
     concurrency,
     status: status as VerificationStatus,
-    dryRun: args.includes("--dry-run")
+    dryRun: args.includes("--dry-run"),
+    onlyAutomated: args.includes("--only-automated")
   };
 }
 

@@ -56,10 +56,9 @@ jobs:
             git reset --hard origin/main
             npm ci --no-audit --no-fund
             npm run build
-            set -a
-            . ./.env.sync
-            set +a
-            npm run db:migrate:resource-v2
+            for migration in db/migrations/*.sql; do
+              sudo -u postgres psql -v ON_ERROR_STOP=1 -d agent_skill_hub -f "$migration"
+            done
             set -a
             . ./.env.local
             set +a
