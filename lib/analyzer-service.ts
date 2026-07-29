@@ -3,7 +3,7 @@ import "server-only";
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
 import { buildCapabilityGraph } from "@/lib/capability-engine";
 import { discoverGitHubResources } from "@/lib/github-discovery-core";
-import { analyzeProject, buildAnalyzerPrompt } from "@/lib/project-analyzer";
+import { analyzeProject, buildAnalyzerPrompt, hasKnownProjectRule } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import { rebuildCodexPrompt } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
@@ -168,10 +168,13 @@ function alignAiAnalysisWithKnownDomain(
   ai: Awaited<ReturnType<typeof analyzeWithDeepSeek>>,
   ruleAnalysis: AnalyzerResult["analysis"]
 ) {
-  if (!ai || !isShortVideoIntent(input)) return ai;
-  const videoSearchQueries = (ai.searchQueries ?? []).filter((query) =>
-    /(video|script|footage|voiceover|text.to.speech|subtitle|caption|ffmpeg|moviepy|remotion)/i.test(query)
-  );
+  if (!ai || !hasKnownProjectRule(input)) return ai;
+  const shortVideoIntent = isShortVideoIntent(input);
+  const searchQueries = shortVideoIntent
+    ? (ai.searchQueries ?? []).filter((query) =>
+        /(video|script|footage|voiceover|text.to.speech|subtitle|caption|ffmpeg|moviepy|remotion)/i.test(query)
+      )
+    : ai.searchQueries;
 
   return {
     ...ai,
@@ -179,11 +182,13 @@ function alignAiAnalysisWithKnownDomain(
     projectType: ruleAnalysis.projectType,
     targetUsers: ruleAnalysis.targetUsers,
     coreFeatures: ruleAnalysis.coreFeatures,
-    capabilities: (ai.capabilities ?? []).filter((capability) => {
-      const source = `${capability.id ?? ""} ${capability.label ?? ""} ${(capability.keywords ?? []).join(" ")}`.toLowerCase();
-      return !/(conversational|chat|message.storage|real.time.communication|user.authentication|natural.language.query|tool.calling|function.calling)/i.test(source);
-    }),
-    searchQueries: videoSearchQueries
+    capabilities: shortVideoIntent
+      ? (ai.capabilities ?? []).filter((capability) => {
+          const source = `${capability.id ?? ""} ${capability.label ?? ""} ${(capability.keywords ?? []).join(" ")}`.toLowerCase();
+          return !/(conversational|chat|message.storage|real.time.communication|user.authentication|natural.language.query|tool.calling|function.calling)/i.test(source);
+        })
+      : ai.capabilities,
+    searchQueries
   };
 }
 

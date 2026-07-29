@@ -86,6 +86,61 @@ const capabilityPatterns: Array<{
   resourceRoles: ResourceRole[];
 }> = [
   {
+    id: "recipe-data",
+    label: "菜谱、食材与制作步骤数据",
+    description: "提供可检索的菜谱、食材用量和分步制作过程，作为推荐系统的领域数据基础。",
+    terms: ["菜谱", "食谱", "食材", "菜品", "制作过程", "烹饪", "做饭", "recipe", "ingredients", "cooking steps"],
+    keywords: ["chinese recipes", "recipe dataset", "ingredients", "cooking steps", "step by step recipe", "recipe guide"],
+    negativeKeywords: ["restaurant landing page", "food delivery ui", "generic recipe blog theme"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_data", "domain_system"]
+  },
+  {
+    id: "ingredient-matching",
+    label: "按食材匹配菜品",
+    description: "根据已有食材检索可制作菜品，并说明缺少材料。",
+    terms: ["根据食材", "现有食材", "食材推荐", "ingredient matching", "recipe by ingredient"],
+    keywords: ["ingredient recommendation", "ingredient matching", "recipe by ingredient", "pantry recipes"],
+    negativeKeywords: ["ingredient image only", "grocery storefront"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
+    id: "dietary-filter",
+    label: "忌口、过敏与饮食限制",
+    description: "按忌口、过敏原和饮食偏好过滤菜品。",
+    terms: ["忌口", "过敏", "素食", "饮食限制", "dietary restriction", "allergy"],
+    keywords: ["dietary restrictions", "food allergies", "allergy filter", "vegan filter", "gluten-free filter"],
+    negativeKeywords: ["content moderation", "generic filter ui"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
+    id: "portion-scaling",
+    label: "按人数换算食材份量",
+    description: "根据用餐人数自动换算每种食材的用量。",
+    terms: ["人数", "份量", "几人份", "servings", "portion scaling", "serving size"],
+    keywords: ["portion scaling", "servings", "scale recipe", "serving size calculator"],
+    negativeKeywords: ["pricing calculator", "generic calculator"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm"]
+  },
+  {
+    id: "age-aware-nutrition",
+    label: "年龄与营养约束",
+    description: "根据儿童、成人或老年人的营养需求筛选和排序菜品。",
+    terms: ["年龄", "儿童", "老人", "老年", "营养", "age appropriate", "elderly nutrition"],
+    keywords: ["age-aware nutrition", "personalized nutrition", "child recipe", "elderly nutrition", "baby food"],
+    negativeKeywords: ["age verification", "identity verification"],
+    preferredTypes: ["template_repo", "mcp_server", "agent_skill"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
     id: "short-video-pipeline",
     label: "AI 短视频生成流水线",
     description: "把主题或文案转换为脚本、素材、配音、字幕和可导出的竖屏短视频。",

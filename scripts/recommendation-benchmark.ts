@@ -236,6 +236,15 @@ assert(vagueFoodRecommendation.codexPrompt.includes("先输出需求澄清结果
 assert(!vagueFoodRecommendation.codexPrompt.includes("严格遵循上面的推荐技术栈"), "美食：Prompt 不应锁死推测技术栈");
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
+const recipeCapabilityGraph = buildCapabilityGraph("根据食材、人数、忌口和年龄推荐菜品及制作过程");
+assert(
+  recipeCapabilityGraph.capabilities.some((item) => item.id === "recipe-data"),
+  "个性化菜谱：应始终包含菜谱与制作步骤数据能力"
+);
+assert(
+  recipeCapabilityGraph.capabilities.some((item) => item.id === "dietary-filter"),
+  "个性化菜谱：应始终包含忌口和过敏过滤能力"
+);
 const shortVideoGraphWithNoisyAi = buildCapabilityGraph("一站式AI短视频生成工具", {
   projectType: "AI应用",
   coreFeatures: ["AI对话"],

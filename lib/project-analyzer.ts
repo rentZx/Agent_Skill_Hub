@@ -72,6 +72,13 @@ function includesTerm(input: string, term: string) {
   return input.toLowerCase().includes(term.toLowerCase());
 }
 
+export function hasKnownProjectRule(input: string) {
+  const matched = rules.find((rule) => rule.terms.some((term) => includesTerm(input, term)));
+  if (!matched) return false;
+  if (matched.projectType !== "AI Agent 应用") return true;
+  return /\bai\s*agent\b|智能体|agent 应用/i.test(input);
+}
+
 export type ProjectAnalysisOverrides = Partial<Omit<ProjectAnalysis, "roadmap">>;
 
 export function analyzeProject(
