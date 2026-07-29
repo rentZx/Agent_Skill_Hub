@@ -53,6 +53,20 @@ export type SeedResource = {
 export type Resource = SeedResource & {
   id: string;
   slug: string;
+  verification_status?: "pending" | "verified" | "rejected" | "stale";
+  artifact_kind?:
+    | "agent_skill"
+    | "mcp_server"
+    | "github_action"
+    | "github_app"
+    | "ui_library"
+    | "project_template"
+    | "library"
+    | "application"
+    | "dataset"
+    | "awesome_list"
+    | "developer_tool";
+  type_confidence?: number;
 };
 
 export type ResourceFilters = {

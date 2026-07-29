@@ -14,6 +14,12 @@ export type ResourceVerification = {
 };
 
 export function getResourceVerification(resource: Resource): ResourceVerification {
+  if (resource.source === "resource_model_v2") {
+    return resource.verification_status === "verified"
+      ? verification("verified", "V2 已验证", "该制品已通过 V2 类型证据校验。", true)
+      : verification("unverified", "V2 待验证", "该制品尚未通过 V2 类型证据校验。", false);
+  }
+
   if (resource.source === "curated_seed" || resource.is_curated || resource.source === "benchmark") {
     return verification("curated", "人工精选", "资源类型经过人工精选或领域锚点确认。", true);
   }

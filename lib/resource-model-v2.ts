@@ -56,6 +56,8 @@ export type LegacyResourceModelInput = {
   hasGithubApp?: boolean;
   isCurated?: boolean;
   tags: string[];
+  supportedAgents?: string[];
+  useCases?: string[];
   metadata?: Record<string, unknown>;
   observedAt?: Date | string;
   runKey: string;
@@ -151,6 +153,9 @@ export function buildResourceModelV2(input: LegacyResourceModelInput): ResourceM
         legacy_slug: input.slug,
         legacy_type: input.type,
         tags: input.tags,
+        supported_agents: input.supportedAgents ?? ["Codex"],
+        use_cases: input.useCases ?? [],
+        legacy_fit_score: clampScore(input.fitScore),
         classifier_version: RESOURCE_MODEL_CLASSIFIER_VERSION
       },
       publishedAt: verification.status === "verified" ? observedAt : null,

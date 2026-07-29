@@ -140,6 +140,8 @@ async function upsertCandidate(candidate: CatalogCandidate) {
       ?? getMetadataBoolean(metadata, "is_curated_anchor")
       ?? candidate.source === "curated_seed",
     tags: candidate.tags,
+    supportedAgents: candidate.supported_agents,
+    useCases: candidate.use_cases,
     metadata,
     observedAt,
     runKey: `resource-model-v2-catalog-sync:${savedResource.id}:${observedAt}`,

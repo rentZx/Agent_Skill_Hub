@@ -184,6 +184,8 @@ export async function importResourceWithTags(resource: GitHubParsedResource) {
     hasMcpManifest: resource.github.has_mcp_manifest,
     hasPackageJson: resource.github.has_package_json,
     tags: resource.tags,
+    supportedAgents: resource.supported_agents,
+    useCases: resource.use_cases,
     metadata,
     observedAt: importedAt,
     runKey: `resource-model-v2-github-import:${savedResource.id}:${importedAt.toISOString()}`,

@@ -69,6 +69,8 @@ async function main() {
         || resource.source === "benchmark"
         || getBoolean(metadata, "is_curated_anchor") === true,
       tags: resourceTagList,
+      supportedAgents: resource.supportedAgents,
+      useCases: resource.useCases,
       metadata,
       observedAt,
       runKey: `resource-model-v2-backfill:${resource.id}`,

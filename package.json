@@ -13,7 +13,8 @@
     "test:recommendation": "tsx scripts/recommendation-benchmark.ts",
     "test:search": "tsx scripts/search-benchmark.ts",
     "test:resources": "tsx scripts/resource-verification-benchmark.ts",
-    "test:resource-model": "tsx scripts/resource-model-v2-benchmark.ts"
+    "test:resource-model": "tsx scripts/resource-model-v2-benchmark.ts",
+    "test:recommendation:v2": "tsx scripts/v2-recommendation-validation.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",
