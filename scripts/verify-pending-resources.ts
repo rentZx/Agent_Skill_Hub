@@ -83,6 +83,9 @@ async function main() {
   if (options.onlyAutomated) {
     filters.push(sql`${resourceArtifacts.metadata}->'validation'->>'classifier_version' = 'resource-verifier-v1'`);
   }
+  if (options.kind) {
+    filters.push(eq(resourceArtifacts.kind, options.kind));
+  }
 
   const rows = await db
     .select({
@@ -199,11 +202,8 @@ function classifyArtifact(
     || /\bawesome list\b|\bcurated (?:list|collection)\b|\bresource list\b|\bskills collection\b/.test(description)
     || (/^#?\s*awesome\b/.test(readmeLead) && /\b(list|collection|resources)\b/.test(readmeLead));
   const isMcpIdentity = /\bmcp\b/.test(repositoryName)
-    || topics.has("mcp")
-    || topics.has("mcp-server")
-    || topics.has("model-context-protocol")
-    || /\bmcp server\b|\bmodel context protocol server\b/.test(description)
-    || /^#?\s*.+\bmcp server\b/.test(readmeLead);
+    || /\b(?:is|provides?|implements?) (?:an? )?mcp server\b|\bmcp server (?:for|that|to)\b|\bmodel context protocol server\b/.test(description)
+    || /^#?\s*[^.\n]{0,100}\bmcp server\b/.test(readmeLead);
   const isGitHubActionIdentity = hasRootGitHubAction
     && (
       /\baction\b|\breviewer\b|\bpull request\b|\bpr\b/.test(repositoryName)
@@ -632,12 +632,30 @@ function parseOptions(args: string[]) {
   if (!["pending", "verified", "rejected", "stale"].includes(status)) {
     throw new Error("--status must be pending, verified, rejected, or stale.");
   }
+  const kind = readArg(args, "kind");
+  const artifactKinds: ArtifactKind[] = [
+    "agent_skill",
+    "mcp_server",
+    "github_action",
+    "github_app",
+    "ui_library",
+    "project_template",
+    "library",
+    "application",
+    "dataset",
+    "awesome_list",
+    "developer_tool"
+  ];
+  if (kind && !artifactKinds.includes(kind as ArtifactKind)) {
+    throw new Error(`--kind must be one of: ${artifactKinds.join(", ")}.`);
+  }
   return {
     limit,
     concurrency,
     status: status as VerificationStatus,
     dryRun: args.includes("--dry-run"),
-    onlyAutomated: args.includes("--only-automated")
+    onlyAutomated: args.includes("--only-automated"),
+    kind: kind as ArtifactKind | undefined
   };
 }
 
