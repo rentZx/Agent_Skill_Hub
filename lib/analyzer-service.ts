@@ -106,11 +106,11 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       input,
       resources,
       {},
-      capabilityGraph
+      preliminaryGraph
     ).recommendation;
     const groundedRecommendation = {
       ...reranked,
-      groups: preserveEvidenceBackedCoreItems(
+      groups: mergeCatalogBaselineItems(
         reranked.groups,
         catalogRecommendation
       )
@@ -154,6 +154,30 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
       selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered)
     };
   }
+}
+
+function mergeCatalogBaselineItems(
+  enrichedGroups: AnalyzerResult["recommendation"]["groups"],
+  catalogBaseline: AnalyzerResult["recommendation"]
+) {
+  return enrichedGroups.map((group) => {
+    const baselineGroup = catalogBaseline.groups.find((candidate) => candidate.id === group.id);
+    if (!baselineGroup) return group;
+
+    const merged = new Map(group.items.map((item) => [item.resource.id, item]));
+    for (const item of baselineGroup.items) {
+      if (!merged.has(item.resource.id)) merged.set(item.resource.id, item);
+    }
+    const items = Array.from(merged.values())
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 4);
+
+    return {
+      ...group,
+      items,
+      gap: items.length > 0 ? undefined : group.gap
+    };
+  });
 }
 
 function countSelectedDiscoveredResources(
