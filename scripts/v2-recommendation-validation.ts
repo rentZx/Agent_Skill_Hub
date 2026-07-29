@@ -63,6 +63,14 @@ const cases = [
     targetPool: ["short-video-maker", "MoneyPrinter", "Text-To-Video-AI"],
     minTargetMatches: 1,
     forbidden: ["erpnext", "neuron-tool-creator", "img2threejs"]
+  },
+  {
+    name: "画室管理",
+    prompt: "我要开发一个画室管理系统",
+    mustInclude: [],
+    targetPool: ["education", "Frappe Education", "core", "Gibbon 学校管理平台", "RosarioSIS", "UniTime", "UniTime 排课系统", "FullCalendar"],
+    minTargetMatches: 3,
+    forbidden: ["@heymantle/react", "MoneyPrinterTurbo", "InvenTree", "FunASR"]
   }
 ];
 

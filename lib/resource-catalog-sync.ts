@@ -70,6 +70,9 @@ type GitHubCatalogConfig = {
   hasSkillMd?: boolean;
   hasMcpManifest?: boolean;
   hasPackageJson?: boolean;
+  displayName?: string;
+  localizedDescription?: string;
+  verifiedLicense?: string;
 };
 
 type CuratedGitHubAnchor = Omit<GitHubCatalogConfig, "query"> & {
@@ -109,11 +112,11 @@ const curatedGitHubAnchors: CuratedGitHubAnchor[] = [
   { repository: "Anduin2017/HowToCook", type: "template_repo", tags: ["chinese-recipes", "recipe", "ingredients", "cooking-steps", "recipe-dataset"] },
   { repository: "worryzyy/HowToCook-mcp", type: "mcp_server", tags: ["recipe-mcp", "chinese-recipes", "recipe", "ingredients", "cooking-steps"], hasPackageJson: true },
   { repository: "mealie-recipes/mealie", type: "template_repo", tags: ["recipe", "meal-planning", "shopping-list", "servings", "recipe-import"] },
-  { repository: "GibbonEdu/core", type: "template_repo", tags: ["education-management", "school-management", "student-management", "teacher-management", "parent-portal", "attendance-system", "enrollment-management", "school-erp"] },
-  { repository: "frappe/education", type: "template_repo", tags: ["education-management", "school-management", "student-information-system", "course-management", "class-scheduling", "student-attendance", "fee-management", "school-erp"] },
-  { repository: "francoisjacquet/rosariosis", type: "template_repo", tags: ["student-information-system", "school-management", "student-management", "teacher-management", "attendance-system", "course-scheduling", "enrollment-management"] },
-  { repository: "UniTime/unitime", type: "template_repo", tags: ["course-scheduling", "class-scheduling", "student-scheduling", "teacher-scheduling", "timetabling", "exam-scheduling"] },
-  { repository: "fullcalendar/fullcalendar", type: "ui_component", tags: ["course-scheduling", "class-calendar", "timetable-ui", "teacher-scheduling", "calendar", "react", "ui"] },
+  { repository: "GibbonEdu/core", displayName: "Gibbon 学校管理平台", localizedDescription: "面向学校和培训机构的开源管理平台，覆盖学生、教师、家长、报名、考勤和日常教务流程。", type: "template_repo", tags: ["education-management", "school-management", "student-management", "teacher-management", "parent-portal", "attendance-system", "enrollment-management", "school-erp"] },
+  { repository: "frappe/education", displayName: "Frappe Education", localizedDescription: "基于 Frappe 的开源教育管理系统，覆盖学生、课程、班级、排课、考勤和费用管理。", verifiedLicense: "GPL-3.0", type: "template_repo", tags: ["education-management", "school-management", "student-information-system", "course-management", "class-scheduling", "student-attendance", "fee-management", "school-erp"] },
+  { repository: "francoisjacquet/rosariosis", displayName: "RosarioSIS", localizedDescription: "开源学生信息与学校管理系统，覆盖学生档案、教师、报名、考勤、课程和成绩管理。", type: "template_repo", tags: ["student-information-system", "school-management", "student-management", "teacher-management", "attendance-system", "course-scheduling", "enrollment-management"] },
+  { repository: "UniTime/unitime", displayName: "UniTime 排课系统", localizedDescription: "面向教育机构的开源排课系统，支持课程、学生、教师、考试和教室时间安排。", type: "template_repo", tags: ["course-scheduling", "class-scheduling", "student-scheduling", "teacher-scheduling", "timetabling", "exam-scheduling"] },
+  { repository: "fullcalendar/fullcalendar", displayName: "FullCalendar", localizedDescription: "支持拖拽和多视图的 JavaScript 日历组件，可用于画室课表、教师排课和课程日历。", type: "ui_component", tags: ["course-scheduling", "class-calendar", "timetable-ui", "teacher-scheduling", "calendar", "react", "ui"] },
   { repository: "frappe/erpnext", type: "template_repo", tags: ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "erp", "retail"] },
   { repository: "inventree/InvenTree", type: "template_repo", tags: ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "inventory-api"] },
   { repository: "modelscope/FunASR", type: "github_plugin", tags: ["speech-to-text", "automatic-speech-recognition", "chinese-asr", "streaming-asr", "voice-transcription"] },
@@ -305,9 +308,11 @@ async function fetchGitHubRepositories(query: string, limit: number) {
 }
 
 function mapGitHubRepository(repository: GitHubRepository, config: GitHubCatalogConfig): CatalogCandidate {
+  const license = normalizeDetectedLicense(config.verifiedLicense ?? repository.license?.spdx_id);
+  const description = config.localizedDescription ?? repository.description ?? `${repository.name} GitHub repository`;
   const risk = assessRiskLevel({
     stars: repository.stargazers_count,
-    license: repository.license?.spdx_id ?? null,
+    license,
     latestCommitTime: repository.pushed_at,
     archived: repository.archived
   });
@@ -320,25 +325,25 @@ function mapGitHubRepository(repository: GitHubRepository, config: GitHubCatalog
 
   return {
     slug: `catalog-github-${repository.full_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    name: repository.name,
+    name: config.displayName ?? repository.name,
     type: config.type,
-    description: repository.description ?? `${repository.name} GitHub repository`,
+    description,
     tags,
     supported_agents: config.type === "mcp_server" ? ["Codex", "Claude", "Cursor"] : ["Codex"],
     install_command: installCommandForGitHub(config.type, repository.html_url),
     use_cases: getUseCasesForType(config.type),
     risk_level: risk.level,
     risk_reason: risk.reason,
-    trust_score: Math.min(95, 35 + Math.min(32, Math.floor(Math.log10(Math.max(repository.stargazers_count, 1)) * 12)) + (repository.license ? 16 : 0) + (risk.level === "low" ? 22 : risk.level === "medium" ? 12 : 4)),
+    trust_score: Math.min(95, 35 + Math.min(32, Math.floor(Math.log10(Math.max(repository.stargazers_count, 1)) * 12)) + (license ? 16 : 0) + (risk.level === "low" ? 22 : risk.level === "medium" ? 12 : 4)),
     fit_score: Math.min(92, 58 + Math.min(24, Math.floor(Math.log10(Math.max(repository.stargazers_count, 1)) * 8)) + (repository.topics?.length ? 8 : 0)),
     repo_url: repository.html_url,
     source: "github_catalog",
     last_updated: (repository.pushed_at ?? new Date().toISOString()).slice(0, 10),
     github_stars: repository.stargazers_count,
     github_forks: repository.forks_count,
-    license: repository.license?.spdx_id ?? null,
+    license,
     latest_commit_at: repository.pushed_at,
-    readme_summary: repository.description ?? `${repository.name} GitHub repository`,
+    readme_summary: description,
     has_skill_md: config.hasSkillMd,
     has_mcp_manifest: config.hasMcpManifest,
     has_package_json: config.hasPackageJson,
@@ -349,9 +354,15 @@ function mapGitHubRepository(repository: GitHubRepository, config: GitHubCatalog
       default_branch: repository.default_branch,
       is_curated_anchor: config.query.startsWith("curated:"),
       type_verified: config.query.startsWith("curated:") || config.hasSkillMd === true || config.hasMcpManifest === true,
+      license_evidence: config.verifiedLicense ? "curated_repository_license_file" : "github_api",
       synced_at: new Date().toISOString()
     }
   };
+}
+
+function normalizeDetectedLicense(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized && !/^(noassertion|other|none|null)$/i.test(normalized) ? normalized : null;
 }
 
 async function syncMcpRegistry(limit: number) {
