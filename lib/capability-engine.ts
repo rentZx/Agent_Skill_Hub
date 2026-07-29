@@ -314,6 +314,94 @@ const capabilityPatterns: Array<{
     resourceRoles: ["agent_tool", "mcp_integration"]
   },
   {
+    id: "weather-forecast-data",
+    label: "实时天气与预报数据",
+    description: "获取当前位置或指定城市的实时天气、小时预报、逐日预报和气象变量。",
+    terms: ["天气", "天气预报", "气象", "weather", "forecast"],
+    keywords: ["weather api", "weather forecast", "current weather", "hourly forecast", "daily forecast"],
+    negativeKeywords: ["weather icon only", "weather ui only", "static weather widget"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_data", "mcp_integration"]
+  },
+  {
+    id: "historical-weather",
+    label: "历史天气与趋势",
+    description: "查询历史气温、降水、风速等时间序列，为趋势比较和记录分析提供数据。",
+    terms: ["历史天气", "天气历史", "气象趋势", "historical weather", "weather history"],
+    keywords: ["historical weather", "weather archive", "climate data", "weather history"],
+    negativeKeywords: ["weather icon only", "forecast only"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_data"]
+  },
+  {
+    id: "food-diary",
+    label: "饮食与热量记录",
+    description: "按日期和餐次记录食物、份量、热量及营养摄入，支持历史查询和目标跟踪。",
+    terms: ["饮食记录", "饮食日志", "热量记录", "卡路里记录", "food diary", "nutrition tracker", "calorie tracker"],
+    keywords: ["food diary", "meal logging", "nutrition tracker", "calorie tracker", "diet tracking"],
+    negativeKeywords: ["recipe blog only", "restaurant discovery", "food delivery"],
+    preferredTypes: ["template_repo", "github_plugin", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
+    id: "nutrition-database",
+    label: "食品营养数据库",
+    description: "按食品、品牌或条码查询热量、营养成分和过敏原，作为饮食记录的数据底座。",
+    terms: ["营养数据库", "食品营养", "营养成分", "过敏原", "nutrition database", "food database"],
+    keywords: ["food database nutrition", "nutrition database", "open food facts", "food products allergens"],
+    negativeKeywords: ["recipe styling", "restaurant menu ui"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_data"]
+  },
+  {
+    id: "barcode-food-lookup",
+    label: "食品条码扫描与查询",
+    description: "扫描商品条码并查询食品、营养和过敏原信息，减少手工录入。",
+    terms: ["食品条码", "条码扫描", "扫码记录饮食", "food barcode", "barcode nutrition"],
+    keywords: ["barcode food lookup", "barcode nutrition", "open food facts barcode", "food scanner"],
+    negativeKeywords: ["generic barcode generator", "qr code only"],
+    preferredTypes: ["github_plugin", "template_repo", "mcp_server"],
+    priority: "required",
+    resourceRoles: ["domain_data", "domain_system"]
+  },
+  {
+    id: "workout-planning",
+    label: "训练计划与动作编排",
+    description: "创建训练动作、组次、重量、训练日和渐进式计划。",
+    terms: ["健身计划", "训练计划", "动作编排", "workout planning", "training plan"],
+    keywords: ["workout planning", "workout routines", "training plan exercise", "workout plan"],
+    negativeKeywords: ["fitness landing page", "gym website template only"],
+    preferredTypes: ["template_repo", "agent_skill", "github_plugin"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_algorithm"]
+  },
+  {
+    id: "workout-tracking",
+    label: "训练与运动记录",
+    description: "记录力量训练、运动活动、组次、重量、距离、轨迹和完成状态。",
+    terms: ["健身记录", "训练记录", "运动记录", "workout tracker", "fitness tracker", "activity tracker"],
+    keywords: ["workout tracker", "fitness tracker", "activity tracker", "exercise log", "track workouts"],
+    negativeKeywords: ["fitness landing page", "wearable marketing"],
+    preferredTypes: ["template_repo", "github_plugin", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
+    id: "body-measurements",
+    label: "体重与身体指标跟踪",
+    description: "跟踪体重、围度、身体测量和训练进度变化。",
+    terms: ["体重记录", "身体指标", "围度", "body measurements", "weight tracker"],
+    keywords: ["body measurements", "body weight tracker", "fitness progress", "weight tracking"],
+    negativeKeywords: ["weight loss landing page"],
+    preferredTypes: ["template_repo", "github_plugin"],
+    priority: "required",
+    resourceRoles: ["domain_data", "domain_system"]
+  },
+  {
     id: "domain-data",
     label: "领域数据与数据源",
     description: "获取、整理和查询项目核心业务数据，并保留数据来源与更新方式。",

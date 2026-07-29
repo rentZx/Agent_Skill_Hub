@@ -127,7 +127,13 @@ const curatedGitHubAnchors: CuratedGitHubAnchor[] = [
   { repository: "microsoft/qlib", type: "github_plugin", tags: ["quantitative-trading", "quant-research", "machine-learning", "backtesting"] },
   { repository: "ricequant/rqalpha", type: "github_plugin", tags: ["backtesting", "algorithmic-trading", "a-share", "trading-strategy"] },
   { repository: "hsliuping/TradingAgents-CN", type: "template_repo", tags: ["multi-agent-research", "stock-analysis", "quantitative-trading", "stock-market"] },
-  { repository: "tradingview/lightweight-charts", type: "ui_component", tags: ["financial-charts", "candlestick", "ui", "stock-market"] }
+  { repository: "tradingview/lightweight-charts", type: "ui_component", tags: ["financial-charts", "candlestick", "ui", "stock-market"] },
+  { repository: "open-meteo/open-meteo", displayName: "Open-Meteo 天气服务", localizedDescription: "开源天气 API，提供实时天气、小时与逐日预报、历史天气和多种气象变量，可作为天气记录与预报系统的数据源。", type: "github_plugin", tags: ["weather-api", "weather-forecast", "current-weather", "hourly-forecast", "historical-weather", "climate-data"] },
+  { repository: "openfoodfacts/openfoodfacts-server", displayName: "Open Food Facts 食品数据库", localizedDescription: "开放食品与营养数据库服务，提供商品、营养成分、过敏原和条码查询能力，可作为饮食记录系统的数据底座。", type: "github_plugin", tags: ["nutrition-database", "food-products", "allergens", "barcode-food-lookup", "open-food-facts"] },
+  { repository: "simonoppowa/OpenNutriTracker", displayName: "OpenNutriTracker 饮食记录", localizedDescription: "开源饮食、热量与营养记录应用，支持食品搜索、条码扫描和 Open Food Facts 数据，可作为饮食记录系统参考实现。", type: "template_repo", tags: ["food-diary", "nutrition-tracker", "calorie-tracker", "barcode-food-lookup", "open-food-facts"] },
+  { repository: "maksimowiczm/FoodYou", displayName: "FoodYou 饮食日志", localizedDescription: "自托管饮食与营养记录应用，覆盖餐次、食品、热量和营养目标，可用于饮食日志类项目参考。", type: "template_repo", tags: ["food-diary", "meal-logging", "nutrition-tracker", "calorie-tracker"] },
+  { repository: "wger-project/wger", displayName: "wger 健身与营养管理", localizedDescription: "自托管健身、训练、营养和体重管理系统，覆盖训练计划、动作记录、饮食与身体指标。", type: "template_repo", tags: ["workout-planning", "workout-tracking", "nutrition-tracker", "body-measurements", "weight-tracker"] },
+  { repository: "SamR1/FitTrackee", displayName: "FitTrackee 运动记录", localizedDescription: "自托管运动活动记录平台，支持跑步、骑行等活动、轨迹和统计，可作为运动记录系统参考实现。", type: "template_repo", tags: ["workout-tracking", "activity-tracker", "fitness-tracker", "gps-tracking"] }
 ];
 
 const npmQueries: Array<{ type: ResourceType; query: string; tags: string[] }> = [

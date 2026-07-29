@@ -7,9 +7,14 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
 import { syncResourceCatalog, type CatalogCandidate } from "../lib/resource-catalog-sync";
 import { upsertResourceModelV2 } from "../lib/db/resource-model-v2-write";
+import {
+  replaceArtifactCapabilities,
+  syncCapabilityDefinitions
+} from "../lib/db/resource-capability-write";
 import * as schema from "../lib/db/schema";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 import { buildResourceModelV2 } from "../lib/resource-model-v2";
+import { extractResourceCapabilities } from "../lib/resource-capabilities";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required.");
@@ -20,6 +25,7 @@ const db = drizzle(client, { schema });
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   console.log(`Syncing resource catalog from: ${Array.from(options.sources).join(", ")}`);
+  await syncCapabilityDefinitions(db);
   const candidates = await syncResourceCatalog(options);
   let saved = 0;
 
@@ -112,7 +118,7 @@ async function upsertCandidate(candidate: CatalogCandidate) {
   }
 
   const observedAt = typeof metadata.synced_at === "string" ? metadata.synced_at : new Date().toISOString();
-  await upsertResourceModelV2(db, buildResourceModelV2({
+  const savedModel = await upsertResourceModelV2(db, buildResourceModelV2({
     legacyResourceId: savedResource.id,
     slug: candidate.slug,
     name: candidate.name,
@@ -148,6 +154,20 @@ async function upsertCandidate(candidate: CatalogCandidate) {
     runKey: `resource-model-v2-catalog-sync:${savedResource.id}:${observedAt}`,
     runSource: candidate.source
   }));
+
+  const capabilityMatches = extractResourceCapabilities({
+    name: candidate.name,
+    description: candidate.description,
+    tags: candidate.tags,
+    readme: candidate.readme_summary
+  });
+  await replaceArtifactCapabilities(
+    db,
+    savedModel.artifactId,
+    capabilityMatches,
+    `catalog_sync:${candidate.source}`,
+    new Date(observedAt)
+  );
 }
 
 function parseOptions(args: string[]) {

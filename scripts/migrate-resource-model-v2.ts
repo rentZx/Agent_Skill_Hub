@@ -12,11 +12,18 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required.");
 const client = postgres(databaseUrl, { max: 1, prepare: false });
 
 async function main() {
-  const migrationPath = path.join(process.cwd(), "db", "migrations", "0001_resource_model_v2.sql");
-  const migration = await fs.readFile(migrationPath, "utf8");
+  const migrationDirectory = path.join(process.cwd(), "db", "migrations");
+  const migrationFiles = (await fs.readdir(migrationDirectory))
+    .filter((file) => /^\d+.*\.sql$/i.test(file))
+    .sort((left, right) => left.localeCompare(right));
 
-  await client.unsafe(migration);
-  console.log("Resource model V2 migration completed.");
+  for (const file of migrationFiles) {
+    const migration = await fs.readFile(path.join(migrationDirectory, file), "utf8");
+    await client.unsafe(migration);
+    console.log(`Applied ${file}`);
+  }
+
+  console.log(`Resource model V2 migrations completed (${migrationFiles.length}).`);
 }
 
 void main()

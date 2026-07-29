@@ -5,9 +5,15 @@ import postgres from "postgres";
 import * as schema from "../lib/db/schema";
 import { resourceTags, resources, tags } from "../lib/db/schema";
 import { upsertResourceModelV2 } from "../lib/db/resource-model-v2-write";
+import {
+  replaceArtifactCapabilities,
+  syncCapabilityDefinitions
+} from "../lib/db/resource-capability-write";
 import { buildResourceModelV2 } from "../lib/resource-model-v2";
+import { extractResourceCapabilities } from "../lib/resource-capabilities";
 import type { ResourceType, RiskLevel } from "../lib/types";
 
+dotenv.config({ path: ".env.sync" });
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
@@ -18,6 +24,7 @@ const client = postgres(databaseUrl, { max: 3, prepare: false });
 const db = drizzle(client, { schema });
 
 async function main() {
+  await syncCapabilityDefinitions(db);
   const rows = await db
     .select({
       resource: resources,
@@ -78,7 +85,19 @@ async function main() {
       runSource: "legacy_backfill"
     });
 
-    await upsertResourceModelV2(db, model);
+    const savedModel = await upsertResourceModelV2(db, model);
+    await replaceArtifactCapabilities(
+      db,
+      savedModel.artifactId,
+      extractResourceCapabilities({
+        name: resource.name,
+        description: resource.description,
+        tags: resourceTagList,
+        readme: resource.readmeSummary ?? undefined
+      }),
+      "legacy_backfill",
+      observedAt
+    );
     processed += 1;
     if (processed % 100 === 0) console.log(`Backfilled ${processed}/${grouped.size} resources.`);
   }

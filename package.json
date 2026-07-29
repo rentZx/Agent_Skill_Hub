@@ -8,12 +8,14 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "db:migrate:resource-v2": "tsx scripts/migrate-resource-model-v2.ts",
+    "verify:resources:pending": "tsx scripts/verify-pending-resources.ts",
     "db:backfill:resource-v2": "tsx scripts/backfill-resource-model-v2.ts",
     "sync:resources": "tsx scripts/sync-resource-catalog.ts",
     "test:recommendation": "tsx scripts/recommendation-benchmark.ts",
     "test:search": "tsx scripts/search-benchmark.ts",
     "test:resources": "tsx scripts/resource-verification-benchmark.ts",
     "test:resource-model": "tsx scripts/resource-model-v2-benchmark.ts",
+    "test:resource-capabilities": "tsx scripts/resource-capability-benchmark.ts",
     "test:recommendation:v2": "tsx scripts/v2-recommendation-validation.ts"
   },
   "dependencies": {

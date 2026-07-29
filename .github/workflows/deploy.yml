@@ -32,6 +32,7 @@ jobs:
           npm run lint
           npm run test:resources
           npm run test:resource-model
+          npm run test:resource-capabilities
           npm run test:recommendation
           npm run test:search
           npm run build
@@ -55,6 +56,10 @@ jobs:
             git reset --hard origin/main
             npm ci --no-audit --no-fund
             npm run build
+            set -a
+            . ./.env.sync
+            set +a
+            npm run db:migrate:resource-v2
             set -a
             . ./.env.local
             set +a

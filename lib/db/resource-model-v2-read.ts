@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
+  artifactCapabilities,
   resourceArtifacts,
   resourceEvidence,
   resourceRepositories
@@ -13,22 +14,42 @@ type ArtifactKind = typeof resourceArtifacts.$inferSelect.kind;
 type EvidenceKind = typeof resourceEvidence.$inferSelect.kind;
 
 export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): Promise<Resource[]> {
-  const rows = await db
-    .select({
-      artifact: resourceArtifacts,
-      repository: resourceRepositories,
-      evidenceKind: resourceEvidence.kind,
-      evidenceSummary: resourceEvidence.summary
-    })
-    .from(resourceArtifacts)
-    .innerJoin(resourceRepositories, eq(resourceRepositories.id, resourceArtifacts.repositoryId))
-    .leftJoin(resourceEvidence, eq(resourceEvidence.artifactId, resourceArtifacts.id))
-    .where(eq(resourceArtifacts.verificationStatus, "verified"))
-    .orderBy(desc(resourceArtifacts.qualityScore), desc(resourceArtifacts.trustScore));
+  const [rows, capabilityRows] = await Promise.all([
+    db
+      .select({
+        artifact: resourceArtifacts,
+        repository: resourceRepositories,
+        evidenceKind: resourceEvidence.kind,
+        evidenceSummary: resourceEvidence.summary
+      })
+      .from(resourceArtifacts)
+      .innerJoin(resourceRepositories, eq(resourceRepositories.id, resourceArtifacts.repositoryId))
+      .leftJoin(resourceEvidence, eq(resourceEvidence.artifactId, resourceArtifacts.id))
+      .where(eq(resourceArtifacts.verificationStatus, "verified"))
+      .orderBy(desc(resourceArtifacts.qualityScore), desc(resourceArtifacts.trustScore)),
+    db
+      .select({
+        artifactId: artifactCapabilities.artifactId,
+        capabilityId: artifactCapabilities.capabilityId,
+        summary: artifactCapabilities.summary
+      })
+      .from(artifactCapabilities)
+  ]);
+
+  const capabilityMap = new Map<string, { ids: string[]; summaries: string[] }>();
+  for (const row of capabilityRows) {
+    const entry = capabilityMap.get(row.artifactId) ?? { ids: [], summaries: [] };
+    if (!entry.ids.includes(row.capabilityId)) entry.ids.push(row.capabilityId);
+    if (row.summary && !entry.summaries.includes(row.summary)) entry.summaries.push(row.summary);
+    capabilityMap.set(row.artifactId, entry);
+  }
 
   const mapped = new Map<string, Resource & { evidenceKinds: Set<EvidenceKind>; evidence: string[] }>();
 
   for (const row of rows) {
+    // Collections are useful discovery sources, but they are not installable recommendations.
+    if (row.artifact.kind === "awesome_list") continue;
+
     const existing = mapped.get(row.artifact.id);
     if (existing) {
       if (row.evidenceKind) existing.evidenceKinds.add(row.evidenceKind);
@@ -40,7 +61,11 @@ export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): 
 
     const metadata = asMetadata(row.artifact.metadata);
     const evidenceKinds = new Set<EvidenceKind>();
-    const evidence = row.evidenceSummary ? [row.evidenceSummary] : [];
+    const capabilityEvidence = capabilityMap.get(row.artifact.id);
+    const evidence = [
+      ...(row.evidenceSummary ? [row.evidenceSummary] : []),
+      ...(capabilityEvidence?.summaries ?? [])
+    ];
     if (row.evidenceKind) evidenceKinds.add(row.evidenceKind);
 
     mapped.set(row.artifact.id, {
@@ -69,7 +94,7 @@ export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): 
       verification_status: row.artifact.verificationStatus,
       artifact_kind: row.artifact.kind,
       type_confidence: row.artifact.typeConfidence,
-      matched_capabilities: getStringArray(metadata, "tags"),
+      matched_capabilities: capabilityEvidence?.ids ?? [],
       evidenceKinds,
       evidence
     });

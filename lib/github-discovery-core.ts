@@ -195,6 +195,79 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
   }
 };
 
+const weatherDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"weather API\" forecast historical in:name,description,readme archived:false fork:false",
+    "\"weather forecast\" hourly daily API in:name,description,readme archived:false fork:false"
+  ],
+  repositories: ["open-meteo/open-meteo"],
+  relevanceTerms: [
+    "weather api", "weather forecast", "current weather", "hourly forecast",
+    "daily forecast", "historical weather", "climate data"
+  ],
+  typeOverrides: {
+    "open-meteo/open-meteo": "github_plugin"
+  },
+  tagOverrides: {
+    "open-meteo/open-meteo": ["weather-api", "weather-forecast", "current-weather", "hourly-forecast", "historical-weather", "climate-data"]
+  }
+};
+
+const nutritionTrackingDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"food diary\" nutrition tracker barcode in:name,description,readme archived:false fork:false",
+    "\"calorie tracker\" \"Open Food Facts\" in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "openfoodfacts/openfoodfacts-server",
+    "simonoppowa/OpenNutriTracker",
+    "maksimowiczm/FoodYou",
+    "wger-project/wger"
+  ],
+  relevanceTerms: [
+    "food diary", "meal logging", "nutrition tracker", "calorie tracker",
+    "nutrition database", "barcode food lookup", "open food facts"
+  ],
+  typeOverrides: {
+    "openfoodfacts/openfoodfacts-server": "github_plugin",
+    "simonoppowa/opennutritracker": "template_repo",
+    "maksimowiczm/foodyou": "template_repo",
+    "wger-project/wger": "template_repo"
+  },
+  tagOverrides: {
+    "openfoodfacts/openfoodfacts-server": ["nutrition-database", "food-products", "allergens", "barcode-food-lookup", "open-food-facts"],
+    "simonoppowa/opennutritracker": ["food-diary", "nutrition-tracker", "calorie-tracker", "barcode-food-lookup", "open-food-facts"],
+    "maksimowiczm/foodyou": ["food-diary", "meal-logging", "nutrition-tracker", "calorie-tracker"],
+    "wger-project/wger": ["workout-planning", "workout-tracking", "nutrition-tracker", "body-measurements", "weight-tracker"]
+  }
+};
+
+const fitnessTrackingDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"workout tracker\" self-hosted in:name,description,readme archived:false fork:false",
+    "\"fitness tracker\" workout planning body measurements in:name,description,readme archived:false fork:false"
+  ],
+  repositories: [
+    "wger-project/wger",
+    "SamR1/FitTrackee",
+    "felixrieseberg/claude-coach"
+  ],
+  relevanceTerms: [
+    "workout planning", "workout routines", "workout tracker", "fitness tracker",
+    "activity tracker", "exercise log", "body measurements", "weight tracker"
+  ],
+  typeOverrides: {
+    "wger-project/wger": "template_repo",
+    "samr1/fittrackee": "template_repo",
+    "felixrieseberg/claude-coach": "agent_skill"
+  },
+  tagOverrides: {
+    "wger-project/wger": ["workout-planning", "workout-tracking", "nutrition-tracker", "body-measurements", "weight-tracker"],
+    "samr1/fittrackee": ["workout-tracking", "activity-tracker", "fitness-tracker", "gps-tracking"],
+    "felixrieseberg/claude-coach": ["agent-skill", "fitness-coach", "training-plan", "workout-planning", "endurance"]
+  }
+};
+
 const vehicleRoutingDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"vehicle routing problem\" capacity \"time windows\" in:name,description,readme archived:false fork:false",
@@ -667,6 +740,15 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   }
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
     return imageTo3dDiscoveryProfile;
+  }
+  if (/(天气|天气预报|气象|weather.forecast|weather.api|historical.weather)/i.test(source)) {
+    return weatherDiscoveryProfile;
+  }
+  if (/(饮食记录|饮食日志|热量记录|卡路里|营养记录|food.diary|meal.logging|nutrition.tracker|calorie.tracker)/i.test(source)) {
+    return nutritionTrackingDiscoveryProfile;
+  }
+  if (/(健身记录|训练记录|运动记录|健身计划|训练计划|workout.tracker|fitness.tracker|activity.tracker|workout.planning)/i.test(source)) {
+    return fitnessTrackingDiscoveryProfile;
   }
   if (/(美食|餐饮|做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|food.discovery|food.content|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
     return recipeDiscoveryProfile;

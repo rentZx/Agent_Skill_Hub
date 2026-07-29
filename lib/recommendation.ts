@@ -532,16 +532,19 @@ function scoreResources(
       const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
       const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
-      const matchedCapabilities = (capabilityGraph?.capabilities ?? []).filter((capability) =>
+      const textualCapabilityMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         matchesCapabilityEvidence(haystack, capability, capabilityGraph)
       );
+      const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
+      const matchedCapabilities = resource.source === "resource_model_v2"
+        ? textualCapabilityMatches.filter((capability) => inspectedCapabilityHits.has(capability.id))
+        : textualCapabilityMatches;
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
       const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];
       const matchedCore = matchedCapabilities.filter((capability) => capability.priority === "core");
       const matchedRequired = matchedCapabilities.filter((capability) => capability.priority === "required");
       const capabilityWeight = Math.max(1, coreCapabilities.length * 2 + requiredCapabilities.length);
       const capabilityCoverage = (matchedCore.length * 2 + matchedRequired.length) / capabilityWeight;
-      const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
       const evidenceHits = matchedCapabilities.filter((capability) => inspectedCapabilityHits.has(capability.id)).length;
       const negativeHits = (capabilityGraph?.capabilities ?? []).flatMap((capability) =>
         capability.negativeKeywords.filter((keyword) => matchesScoringTerm(haystack, keyword))

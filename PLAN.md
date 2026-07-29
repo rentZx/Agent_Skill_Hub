@@ -156,6 +156,13 @@ V2 keeps `resources` as the compatibility read model and separates source identi
 - Stores every deterministic classifier run and its checks.
 - AI analysis may enrich or rerank candidates, but cannot bypass the evidence-backed verification status.
 
+#### capability_definitions and artifact_capabilities
+
+- Store normalized, reusable capability IDs separately from discovery tags.
+- Capability claims must be backed by README, artifact path, manifest, or repository structure evidence.
+- Recommendation matching reads verified capability IDs; broad catalog tags cannot impersonate implemented capabilities.
+- The pending-resource verifier may reclassify repositories, reject unsupported claims, or mark archived resources stale while preserving high-risk resources for explicit review.
+
 The V2 migration is additive and idempotent. Existing pages and seed fallback continue to use `resources` until the recommendation read path is intentionally migrated.
 Set `RESOURCE_READ_MODEL=v2` to route server-side resource reads through verified V2 artifacts. The default remains `v1` until shadow recommendation validation is accepted.
 

@@ -333,3 +333,45 @@ export const resourceVerificationRuns = pgTable(
     statusIdx: index("resource_verification_runs_status_idx").on(table.status)
   })
 );
+
+export const capabilityDefinitions = pgTable(
+  "capability_definitions",
+  {
+    id: text("id").primaryKey(),
+    labelZh: text("label_zh").notNull(),
+    descriptionZh: text("description_zh").notNull(),
+    domain: text("domain").notNull(),
+    resourceRole: text("resource_role").notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    domainIdx: index("capability_definitions_domain_idx").on(table.domain)
+  })
+);
+
+export const artifactCapabilities = pgTable(
+  "artifact_capabilities",
+  {
+    artifactId: uuid("artifact_id")
+      .notNull()
+      .references(() => resourceArtifacts.id, { onDelete: "cascade" }),
+    capabilityId: text("capability_id")
+      .notNull()
+      .references(() => capabilityDefinitions.id, { onDelete: "cascade" }),
+    confidence: integer("confidence").notNull().default(0),
+    coverageLevel: text("coverage_level").notNull().default("partial"),
+    source: text("source").notNull(),
+    summary: text("summary").notNull(),
+    matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.artifactId, table.capabilityId] }),
+    capabilityIdx: index("artifact_capabilities_capability_idx").on(table.capabilityId),
+    confidenceIdx: index("artifact_capabilities_confidence_idx").on(table.confidence)
+  })
+);
