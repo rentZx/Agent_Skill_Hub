@@ -301,9 +301,13 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
           : group.gap ?? `当前需求暂无${group.title}的强匹配资源。`
       };
     });
+    const evidencePreservedGroups = preserveEvidenceBackedCoreItems(
+      rerankedGroups,
+      recommendation
+    );
     const groups = recommendation.clarity.confidence === "low"
-      ? rerankedGroups
-      : addFoundationalUiFallback(rerankedGroups, recommendation);
+      ? evidencePreservedGroups
+      : addFoundationalUiFallback(evidencePreservedGroups, recommendation);
 
     return {
       ...recommendation,
@@ -314,6 +318,33 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     console.warn("DeepSeek rerank failed, keeping evidence-backed resources only.", error);
     return applyEvidenceFallback(recommendation);
   }
+}
+
+function preserveEvidenceBackedCoreItems(
+  rerankedGroups: AnalyzerResult["recommendation"]["groups"],
+  original: AnalyzerResult["recommendation"]
+) {
+  return rerankedGroups.map((group) => {
+    const originalGroup = original.groups.find((candidate) => candidate.id === group.id);
+    if (!originalGroup) return group;
+
+    const evidenceBacked = originalGroup.items.filter((item) =>
+      hasStrongRepositoryEvidence(item, original.modules, original.keywords)
+    );
+    const merged = new Map(group.items.map((item) => [item.resource.id, item]));
+    for (const item of evidenceBacked) {
+      if (!merged.has(item.resource.id)) merged.set(item.resource.id, item);
+    }
+    const items = Array.from(merged.values())
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 4);
+
+    return {
+      ...group,
+      items,
+      gap: items.length > 0 ? undefined : group.gap
+    };
+  });
 }
 
 function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]) {
