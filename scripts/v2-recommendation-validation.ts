@@ -71,6 +71,30 @@ const cases = [
     targetPool: ["education", "Frappe Education", "core", "Gibbon 学校管理平台", "RosarioSIS", "UniTime", "UniTime 排课系统", "FullCalendar"],
     minTargetMatches: 3,
     forbidden: ["@heymantle/react", "MoneyPrinterTurbo", "InvenTree", "FunASR"]
+  },
+  {
+    name: "天气记录与预报",
+    prompt: "我想做一个天气记录系统，显示实时天气、未来七天预报并保存历史天气趋势",
+    mustInclude: ["Open-Meteo 天气服务"],
+    targetPool: [],
+    minTargetMatches: 0,
+    forbidden: ["HowToCook", "MoneyPrinterTurbo", "FunASR"]
+  },
+  {
+    name: "饮食与营养记录",
+    prompt: "开发一个饮食记录系统，按餐次记录食物和热量，扫描食品条码查询营养成分并跟踪每日目标",
+    mustInclude: ["OpenNutriTracker 饮食记录"],
+    targetPool: ["Open Food Facts 食品数据库", "FoodYou 饮食日志", "wger 健身与营养管理"],
+    minTargetMatches: 1,
+    forbidden: ["HowToCook", "MoneyPrinterTurbo", "mootdx"]
+  },
+  {
+    name: "健身训练记录",
+    prompt: "开发健身记录系统，制定训练计划，记录每次动作组数重量、体重和运动进度",
+    mustInclude: ["wger 健身与营养管理"],
+    targetPool: ["FitTrackee 运动记录"],
+    minTargetMatches: 1,
+    forbidden: ["Open-Meteo 天气服务", "MoneyPrinterTurbo", "akshare"]
   }
 ];
 
