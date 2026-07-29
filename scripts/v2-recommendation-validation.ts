@@ -95,6 +95,14 @@ const cases = [
     targetPool: ["FitTrackee 运动记录"],
     minTargetMatches: 1,
     forbidden: ["Open-Meteo 天气服务", "MoneyPrinterTurbo", "akshare"]
+  },
+  {
+    name: "植物物种识别",
+    prompt: "我想开发一个植物识别软件",
+    mustInclude: ["AI Taxonomist 植物识别组件"],
+    targetPool: ["PlantNet-300K 植物图像数据集", "HortusFox 植物管理系统", "Pl@ntNet 植物识别 API 示例"],
+    minTargetMatches: 2,
+    forbidden: ["PlantVillage 植物病害数据集", "Plant-Disease-Detection", "MoneyPrinterTurbo"]
   }
 ];
 
