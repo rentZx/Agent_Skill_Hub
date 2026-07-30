@@ -553,6 +553,12 @@ const genericProjectKeywords = new Set([
   "table", "data-table", "form", "forms", "filter", "filters", "component", "components", "layout", "responsive"
 ]);
 
+const genericDomainSignalTokens = new Set([
+  "ai", "audio", "classification", "data", "detection", "display", "extraction", "feature",
+  "file", "image", "model", "preprocessing", "processing", "recognition", "result", "software",
+  "speech", "system", "tool", "upload", "voice"
+]);
+
 function hasDirectDomainSignal(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   projectKeywords: string[],
@@ -574,6 +580,7 @@ function hasDirectDomainSignal(
     return normalized.length >= 3
       && normalized.length <= 40
       && !genericProjectKeywords.has(normalized)
+      && isSpecificDomainKeyword(normalized)
       && matchesDomainKeyword(haystack, normalized);
   });
   if (item.resource.type === "ui_component") {
@@ -591,6 +598,12 @@ function hasDirectDomainSignal(
   if (Array.from(capabilityIds).some((id) => !broadCapabilityIds.has(id))) return true;
 
   return hasProjectKeyword;
+}
+
+function isSpecificDomainKeyword(keyword: string) {
+  if (/[\u4e00-\u9fff]/.test(keyword)) return true;
+  const tokens = keyword.split(/[^a-z0-9]+/).filter(Boolean);
+  return tokens.some((token) => !genericDomainSignalTokens.has(token));
 }
 
 function matchesDomainKeyword(haystack: string, keyword: string) {

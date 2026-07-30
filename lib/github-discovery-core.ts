@@ -503,12 +503,30 @@ function buildPlannedQueries(
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
   const profileQueries = profile?.queries.slice(0, 2) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
-  return Array.from(new Set([
-    ...planned,
-    ...adaptiveQueries,
-    ...profileQueries,
-    ...buildQueries(input, tags)
-  ])).slice(0, profile ? 6 : 8);
+  const fallbackQueries = buildQueries(input, tags);
+  if (profile) {
+    return Array.from(new Set([
+      ...planned,
+      ...profileQueries,
+      ...fallbackQueries
+    ])).slice(0, 6);
+  }
+  return interleaveQueries(planned, adaptiveQueries, fallbackQueries).slice(0, 8);
+}
+
+function interleaveQueries(...groups: string[][]) {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const maxLength = Math.max(0, ...groups.map((group) => group.length));
+  for (let index = 0; index < maxLength; index += 1) {
+    for (const group of groups) {
+      const query = group[index];
+      if (!query || seen.has(query)) continue;
+      seen.add(query);
+      result.push(query);
+    }
+  }
+  return result;
 }
 
 function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
