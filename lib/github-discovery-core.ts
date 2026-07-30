@@ -23,6 +23,7 @@ type GitHubSearchItem = {
 type DiscoveryContext = {
   capabilities?: CapabilityRequirement[];
   searchQueries?: string[];
+  repositoryHints?: string[];
 };
 
 type RepositoryEvidence = {
@@ -398,9 +399,13 @@ export async function discoverGitHubResources(
     context.capabilities ?? [],
     profile
   );
+  const repositoryHints = Array.from(new Set([
+    ...(profile?.repositories ?? []),
+    ...(context.repositoryHints ?? [])
+  ])).slice(0, 10);
   const [initialResults, preferredResults] = await Promise.all([
     Promise.all(queries.map((query) => searchRepositories(query))),
-    Promise.all((profile?.repositories ?? []).map((repository) => fetchRepository(repository)))
+    Promise.all(repositoryHints.map((repository) => fetchRepository(repository)))
   ]);
   let results = initialResults;
   if (results.flat().length < 12) {
@@ -410,7 +415,7 @@ export async function discoverGitHubResources(
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
-  const preferredNames = new Set((profile?.repositories ?? []).map((repository) => repository.toLowerCase()));
+  const preferredNames = new Set(repositoryHints.map((repository) => repository.toLowerCase()));
   const unique = new Map<string, GitHubSearchItem>();
 
   results.flat().forEach((item) => {

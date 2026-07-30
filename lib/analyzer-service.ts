@@ -62,7 +62,13 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
           ...initial.analysis.tags,
           ...(ai?.tags ?? [])
         ]));
-    discovered = await discoverSafely(input, discoveryTags, resources, capabilityGraph);
+    discovered = await discoverSafely(
+      input,
+      discoveryTags,
+      resources,
+      capabilityGraph,
+      ai.repositoryHints
+    );
   }
 
   const candidateResources = mergeResources(resources, discovered);
@@ -243,12 +249,14 @@ async function discoverSafely(
   input: string,
   tags: string[],
   resources: Resource[],
-  capabilityGraph: ReturnType<typeof buildCapabilityGraph>
+  capabilityGraph: ReturnType<typeof buildCapabilityGraph>,
+  repositoryHints: string[] = []
 ) {
   try {
     return await discoverGitHubResources(input, tags, resources, {
       capabilities: capabilityGraph.capabilities,
-      searchQueries: capabilityGraph.searchQueries
+      searchQueries: capabilityGraph.searchQueries,
+      repositoryHints
     });
   } catch (error) {
     console.warn("GitHub discovery failed, keeping database resources.", error);

@@ -26,6 +26,7 @@ export type DeepSeekProjectAnalysis = {
   capabilities?: CapabilitySeed[];
   constraints?: string[];
   searchQueries?: string[];
+  repositoryHints?: string[];
 };
 
 export type DeepSeekRerankItem = {
@@ -52,7 +53,7 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
       messages: [
         {
           role: "system",
-          content: "检索规划补充要求：searchQueries 每条使用 2-5 个英文词；至少两条使用该领域的科学术语、行业术语或专业同义词扩展核心能力，避免只重复用户字面表述；不得写 GitHub 搜索语法或编造仓库名。"
+          content: "检索规划补充要求：searchQueries 每条使用 2-5 个英文词；至少两条使用该领域的科学术语、行业术语或专业同义词扩展核心能力，避免只重复用户字面表述，不得写 GitHub 搜索语法。额外输出 repositoryHints 数组，最多 5 个可能真实存在且高度相关的 GitHub owner/repo 候选；它们仅是待 GitHub API 验证的假设，不能当作已验证事实。"
         },
         {
           role: "system",
@@ -76,7 +77,8 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
     tags: cleanList(parsed.tags, 20),
     capabilities: cleanCapabilities(parsed.capabilities, 10),
     constraints: cleanList(parsed.constraints, 10),
-    searchQueries: cleanList(parsed.searchQueries, 8)
+    searchQueries: cleanList(parsed.searchQueries, 8),
+    repositoryHints: cleanRepositoryHints(parsed.repositoryHints)
   };
 }
 
@@ -151,6 +153,12 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
 function cleanList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()))).slice(0, limit);
+}
+
+function cleanRepositoryHints(value: unknown) {
+  return cleanList(value, 5)
+    .map((repository) => repository.replace(/^https?:\/\/github\.com\//i, "").replace(/\/+$/, ""))
+    .filter((repository) => /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(repository));
 }
 
 function cleanCapabilities(value: unknown, limit: number): CapabilitySeed[] {
