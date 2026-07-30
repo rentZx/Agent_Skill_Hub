@@ -504,35 +504,35 @@ function buildPlannedQueries(
   const profileQueries = profile?.queries.slice(0, 2) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
   return Array.from(new Set([
-    ...adaptiveQueries,
     ...planned,
+    ...adaptiveQueries,
     ...profileQueries,
     ...buildQueries(input, tags)
   ])).slice(0, profile ? 6 : 8);
 }
 
 function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
-  return capabilities
+  const ranked = capabilities
     .filter((capability) => capability.priority !== "optional")
+    .filter((capability) => !isGenericCapabilityId(capability.id))
     .sort((left, right) => capabilityPriority(right.priority) - capabilityPriority(left.priority))
-    .flatMap((capability) => {
-      const specificKeywords = capability.keywords
+    .map((capability) => {
+      const keywords = capability.keywords
         .map((keyword) => keyword.toLowerCase().trim())
         .filter(isSpecificDiscoveryKeyword)
         .slice(0, 2);
-
-      const primary = specificKeywords[0];
-      if (!primary) return [];
-      const relaxed = buildRelaxedSearchTerm(primary);
-      return Array.from(new Set([
-        quoteSearchTerm(primary),
-        relaxed,
-        specificKeywords[1] ? quoteSearchTerm(specificKeywords[1]) : ""
-      ]))
-        .filter(Boolean)
-        .map((query) => `${query} in:name,description,readme archived:false fork:false`);
+      return { primary: keywords[0] ?? "", secondary: keywords[1] ?? "" };
     })
-    .slice(0, 6);
+    .filter((entry) => entry.primary);
+  const terms = [
+    ...ranked.map((entry) => quoteSearchTerm(entry.primary)),
+    ...ranked.map((entry) => buildRelaxedSearchTerm(entry.primary)),
+    ...ranked.map((entry) => entry.secondary ? quoteSearchTerm(entry.secondary) : "")
+  ];
+  return Array.from(new Set(terms))
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((query) => `${query} in:name,description,readme archived:false fork:false`);
 }
 
 function buildRelaxedSearchTerm(keyword: string) {

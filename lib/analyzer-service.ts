@@ -428,7 +428,7 @@ function shouldKeepRerankedItem(
     && rerank.score >= minimumScore
     && !negativeReason
     && verifiedCoverage
-    && hasDirectDomainSignal(item, projectKeywords);
+    && hasDirectDomainSignal(item, projectKeywords, false, modules);
 }
 
 function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
@@ -474,11 +474,12 @@ function hasStrongRepositoryEvidence(
     && deterministicCoverage
     && (
       specificDeterministicCoverage
-      || hasDirectDomainSignal(item, projectKeywords, true)
+      || hasDirectDomainSignal(item, projectKeywords, true, modules)
     );
   const inspectedLiveEvidence = (item.resource.ai_recommendation_weight ?? 0) >= 95
     && Boolean(item.resource.evidence_summary)
-    && (item.resource.matched_capabilities?.length ?? 0) > 0;
+    && (item.resource.matched_capabilities?.length ?? 0) > 0
+    && hasDirectDomainSignal(item, projectKeywords, true, modules);
 
   return curatedLiveEvidence || inspectedLiveEvidence;
 }
@@ -555,7 +556,8 @@ const genericProjectKeywords = new Set([
 function hasDirectDomainSignal(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   projectKeywords: string[],
-  requireProjectKeyword = false
+  requireProjectKeyword = false,
+  modules: AnalyzerResult["recommendation"]["modules"] = []
 ) {
   const haystack = [
     item.resource.name,
@@ -563,15 +565,16 @@ function hasDirectDomainSignal(
     ...item.resource.tags,
     ...item.resource.use_cases
   ].join(" ").toLowerCase();
-  const hasProjectKeyword = projectKeywords.some((keyword) => {
+  const domainKeywords = Array.from(new Set([
+    ...projectKeywords,
+    ...modules.flatMap((module) => module.keywords)
+  ]));
+  const hasProjectKeyword = domainKeywords.some((keyword) => {
     const normalized = keyword.toLowerCase().trim();
     return normalized.length >= 3
       && normalized.length <= 40
       && !genericProjectKeywords.has(normalized)
-      && (
-        haystack.includes(normalized)
-        || haystack.includes(normalized.replace(/[-_]+/g, " "))
-      );
+      && matchesDomainKeyword(haystack, normalized);
   });
   if (item.resource.type === "ui_component") {
     return item.resource.name.toLowerCase() === "shadcn/ui"
@@ -588,6 +591,14 @@ function hasDirectDomainSignal(
   if (Array.from(capabilityIds).some((id) => !broadCapabilityIds.has(id))) return true;
 
   return hasProjectKeyword;
+}
+
+function matchesDomainKeyword(haystack: string, keyword: string) {
+  if (/[\u4e00-\u9fff]/.test(keyword)) return haystack.includes(keyword);
+  const haystackTokens = haystack.split(/[^a-z0-9]+/).filter(Boolean);
+  const keywordTokens = keyword.split(/[^a-z0-9]+/).filter(Boolean);
+  if (keywordTokens.length === 0) return false;
+  return keywordTokens.every((token) => haystackTokens.includes(token));
 }
 
 function chunk<T>(items: T[], size: number) {
