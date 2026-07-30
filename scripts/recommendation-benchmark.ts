@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildCapabilityGraph,
+  isGenericCapabilityId,
   type CapabilityPriority,
   type CapabilitySeed,
   type ResourceRole
@@ -358,6 +359,10 @@ assert(
   ),
   "陌生领域：应保留规范化后的发票 OCR / 文档抽取能力"
 );
+assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
+assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
+assert(isGenericCapabilityId("model-training-pipeline"), "陌生领域：模型训练流水线不能独立证明领域适配");
+assert(!isGenericCapabilityId("bird-species-classification"), "陌生领域：具体物种分类应保留为领域能力");
 
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");

@@ -38,10 +38,19 @@ export type CapabilitySeed = Partial<Omit<CapabilityRequirement, "preferredTypes
 };
 
 const genericCapabilityIds = new Set([
+  "audio-preprocessing",
+  "audio-upload",
   "domain-data",
   "domain-rules",
+  "feature-extraction",
+  "file-upload",
+  "image-upload",
+  "model-training-pipeline",
   "personalized-recommendation",
   "real-time-integration",
+  "result-display",
+  "spectrogram-generation",
+  "structured-result-display",
   "visualization",
   "web-research",
   "workflow-automation"

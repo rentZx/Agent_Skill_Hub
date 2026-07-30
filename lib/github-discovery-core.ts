@@ -673,6 +673,7 @@ async function inspectRepository(
   const matched = capabilities.filter((capability) =>
     capability.keywords.some((keyword) => matchesCapabilityKeyword(evidenceSource, keyword))
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
+    && !hasCapabilityConflict(evidenceSource, capability)
   );
   const evidenceFiles = inspection.paths.filter((path) =>
     /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
@@ -801,6 +802,14 @@ function matchesCapabilityKeyword(source: string, keyword: string) {
   return matchedTokens.length >= 2;
 }
 
+function hasCapabilityConflict(source: string, capability: CapabilityRequirement) {
+  const capabilitySource = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+  const classificationCapability = /(classification|recognition|identification|detection|classifier)/.test(capabilitySource);
+  const speechSynthesisRepository = /\b(text[- ]to[- ]speech|speech synthesis|voice clon(?:e|ing)|zero[- ]shot tts|\btts\b)\b/i.test(source);
+  const speechSynthesisCapability = /(text.to.speech|speech.synthesis|voice.clon|\btts\b)/.test(capabilitySource);
+  return classificationCapability && speechSynthesisRepository && !speechSynthesisCapability;
+}
+
 function isAiPluginLike(item: GitHubSearchItem) {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const ai = /(artificial intelligence|\bai\b|llm|mcp|agent|copilot|claude|openai|gemini|rag|embedding)/i.test(text);
@@ -833,7 +842,6 @@ function toResource(
     ...(overrides.tagOverrides ?? []),
     ...(item.topics ?? []),
     ...matchedProjectTags,
-    ...(overrides.evidence?.matchedCapabilities ?? []),
     type.replace("_", "-")
   ])).slice(0, 18);
 
