@@ -405,15 +405,25 @@ export async function discoverGitHubResources(
     ...(profile?.repositories ?? []),
     ...(context.repositoryHints ?? [])
   ])).slice(0, 10);
-  const [initialResults, preferredResults] = await Promise.all([
-    Promise.all(queries.map((query) => searchRepositories(query, 15, context.signal))),
-    Promise.all(repositoryHints.map((repository) => fetchRepository(repository, context.signal)))
+  const [searchResults, repositoryResults] = await Promise.all([
+    Promise.allSettled(queries.map((query) => searchRepositories(query, 15, context.signal))),
+    Promise.allSettled(repositoryHints.map((repository) => fetchRepository(repository, context.signal)))
   ]);
+  const initialResults = searchResults.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : []
+  );
+  const preferredResults = repositoryResults.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : []
+  );
   let results = initialResults;
-  if (results.flat().length < 12) {
+  if (!context.signal?.aborted && results.flat().length < 12) {
     const fallbackQuery = buildFallbackQuery(input, tags);
     if (fallbackQuery && !queries.includes(fallbackQuery)) {
-      results = [...results, await searchRepositories(fallbackQuery, 12, context.signal)];
+      try {
+        results = [...results, await searchRepositories(fallbackQuery, 12, context.signal)];
+      } catch {
+        // Keep completed query results when the shared discovery deadline expires.
+      }
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
@@ -425,7 +435,7 @@ export async function discoverGitHubResources(
       unique.set(item.full_name.toLowerCase(), item);
     }
   });
-  preferredResults.filter((item): item is GitHubSearchItem => Boolean(item)).forEach((item) => {
+  preferredResults.forEach((item) => {
     unique.set(item.full_name.toLowerCase(), item);
   });
 
@@ -446,11 +456,14 @@ export async function discoverGitHubResources(
     1,
     Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
   );
-  const evidenceEntries = await Promise.all(
+  const evidenceResults = await Promise.allSettled(
     ranked.slice(0, inspectionLimit).map(async (item) => [
       item.full_name.toLowerCase(),
       await inspectRepository(item, context.capabilities ?? [], context.signal)
     ] as const)
+  );
+  const evidenceEntries = evidenceResults.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : []
   );
   const evidenceByRepository = new Map(evidenceEntries);
 
