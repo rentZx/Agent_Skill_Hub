@@ -9,6 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "db:migrate:resource-v2": "tsx scripts/migrate-resource-model-v2.ts",
     "verify:resources:pending": "tsx scripts/verify-pending-resources.ts",
+    "verify:discovery-cache": "tsx scripts/verify-discovery-cache.ts",
     "db:backfill:resource-v2": "tsx scripts/backfill-resource-model-v2.ts",
     "sync:resources": "tsx scripts/sync-resource-catalog.ts",
     "test:recommendation": "tsx scripts/recommendation-benchmark.ts",

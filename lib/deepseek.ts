@@ -38,7 +38,10 @@ export type DeepSeekRerankItem = {
   role?: ResourceRole;
 };
 
-export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjectAnalysis | null> {
+export async function analyzeWithDeepSeek(
+  input: string,
+  timeoutMs = 15000
+): Promise<DeepSeekProjectAnalysis | null> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return null;
 
@@ -63,7 +66,7 @@ export async function analyzeWithDeepSeek(input: string): Promise<DeepSeekProjec
       ]
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(15000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) throw new Error(`DeepSeek API request failed: ${response.status}`);
@@ -99,7 +102,7 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
   description: string;
   priority?: CapabilityPriority;
   resourceRoles?: ResourceRole[];
-}> = []): Promise<DeepSeekRerankItem[]> {
+}> = [], timeoutMs = 15000): Promise<DeepSeekRerankItem[]> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey || candidates.length === 0) return [];
 
@@ -120,7 +123,7 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
       ]
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(15000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) throw new Error(`DeepSeek rerank failed: ${response.status}`);

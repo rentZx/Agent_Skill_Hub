@@ -33,3 +33,4 @@ jobs:
             set +a
             ./node_modules/.bin/tsx scripts/sync-resource-catalog.ts \
               --source=all --limit=30 --skills-limit=100 --mcp-limit=200
+            npm run verify:discovery-cache -- --limit=100 --concurrency=4

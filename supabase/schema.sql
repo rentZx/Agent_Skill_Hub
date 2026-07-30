@@ -259,6 +259,40 @@ create table if not exists public.resource_verification_runs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.discovery_candidate_cache (
+  repo_url text primary key,
+  repository_full_name text not null,
+  resource jsonb not null,
+  project_tags text[] not null default '{}',
+  capability_ids text[] not null default '{}',
+  capability_context jsonb not null default '[]',
+  search_queries text[] not null default '{}',
+  verification_status text not null default 'verified'
+    check (verification_status in ('verified', 'stale', 'rejected')),
+  verification_score integer not null default 0
+    check (verification_score between 0 and 100),
+  failure_count integer not null default 0 check (failure_count >= 0),
+  last_error text,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  last_verified_at timestamptz not null default now(),
+  next_verification_at timestamptz not null default now() + interval '1 day',
+  expires_at timestamptz not null default now() + interval '14 days',
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.analysis_result_cache (
+  prompt_hash text primary key,
+  normalized_prompt text not null,
+  result jsonb not null,
+  cache_version text not null,
+  hit_count integer not null default 0 check (hit_count >= 0),
+  created_at timestamptz not null default now(),
+  last_accessed_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists resources_type_idx on public.resources(type);
 create index if not exists resources_risk_level_idx on public.resources(risk_level);
 create index if not exists resources_trust_score_idx on public.resources(trust_score desc);
@@ -281,6 +315,18 @@ create index if not exists resource_evidence_artifact_idx on public.resource_evi
 create index if not exists resource_evidence_kind_idx on public.resource_evidence(kind);
 create index if not exists resource_verification_runs_artifact_idx on public.resource_verification_runs(artifact_id);
 create index if not exists resource_verification_runs_status_idx on public.resource_verification_runs(status);
+create index if not exists discovery_candidate_cache_capability_ids_idx
+  on public.discovery_candidate_cache using gin(capability_ids);
+create index if not exists discovery_candidate_cache_project_tags_idx
+  on public.discovery_candidate_cache using gin(project_tags);
+create index if not exists discovery_candidate_cache_verification_idx
+  on public.discovery_candidate_cache(verification_status, next_verification_at);
+create index if not exists discovery_candidate_cache_expires_idx
+  on public.discovery_candidate_cache(expires_at);
+create index if not exists analysis_result_cache_expires_idx
+  on public.analysis_result_cache(expires_at);
+create index if not exists analysis_result_cache_accessed_idx
+  on public.analysis_result_cache(last_accessed_at);
 
 create index if not exists resources_embedding_idx
   on public.resources using ivfflat (embedding vector_cosine_ops)
@@ -321,6 +367,16 @@ create trigger resource_evidence_set_updated_at
 before update on public.resource_evidence
 for each row execute function public.set_updated_at();
 
+drop trigger if exists discovery_candidate_cache_set_updated_at on public.discovery_candidate_cache;
+create trigger discovery_candidate_cache_set_updated_at
+before update on public.discovery_candidate_cache
+for each row execute function public.set_updated_at();
+
+drop trigger if exists analysis_result_cache_set_updated_at on public.analysis_result_cache;
+create trigger analysis_result_cache_set_updated_at
+before update on public.analysis_result_cache
+for each row execute function public.set_updated_at();
+
 alter table public.resources enable row level security;
 alter table public.tags enable row level security;
 alter table public.resource_tags enable row level security;
@@ -331,6 +387,8 @@ alter table public.resource_repositories enable row level security;
 alter table public.resource_artifacts enable row level security;
 alter table public.resource_evidence enable row level security;
 alter table public.resource_verification_runs enable row level security;
+alter table public.discovery_candidate_cache enable row level security;
+alter table public.analysis_result_cache enable row level security;
 
 drop policy if exists "Public resources are readable" on public.resources;
 create policy "Public resources are readable"

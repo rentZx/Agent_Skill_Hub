@@ -375,3 +375,54 @@ export const artifactCapabilities = pgTable(
     confidenceIdx: index("artifact_capabilities_confidence_idx").on(table.confidence)
   })
 );
+
+export const discoveryCandidateCache = pgTable(
+  "discovery_candidate_cache",
+  {
+    repoUrl: text("repo_url").primaryKey(),
+    repositoryFullName: text("repository_full_name").notNull(),
+    resource: jsonb("resource").notNull(),
+    projectTags: text("project_tags").array().notNull().default(sql`'{}'::text[]`),
+    capabilityIds: text("capability_ids").array().notNull().default(sql`'{}'::text[]`),
+    capabilityContext: jsonb("capability_context").notNull().default(sql`'[]'::jsonb`),
+    searchQueries: text("search_queries").array().notNull().default(sql`'{}'::text[]`),
+    verificationStatus: text("verification_status").notNull().default("verified"),
+    verificationScore: integer("verification_score").notNull().default(0),
+    failureCount: integer("failure_count").notNull().default(0),
+    lastError: text("last_error"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }).notNull().defaultNow(),
+    nextVerificationAt: timestamp("next_verification_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    capabilityIdsIdx: index("discovery_candidate_cache_capability_ids_idx").using("gin", table.capabilityIds),
+    projectTagsIdx: index("discovery_candidate_cache_project_tags_idx").using("gin", table.projectTags),
+    verificationIdx: index("discovery_candidate_cache_verification_idx").on(
+      table.verificationStatus,
+      table.nextVerificationAt
+    ),
+    expiresIdx: index("discovery_candidate_cache_expires_idx").on(table.expiresAt)
+  })
+);
+
+export const analysisResultCache = pgTable(
+  "analysis_result_cache",
+  {
+    promptHash: text("prompt_hash").primaryKey(),
+    normalizedPrompt: text("normalized_prompt").notNull(),
+    result: jsonb("result").notNull(),
+    cacheVersion: text("cache_version").notNull(),
+    hitCount: integer("hit_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    expiresIdx: index("analysis_result_cache_expires_idx").on(table.expiresAt),
+    accessedIdx: index("analysis_result_cache_accessed_idx").on(table.lastAccessedAt)
+  })
+);

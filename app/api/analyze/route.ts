@@ -15,6 +15,7 @@ const maxConcurrentAnalyses = positiveInteger(process.env.ANALYZE_MAX_CONCURRENC
 let activeAnalyses = 0;
 
 export async function POST(request: Request) {
+  const startedAt = performance.now();
   const rateLimited = enforceRateLimit(request, "analyze", analyzeRateLimit, analyzeRateWindowMs);
   if (rateLimited) return rateLimited;
 
@@ -42,7 +43,23 @@ export async function POST(request: Request) {
 
     const resources = await getResources();
     const result = await analyzeProjectWithAI(input, resources);
-    return noStoreJson({ ok: true, result });
+    const durationMs = Math.round(performance.now() - startedAt);
+    return noStoreJson(
+      {
+        ok: true,
+        result,
+        meta: {
+          durationMs,
+          cacheStatus: result.cacheStatus
+        }
+      },
+      {
+        headers: {
+          "Server-Timing": `analyze;dur=${durationMs}`,
+          "X-Analysis-Cache": result.cacheStatus
+        }
+      }
+    );
   } catch (error) {
     if (error instanceof RequestValidationError) {
       return noStoreJson({ ok: false, error: error.message }, { status: error.status });

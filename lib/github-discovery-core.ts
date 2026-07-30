@@ -24,6 +24,8 @@ type DiscoveryContext = {
   capabilities?: CapabilityRequirement[];
   searchQueries?: string[];
   repositoryHints?: string[];
+  inspectionLimit?: number;
+  signal?: AbortSignal;
 };
 
 type RepositoryEvidence = {
@@ -404,14 +406,14 @@ export async function discoverGitHubResources(
     ...(context.repositoryHints ?? [])
   ])).slice(0, 10);
   const [initialResults, preferredResults] = await Promise.all([
-    Promise.all(queries.map((query) => searchRepositories(query))),
-    Promise.all(repositoryHints.map((repository) => fetchRepository(repository)))
+    Promise.all(queries.map((query) => searchRepositories(query, 15, context.signal))),
+    Promise.all(repositoryHints.map((repository) => fetchRepository(repository, context.signal)))
   ]);
   let results = initialResults;
   if (results.flat().length < 12) {
     const fallbackQuery = buildFallbackQuery(input, tags);
     if (fallbackQuery && !queries.includes(fallbackQuery)) {
-      results = [...results, await searchRepositories(fallbackQuery, 12)];
+      results = [...results, await searchRepositories(fallbackQuery, 12, context.signal)];
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
@@ -439,11 +441,15 @@ export async function discoverGitHubResources(
       scoreRepositoryRelevance(left, relevanceTerms, preferredNames)
     )
     .slice(0, 24);
-  const inspectionLimit = profile ? 6 : 12;
+  const defaultInspectionLimit = profile ? 6 : 12;
+  const inspectionLimit = Math.max(
+    1,
+    Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
+  );
   const evidenceEntries = await Promise.all(
     ranked.slice(0, inspectionLimit).map(async (item) => [
       item.full_name.toLowerCase(),
-      await inspectRepository(item, context.capabilities ?? [])
+      await inspectRepository(item, context.capabilities ?? [], context.signal)
     ] as const)
   );
   const evidenceByRepository = new Map(evidenceEntries);
@@ -464,6 +470,21 @@ export async function discoverGitHubResources(
         evidence: evidenceByRepository.get(key)
       });
     });
+}
+
+export async function verifyGitHubRepository(
+  fullName: string,
+  projectTags: string[],
+  capabilities: CapabilityRequirement[]
+): Promise<Resource | null> {
+  const item = await fetchRepository(fullName);
+  if (!item) return null;
+  const evidence = await inspectRepository(item, capabilities);
+  if (!hasColdStartEvidence(evidence)) return null;
+  return toResource(item, projectTags, {
+    recommendationWeight: 100,
+    evidence
+  });
 }
 
 export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
@@ -593,14 +614,18 @@ function buildFallbackQuery(input: string, tags: string[]) {
   return getDiscoveryTerms(input, tags).slice(0, 3).map(quoteSearchTerm).join(" ");
 }
 
-async function searchRepositories(query: string, perPage = 15): Promise<GitHubSearchItem[]> {
+async function searchRepositories(
+  query: string,
+  perPage = 15,
+  signal?: AbortSignal
+): Promise<GitHubSearchItem[]> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   try {
     const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, {
       headers,
       cache: "no-store",
-      signal: AbortSignal.timeout(8000)
+      signal: requestSignal(signal, 8000)
     });
     if (!response.ok) {
       console.warn(`GitHub discovery search failed: ${response.status}`);
@@ -614,7 +639,10 @@ async function searchRepositories(query: string, perPage = 15): Promise<GitHubSe
   }
 }
 
-async function fetchRepository(fullName: string): Promise<GitHubSearchItem | null> {
+async function fetchRepository(
+  fullName: string,
+  signal?: AbortSignal
+): Promise<GitHubSearchItem | null> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
@@ -622,7 +650,7 @@ async function fetchRepository(fullName: string): Promise<GitHubSearchItem | nul
     const response = await fetch(`https://api.github.com/repos/${repositoryPath}`, {
       headers,
       cache: "no-store",
-      signal: AbortSignal.timeout(8000)
+      signal: requestSignal(signal, 8000)
     });
     if (!response.ok) {
       console.warn(`GitHub discovery failed for repository ${fullName}: ${response.status}`);
@@ -642,9 +670,10 @@ const repositoryInspectionCache = new Map<string, {
 
 async function inspectRepository(
   item: GitHubSearchItem,
-  capabilities: CapabilityRequirement[]
+  capabilities: CapabilityRequirement[],
+  signal?: AbortSignal
 ): Promise<RepositoryEvidence> {
-  const inspection = await getRepositoryInspection(item);
+  const inspection = await getRepositoryInspection(item, signal);
   const normalizedPaths = inspection.paths.map((path) => path.toLowerCase());
   const hasSkillMd = normalizedPaths.some((path) => /(^|\/)skill\.md$/.test(path));
   const hasPackageJson = normalizedPaths.some((path) => /(^|\/)package\.json$/.test(path));
@@ -719,7 +748,15 @@ function hasColdStartEvidence(evidence: RepositoryEvidence) {
     || evidence.hasReusableUi;
 }
 
-async function getRepositoryInspection(item: GitHubSearchItem) {
+async function getRepositoryInspection(item: GitHubSearchItem, signal?: AbortSignal) {
+  if (signal) {
+    const [paths, readme] = await Promise.all([
+      fetchRepositoryTree(item.full_name, item.default_branch ?? "main", signal),
+      fetchRepositoryReadme(item.full_name, signal)
+    ]);
+    return { paths, readme };
+  }
+
   const key = item.full_name.toLowerCase();
   const cached = repositoryInspectionCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -737,14 +774,18 @@ async function getRepositoryInspection(item: GitHubSearchItem) {
   return value;
 }
 
-async function fetchRepositoryTree(fullName: string, branch: string) {
+async function fetchRepositoryTree(
+  fullName: string,
+  branch: string,
+  signal?: AbortSignal
+) {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
   try {
     const response = await fetch(
       `https://api.github.com/repos/${repositoryPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-      { headers, cache: "no-store", signal: AbortSignal.timeout(5000) }
+      { headers, cache: "no-store", signal: requestSignal(signal, 5000) }
     );
     if (!response.ok) return [];
     const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }> };
@@ -756,7 +797,7 @@ async function fetchRepositoryTree(fullName: string, branch: string) {
   }
 }
 
-async function fetchRepositoryReadme(fullName: string) {
+async function fetchRepositoryReadme(fullName: string, signal?: AbortSignal) {
   const headers: HeadersInit = { Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const repositoryPath = fullName.split("/").map(encodeURIComponent).join("/");
@@ -764,13 +805,18 @@ async function fetchRepositoryReadme(fullName: string) {
     const response = await fetch(`https://api.github.com/repos/${repositoryPath}/readme`, {
       headers,
       cache: "no-store",
-      signal: AbortSignal.timeout(5000)
+      signal: requestSignal(signal, 5000)
     });
     if (!response.ok) return "";
     return (await response.text()).slice(0, 40000);
   } catch {
     return "";
   }
+}
+
+function requestSignal(signal: AbortSignal | undefined, timeoutMs: number) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
 function matchesEvidenceTerm(source: string, term: string) {

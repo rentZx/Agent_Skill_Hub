@@ -164,7 +164,15 @@ V2 keeps `resources` as the compatibility read model and separates source identi
 - The pending-resource verifier may reclassify repositories, reject unsupported claims, or mark archived resources stale while preserving high-risk resources for explicit review.
 
 The V2 migration is additive and idempotent. Existing pages remain compatible with the legacy `resources` table, and seed fallback remains available when database reads fail.
-`RESOURCE_READ_MODEL=v2` is now the accepted default after the nine-case shadow recommendation suite passed; set it to `v1` only for emergency rollback.
+`RESOURCE_READ_MODEL=v2` is now the accepted default after the ten-case shadow recommendation suite passed; set it to `v1` only for emergency rollback.
+
+### Discovery And Analysis Cache
+
+- `discovery_candidate_cache` stores evidence-verified GitHub candidates discovered during project analysis, indexed by project tags and capability IDs.
+- Cached candidates are reverified every day; transient failures are retried before a candidate becomes stale, and expired stale rows are removed.
+- `analysis_result_cache` stores complete analyzer results by normalized prompt hash for twelve hours.
+- The analyzer performs at most one bounded GitHub discovery pass on a cache miss. DeepSeek analysis, GitHub discovery, and optional reranking each have independent deadlines so an unfamiliar-domain request can complete within the ten-second product target.
+- Cache tables are server-only operational data and are not publicly readable through Supabase RLS.
 
 ## Development Milestones
 

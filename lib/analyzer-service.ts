@@ -2,6 +2,12 @@ import "server-only";
 
 import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
 import { buildCapabilityGraph } from "@/lib/capability-engine";
+import {
+  readAnalysisResultCache,
+  readDiscoveryCandidateCache,
+  writeAnalysisResultCache,
+  writeDiscoveryCandidateCache
+} from "@/lib/db/analyzer-cache";
 import { discoverGitHubResources } from "@/lib/github-discovery-core";
 import { analyzeProject, buildAnalyzerPrompt, hasKnownProjectRule } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
@@ -17,13 +23,38 @@ import {
 } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-type AnalyzerRuntimeResult = AnalyzerResult & {
+export type AnalyzerRuntimeResult = AnalyzerResult & {
   source: "deepseek" | "rules";
   discoveredCount: number;
   selectedDiscoveredCount: number;
+  cacheStatus: "hit" | "miss";
 };
 
 export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerRuntimeResult> {
+  try {
+    const cached = await readAnalysisResultCache<AnalyzerRuntimeResult>(input);
+    if (cached) return { ...cached, cacheStatus: "hit" };
+  } catch (error) {
+    console.warn("Analysis result cache read failed.", error);
+  }
+
+  const result = await analyzeProjectUncached(input, resources);
+  const runtimeResult: AnalyzerRuntimeResult = {
+    ...result,
+    cacheStatus: "miss"
+  };
+  try {
+    await writeAnalysisResultCache(input, runtimeResult);
+  } catch (error) {
+    console.warn("Analysis result cache write failed.", error);
+  }
+  return runtimeResult;
+}
+
+async function analyzeProjectUncached(
+  input: string,
+  resources: Resource[]
+): Promise<Omit<AnalyzerRuntimeResult, "cacheStatus">> {
   const clarity = assessRequirementClarity(input);
   const isLowConfidence = clarity.confidence === "low";
   const initial = analyzeProject(input, resources);
@@ -35,9 +66,9 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     coreFeatures: initial.analysis.coreFeatures,
     tags: graphTags
   });
-  const [rawAi, preliminaryDiscovered] = await Promise.all([
+  const [rawAi, preliminaryCached] = await Promise.all([
     analyzeSafely(input),
-    discoverSafely(input, initial.analysis.tags, resources, preliminaryGraph)
+    readDiscoveryCacheSafely(initial.analysis.tags, preliminaryGraph)
   ]);
   const ai = alignAiAnalysisWithKnownDomain(input, rawAi, initial.analysis);
 
@@ -54,21 +85,38 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
     searchQueries: isLowConfidence ? preliminaryGraph.searchQueries : ai?.searchQueries
   });
 
-  let discovered = preliminaryDiscovered;
-  if (ai && !preliminaryDiscovered.some((resource) => (resource.ai_recommendation_weight ?? 0) >= 100)) {
-    const discoveryTags = isLowConfidence
-      ? graphTags
-      : Array.from(new Set([
-          ...initial.analysis.tags,
-          ...(ai?.tags ?? [])
-        ]));
-    discovered = await discoverSafely(
+  const discoveryTags = isLowConfidence
+    ? graphTags
+    : Array.from(new Set([
+        ...initial.analysis.tags,
+        ...(ai?.tags ?? [])
+      ]));
+  const enhancedCached = await readDiscoveryCacheSafely(discoveryTags, capabilityGraph);
+  let discovered = mergeCanonicalResources([...preliminaryCached, ...enhancedCached]);
+  const minimumCachedCandidates = positiveInteger(
+    process.env.ANALYZE_MIN_CACHED_CANDIDATES,
+    4
+  );
+  if (discovered.length < minimumCachedCandidates) {
+    const liveDiscovered = await discoverSafely(
       input,
       discoveryTags,
       resources,
       capabilityGraph,
-      ai.repositoryHints
+      ai?.repositoryHints ?? []
     );
+    discovered = mergeCanonicalResources([...discovered, ...liveDiscovered]);
+    if (liveDiscovered.length > 0) {
+      try {
+        await writeDiscoveryCandidateCache(liveDiscovered, {
+          tags: discoveryTags,
+          capabilities: capabilityGraph.capabilities,
+          searchQueries: capabilityGraph.searchQueries
+        });
+      } catch (error) {
+        console.warn("Discovery candidate cache write failed.", error);
+      }
+    }
   }
 
   const candidateResources = mergeResources(resources, discovered);
@@ -205,10 +253,28 @@ function countSelectedDiscoveredResources(
 
 async function analyzeSafely(input: string) {
   try {
-    return await analyzeWithDeepSeek(input);
+    return await analyzeWithDeepSeek(
+      input,
+      positiveInteger(process.env.ANALYZE_DEEPSEEK_TIMEOUT_MS, 4000)
+    );
   } catch (error) {
     console.warn("DeepSeek analysis failed, using rules tags.", error);
     return null;
+  }
+}
+
+async function readDiscoveryCacheSafely(
+  tags: string[],
+  capabilityGraph: ReturnType<typeof buildCapabilityGraph>
+) {
+  try {
+    return await readDiscoveryCandidateCache({
+      tags,
+      capabilities: capabilityGraph.capabilities
+    });
+  } catch (error) {
+    console.warn("Discovery candidate cache read failed.", error);
+    return [];
   }
 }
 
@@ -252,15 +318,28 @@ async function discoverSafely(
   capabilityGraph: ReturnType<typeof buildCapabilityGraph>,
   repositoryHints: string[] = []
 ) {
+  const timeoutMs = positiveInteger(
+    process.env.ANALYZE_GITHUB_TIMEOUT_MS,
+    3500
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await discoverGitHubResources(input, tags, resources, {
       capabilities: capabilityGraph.capabilities,
       searchQueries: capabilityGraph.searchQueries,
-      repositoryHints
+      repositoryHints,
+      inspectionLimit: positiveInteger(
+        process.env.ANALYZE_GITHUB_INSPECTION_LIMIT,
+        6
+      ),
+      signal: controller.signal
     });
   } catch (error) {
     console.warn("GitHub discovery failed, keeping database resources.", error);
     return [];
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -307,7 +386,8 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
           description: module.description,
           priority: module.priority ?? "optional",
           resourceRoles: module.resourceRoles ?? []
-        }))
+        })),
+        positiveInteger(process.env.ANALYZE_RERANK_TIMEOUT_MS, 1200)
       ))
     );
     results.forEach((result, index) => {
@@ -627,4 +707,9 @@ function chunk<T>(items: T[], size: number) {
     { length: Math.ceil(items.length / size) },
     (_, index) => items.slice(index * size, (index + 1) * size)
   );
+}
+
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
