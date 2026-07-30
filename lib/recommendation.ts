@@ -736,8 +736,8 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
   if (/(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(graph)) {
     return /(three\.js|threejs|webgl|mesh|image.to.3d|3d reconstruction|glb|obj|stl|三维)/i.test(haystack);
   }
-  if (/(plant.disease|leaf.disease|crop.disease|plant.pathology|植物病害|病虫害|叶片疾病)/i.test(graph)) {
-    return /(plant[- ]disease|leaf[- ]disease|crop[- ]disease|plant pathology|plantvillage|植物病害|病虫害|叶片疾病)/i.test(haystack);
+  if (/(plant.disease|leaf.disease|crop.disease|plant.pathology|植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病)/i.test(graph)) {
+    return /(plant[- ]disease|leaf[- ]disease|crop[- ]disease|plant pathology|plantvillage|植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病)/i.test(haystack);
   }
   if (/(plant.species|plant.identification|species.classification|plantnet|植物识别|拍照识花|物种识别)/i.test(graph)) {
     const hasSpeciesIdentification = /(plant[- ]identification|plants[- ]identification|plant[- ]species|species[- ]classification|plantnet|ai[- ]taxonomist|植物识别|物种识别)/i.test(haystack);

@@ -417,7 +417,7 @@ const capabilityPatterns: Array<{
     label: "植物病害与叶片健康识别",
     description: "在需求明确包含病害、病斑或叶片健康时，识别植物疾病并返回类别和置信度。",
     terms: [
-      "植物病害", "病虫害识别", "叶片疾病", "病斑识别", "植物健康诊断",
+      "植物病害", "病害识别", "作物病害", "叶片病害", "病虫害识别", "叶片疾病", "病斑识别", "植物健康诊断",
       "plant disease", "leaf disease", "crop disease", "plant pathology"
     ],
     keywords: [
@@ -662,7 +662,7 @@ function isSeededCapabilityCompatible(capability: CapabilityRequirement, source:
     },
     {
       capability: /(plant.disease|leaf.disease|crop.disease|plant.pathology)/,
-      intent: /(植物病害|病虫害|叶片疾病|病斑|植物健康|plant.disease|leaf.disease|crop.disease|plant.pathology)/
+      intent: /(植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病|病斑|植物健康|plant.disease|leaf.disease|crop.disease|plant.pathology)/
     }
   ];
 

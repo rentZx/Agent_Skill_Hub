@@ -407,10 +407,20 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       const items = group.items.flatMap((item) => {
         const rerank = scoreMap.get(item.resource.id);
         if (!rerank) {
-          return hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords) ? [item] : [];
+          return hasStrongRepositoryEvidence(
+            item,
+            recommendation.modules,
+            recommendation.keywords,
+            group.id === "risk-alerts"
+          ) ? [item] : [];
         }
         if (!shouldKeepRerankedItem(item, rerank, recommendation.keywords, recommendation.modules)) {
-          return hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords) ? [item] : [];
+          return hasStrongRepositoryEvidence(
+            item,
+            recommendation.modules,
+            recommendation.keywords,
+            group.id === "risk-alerts"
+          ) ? [item] : [];
         }
 
         const score = Math.round(item.score * 0.55 + rerank.score * 0.45);
@@ -457,7 +467,12 @@ function preserveEvidenceBackedCoreItems(
     if (!originalGroup) return group;
 
     const evidenceBacked = originalGroup.items.filter((item) =>
-      hasStrongRepositoryEvidence(item, original.modules, original.keywords)
+      hasStrongRepositoryEvidence(
+        item,
+        original.modules,
+        original.keywords,
+        group.id === "risk-alerts"
+      )
     );
     const merged = new Map(group.items.map((item) => [item.resource.id, item]));
     for (const item of evidenceBacked) {
@@ -522,7 +537,12 @@ function shouldKeepRerankedItem(
 function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"]) {
   const groups = recommendation.groups.map((group) => {
     const items = group.items.filter((item) =>
-      hasStrongRepositoryEvidence(item, recommendation.modules, recommendation.keywords)
+      hasStrongRepositoryEvidence(
+        item,
+        recommendation.modules,
+        recommendation.keywords,
+        group.id === "risk-alerts"
+      )
     );
     return {
       ...group,
@@ -543,9 +563,13 @@ function applyEvidenceFallback(recommendation: AnalyzerResult["recommendation"])
 function hasStrongRepositoryEvidence(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
   modules: AnalyzerResult["recommendation"]["modules"],
-  projectKeywords: string[]
+  projectKeywords: string[],
+  allowHighRisk = false
 ) {
-  if (item.matchKind === "baseline" || item.resource.risk_level === "high") return false;
+  if (
+    item.matchKind === "baseline"
+    || (item.resource.risk_level === "high" && !allowHighRisk)
+  ) return false;
   const verification = getResourceVerification(item.resource);
   const coreIds = new Set(
     modules
@@ -564,7 +588,8 @@ function hasStrongRepositoryEvidence(
       specificDeterministicCoverage
       || hasDirectDomainSignal(item, projectKeywords, true, modules)
     );
-  const inspectedLiveEvidence = (item.resource.ai_recommendation_weight ?? 0) >= 95
+  const inspectedLiveEvidence = item.resource.source === "github_live"
+    && item.score >= 65
     && Boolean(item.resource.evidence_summary)
     && (item.resource.matched_capabilities?.length ?? 0) > 0
     && hasDirectDomainSignal(item, projectKeywords, true, modules);

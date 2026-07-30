@@ -1012,7 +1012,7 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
     return imageTo3dDiscoveryProfile;
   }
-  if (/(植物病害|病虫害|叶片疾病|病斑|植物健康诊断|plant.disease|leaf.disease|crop.disease|plant.pathology)/i.test(source)) {
+  if (/(植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病|病斑|植物健康诊断|plant.disease|leaf.disease|crop.disease|plant.pathology)/i.test(source)) {
     return plantDiseaseDiscoveryProfile;
   }
   if (/(植物识别|识别植物|拍照识花|拍照识植物|花草识别|植物种类|plant.identification|plant.identifier|plant.species.recognition|species.classification)/i.test(source)) {
