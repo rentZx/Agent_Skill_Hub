@@ -121,11 +121,15 @@ function positiveInteger(value: string | undefined, fallback: number) {
 }
 
 function isSecureKeyTransport(request: Request) {
-  const hostname = new URL(request.url).hostname;
-  if (["localhost", "127.0.0.1", "::1"].includes(hostname)) return true;
   const forwardedProto = request.headers.get("x-forwarded-proto")
     ?.split(",", 1)[0]
     ?.trim()
     .toLowerCase();
-  return forwardedProto === "https" || new URL(request.url).protocol === "https:";
+  if (forwardedProto) return forwardedProto === "https";
+
+  const url = new URL(request.url);
+  const isDirectLoopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
+    && !request.headers.has("x-forwarded-for")
+    && !request.headers.has("x-real-ip");
+  return isDirectLoopback || url.protocol === "https:";
 }
