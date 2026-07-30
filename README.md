@@ -61,11 +61,10 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 GITHUB_TOKEN=
-DEEPSEEK_API_KEY=
-DEEPSEEK_MODEL=deepseek-chat
 ANALYZE_RATE_LIMIT=12
 ANALYZE_RATE_WINDOW_MS=300000
 ANALYZE_MAX_CONCURRENCY=4
+ANALYZE_LLM_TIMEOUT_MS=5000
 ```
 
 Variable usage:
@@ -75,18 +74,18 @@ Variable usage:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key used by the browser client.
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-only key for admin jobs, imports, and trusted writes.
 - `GITHUB_TOKEN`: Server-side GitHub token. It is optional for single-repository imports, but strongly recommended for catalog sync to avoid GitHub search API rate limits.
-- `DEEPSEEK_API_KEY`: Optional server-only key for AI project analysis and tag expansion. When absent, the rules engine remains available.
-- `DEEPSEEK_MODEL`: Optional DeepSeek model name; defaults to `deepseek-chat`.
 - `ANALYZE_RATE_LIMIT`: Maximum analyze requests allowed per client in one rate window.
 - `ANALYZE_RATE_WINDOW_MS`: Analyze rate-limit window in milliseconds.
 - `ANALYZE_MAX_CONCURRENCY`: Maximum analyze requests processed concurrently by one application process.
+- `ANALYZE_LLM_TIMEOUT_MS`: Maximum time allowed for the user-selected model to analyze one project request.
 
 ## Production Security
 
 - Production `/admin`, GitHub parsing/search, and database import endpoints are disabled until administrator authentication is implemented.
 - The Next.js process must bind to `127.0.0.1:3003` and run behind Nginx.
-- Public deployment requires HTTPS before users submit project descriptions.
-- Project descriptions may be sent to DeepSeek, and capability search terms may be sent to GitHub. Publish a privacy notice before launch.
+- Public deployment requires HTTPS before users save or transmit a model API key.
+- Project analysis uses browser-persisted bring-your-own-key settings for DeepSeek, OpenAI, Gemini, or Kimi. Keys are sent only with the analyze request, are never written to the database or result cache, and are not used for GitHub discovery.
+- Project descriptions may be sent to the user-selected model provider, and capability search terms may be sent to GitHub. Publish a privacy notice before launch.
 - Run `npm audit --omit=dev` before deployment and keep production vulnerabilities at zero.
 - See `SECURITY.md` for the public-launch checklist and credential handling rules.
 

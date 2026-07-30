@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { analyzeProjectWithAI } from "@/lib/analyzer-service";
+import { parseLlmRuntimeConfig } from "@/lib/llm-config";
+import {
+  getPublicLlmErrorMessage,
+  LlmProviderRequestError
+} from "@/lib/llm";
 import { getResources } from "@/lib/resources";
 import {
   enforceRateLimit,
@@ -19,6 +24,17 @@ export async function POST(request: Request) {
   const rateLimited = enforceRateLimit(request, "analyze", analyzeRateLimit, analyzeRateWindowMs);
   if (rateLimited) return rateLimited;
 
+  if (!isSecureKeyTransport(request)) {
+    return noStoreJson(
+      {
+        ok: false,
+        error: "项目分析需要通过 HTTPS 安全传输 API Key。当前仍可使用资源搜索。",
+        code: "HTTPS_REQUIRED"
+      },
+      { status: 426 }
+    );
+  }
+
   if (activeAnalyses >= maxConcurrentAnalyses) {
     return NextResponse.json(
       { ok: false, error: "分析服务当前繁忙，请稍后重试。" },
@@ -30,7 +46,7 @@ export async function POST(request: Request) {
   activeAnalyses += 1;
 
   try {
-    const body = await readJsonBody<{ input?: unknown }>(request, 8 * 1024);
+    const body = await readJsonBody<{ input?: unknown; llm?: unknown }>(request, 12 * 1024);
     if (typeof body.input !== "string") {
       return noStoreJson({ ok: false, error: "请输入项目描述。" }, { status: 400 });
     }
@@ -40,9 +56,20 @@ export async function POST(request: Request) {
     if (input.length > 2000) {
       return noStoreJson({ ok: false, error: "项目描述不能超过 2000 个字符。" }, { status: 400 });
     }
+    const llm = parseLlmRuntimeConfig(body.llm);
+    if (!llm) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "请先在模型设置中配置 API Key 和模型。",
+          code: "LLM_CONFIG_REQUIRED"
+        },
+        { status: 400 }
+      );
+    }
 
     const resources = await getResources();
-    const result = await analyzeProjectWithAI(input, resources);
+    const result = await analyzeProjectWithAI(input, resources, llm);
     const durationMs = Math.round(performance.now() - startedAt);
     return noStoreJson(
       {
@@ -50,7 +77,9 @@ export async function POST(request: Request) {
         result,
         meta: {
           durationMs,
-          cacheStatus: result.cacheStatus
+          cacheStatus: result.cacheStatus,
+          provider: llm.provider,
+          model: llm.model
         }
       },
       {
@@ -63,6 +92,17 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof RequestValidationError) {
       return noStoreJson({ ok: false, error: error.message }, { status: error.status });
+    }
+    if (error instanceof LlmProviderRequestError) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: getPublicLlmErrorMessage(error),
+          code: "LLM_PROVIDER_ERROR",
+          requestId
+        },
+        { status: error.status === 429 ? 429 : 502 }
+      );
     }
 
     console.error(`[analyze:${requestId}] request failed`, error);
@@ -78,4 +118,14 @@ export async function POST(request: Request) {
 function positiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isSecureKeyTransport(request: Request) {
+  const hostname = new URL(request.url).hostname;
+  if (["localhost", "127.0.0.1", "::1"].includes(hostname)) return true;
+  const forwardedProto = request.headers.get("x-forwarded-proto")
+    ?.split(",", 1)[0]
+    ?.trim()
+    .toLowerCase();
+  return forwardedProto === "https" || new URL(request.url).protocol === "https:";
 }

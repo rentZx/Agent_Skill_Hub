@@ -25,7 +25,7 @@ export function HomeAnalyzerForm() {
         </div>
         <Button type="submit" size="lg" className="h-full min-h-14 shrink-0 px-5">生成方案 <ArrowRight className="h-4 w-4" /></Button>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2 px-1 text-xs text-slate-400"><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">DeepSeek 分析</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">数据库检索</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">GitHub 实时发现</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">风险提示</span></div>
+      <div className="mt-2 flex flex-wrap gap-2 px-1 text-xs text-slate-400"><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">自选大模型分析</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">数据库检索</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">GitHub 实时发现</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">风险提示</span></div>
     </form>
   );
 }

@@ -1,7 +1,9 @@
 import "server-only";
 
-import { analyzeWithDeepSeek, rerankWithDeepSeek } from "@/lib/deepseek";
+import { createHash } from "node:crypto";
+import { analyzeWithLlm, rerankWithLlm } from "@/lib/llm";
 import { buildCapabilityGraph } from "@/lib/capability-engine";
+import type { LlmProvider, LlmRuntimeConfig } from "@/lib/llm-config";
 import {
   readAnalysisResultCache,
   readDiscoveryCandidateCache,
@@ -24,27 +26,36 @@ import {
 import type { Resource } from "@/lib/types";
 
 export type AnalyzerRuntimeResult = AnalyzerResult & {
-  source: "deepseek" | "rules";
+  source: LlmProvider;
   discoveredCount: number;
   selectedDiscoveredCount: number;
   cacheStatus: "hit" | "miss";
 };
 
-export async function analyzeProjectWithAI(input: string, resources: Resource[]): Promise<AnalyzerRuntimeResult> {
+export async function analyzeProjectWithAI(
+  input: string,
+  resources: Resource[],
+  llm: LlmRuntimeConfig
+): Promise<AnalyzerRuntimeResult> {
+  const credentialFingerprint = createHash("sha256")
+    .update(llm.apiKey)
+    .digest("hex")
+    .slice(0, 24);
+  const cacheScope = `${llm.provider}:${llm.model}:${credentialFingerprint}`;
   try {
-    const cached = await readAnalysisResultCache<AnalyzerRuntimeResult>(input);
+    const cached = await readAnalysisResultCache<AnalyzerRuntimeResult>(input, cacheScope);
     if (cached) return { ...cached, cacheStatus: "hit" };
   } catch (error) {
     console.warn("Analysis result cache read failed.", error);
   }
 
-  const result = await analyzeProjectUncached(input, resources);
+  const result = await analyzeProjectUncached(input, resources, llm);
   const runtimeResult: AnalyzerRuntimeResult = {
     ...result,
     cacheStatus: "miss"
   };
   try {
-    await writeAnalysisResultCache(input, runtimeResult);
+    await writeAnalysisResultCache(input, runtimeResult, cacheScope);
   } catch (error) {
     console.warn("Analysis result cache write failed.", error);
   }
@@ -53,7 +64,8 @@ export async function analyzeProjectWithAI(input: string, resources: Resource[])
 
 async function analyzeProjectUncached(
   input: string,
-  resources: Resource[]
+  resources: Resource[],
+  llm: LlmRuntimeConfig
 ): Promise<Omit<AnalyzerRuntimeResult, "cacheStatus">> {
   const clarity = assessRequirementClarity(input);
   const isLowConfidence = clarity.confidence === "low";
@@ -67,7 +79,7 @@ async function analyzeProjectUncached(
     tags: graphTags
   });
   const [rawAi, preliminaryCached] = await Promise.all([
-    analyzeSafely(input),
+    analyzeSafely(input, llm),
     readDiscoveryCacheSafely(initial.analysis.tags, preliminaryGraph)
   ]);
   const ai = alignAiAnalysisWithKnownDomain(input, rawAi, initial.analysis);
@@ -123,23 +135,6 @@ async function analyzeProjectUncached(
   const fallback = analyzeProject(input, candidateResources, {}, capabilityGraph);
 
   try {
-    if (!ai) {
-      const evidenceBacked = applyEvidenceFallback(fallback.recommendation);
-      const recommendation = {
-        ...evidenceBacked,
-        codexPrompt: rebuildCodexPrompt(input, evidenceBacked)
-      };
-      return {
-        ...fallback,
-        source: "rules",
-        discoveredCount: discovered.length,
-        selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
-        recommendation: {
-          ...recommendation,
-          codexPrompt: buildAnalyzerPrompt(input, fallback.analysis, recommendation.codexPrompt, recommendation.clarity)
-        }
-      };
-    }
     const enriched = analyzeProject(input, candidateResources, isLowConfidence
       ? {
           industry: ai.industry
@@ -158,7 +153,7 @@ async function analyzeProjectUncached(
           difficulty: ai.difficulty,
           tags: ai.tags
         }, capabilityGraph);
-    const reranked = await rerankRecommendation(input, enriched.recommendation);
+    const reranked = await rerankRecommendation(input, enriched.recommendation, llm);
     const catalogRecommendation = analyzeProject(
       input,
       resources,
@@ -193,7 +188,7 @@ async function analyzeProjectUncached(
     };
     return {
       ...enriched,
-      source: "deepseek",
+      source: llm.provider,
       discoveredCount: discovered.length,
       selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
       recommendation: {
@@ -203,10 +198,10 @@ async function analyzeProjectUncached(
       analysis
     };
   } catch (error) {
-    console.warn("DeepSeek analysis failed, using rules fallback.", error);
+    console.warn("Model-enriched analysis assembly failed, using deterministic fallback.", error);
     return {
       ...fallback,
-      source: "rules",
+      source: llm.provider,
       discoveredCount: discovered.length,
       selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered)
     };
@@ -251,16 +246,12 @@ function countSelectedDiscoveredResources(
   return new Set(selectedIds).size;
 }
 
-async function analyzeSafely(input: string) {
-  try {
-    return await analyzeWithDeepSeek(
-      input,
-      positiveInteger(process.env.ANALYZE_DEEPSEEK_TIMEOUT_MS, 4000)
-    );
-  } catch (error) {
-    console.warn("DeepSeek analysis failed, using rules tags.", error);
-    return null;
-  }
+async function analyzeSafely(input: string, llm: LlmRuntimeConfig) {
+  return analyzeWithLlm(
+    input,
+    llm,
+    positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 5000)
+  );
 }
 
 async function readDiscoveryCacheSafely(
@@ -280,7 +271,7 @@ async function readDiscoveryCacheSafely(
 
 function alignAiAnalysisWithKnownDomain(
   input: string,
-  ai: Awaited<ReturnType<typeof analyzeWithDeepSeek>>,
+  ai: Awaited<ReturnType<typeof analyzeWithLlm>>,
   ruleAnalysis: AnalyzerResult["analysis"]
 ) {
   if (!ai || !hasKnownProjectRule(input)) return ai;
@@ -356,7 +347,11 @@ function normalizeOfficialResourceName(resource: Resource): Resource {
     : resource;
 }
 
-async function rerankRecommendation(input: string, recommendation: AnalyzerResult["recommendation"]) {
+async function rerankRecommendation(
+  input: string,
+  recommendation: AnalyzerResult["recommendation"],
+  llm: LlmRuntimeConfig
+) {
   const candidates = selectRerankCandidates(recommendation).map((item) => ({
     id: item.resource.id,
     name: item.resource.name,
@@ -377,7 +372,8 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
   try {
     const batches = chunk(candidates, 6);
     const results = await Promise.allSettled(
-      batches.map((batch) => rerankWithDeepSeek(
+      batches.map((batch) => rerankWithLlm(
+        llm,
         input,
         batch,
         recommendation.modules.map((module) => ({
@@ -392,7 +388,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
     );
     results.forEach((result, index) => {
       if (result.status === "rejected") {
-        console.warn(`DeepSeek rerank batch ${index + 1} failed.`, result.reason);
+        console.warn(`Model rerank batch ${index + 1} failed.`, result.reason);
       }
     });
     const scores = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
@@ -453,7 +449,7 @@ async function rerankRecommendation(input: string, recommendation: AnalyzerResul
       gaps: Array.from(new Set(retainedGaps))
     };
   } catch (error) {
-    console.warn("DeepSeek rerank failed, keeping evidence-backed resources only.", error);
+    console.warn("Model rerank failed, keeping evidence-backed resources only.", error);
     return applyEvidenceFallback(recommendation);
   }
 }
@@ -512,7 +508,7 @@ function selectRerankCandidates(recommendation: AnalyzerResult["recommendation"]
 
 function shouldKeepRerankedItem(
   item: AnalyzerResult["recommendation"]["groups"][number]["items"][number],
-  rerank: Awaited<ReturnType<typeof rerankWithDeepSeek>>[number],
+  rerank: Awaited<ReturnType<typeof rerankWithLlm>>[number],
   projectKeywords: string[],
   modules: AnalyzerResult["recommendation"]["modules"]
 ) {

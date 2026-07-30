@@ -171,8 +171,16 @@ The V2 migration is additive and idempotent. Existing pages remain compatible wi
 - `discovery_candidate_cache` stores evidence-verified GitHub candidates discovered during project analysis, indexed by project tags and capability IDs.
 - Cached candidates are reverified every day; transient failures are retried before a candidate becomes stale, and expired stale rows are removed.
 - `analysis_result_cache` stores complete analyzer results by normalized prompt hash for twelve hours.
-- The analyzer performs at most one bounded GitHub discovery pass on a cache miss. DeepSeek analysis, GitHub discovery, and optional reranking each have independent deadlines so an unfamiliar-domain request can complete within the ten-second product target.
+- The analyzer performs at most one bounded GitHub discovery pass on a cache miss. User-selected model analysis, GitHub discovery, and optional reranking each have independent deadlines so an unfamiliar-domain request can complete within the ten-second product target.
 - Cache tables are server-only operational data and are not publicly readable through Supabase RLS.
+
+### Bring Your Own Model Key
+
+- Public project analysis does not use an operator-owned model credential.
+- Users may configure DeepSeek, OpenAI, Gemini, or Kimi. Each provider configuration persists only in the current browser, and one provider is selected for each analysis request.
+- Model keys are accepted only over HTTPS, forwarded transiently to a fixed official endpoint, and never written to PostgreSQL, result caches, logs, URLs, or analytics.
+- Analysis result cache keys include a one-way credential fingerprint plus provider and model, so one visitor cannot reuse another visitor's private result cache.
+- Without a configured provider, the analyzer does not run rule-based requirement inference and instead directs the visitor to the existing resource search.
 
 ## Development Milestones
 

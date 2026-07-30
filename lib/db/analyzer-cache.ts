@@ -18,7 +18,7 @@ import {
 } from "@/lib/db/schema";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v1";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v2";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -39,11 +39,14 @@ export type DiscoveryCacheContext = {
   searchQueries: string[];
 };
 
-export async function readAnalysisResultCache<T>(input: string): Promise<T | null> {
+export async function readAnalysisResultCache<T>(
+  input: string,
+  scope = "default"
+): Promise<T | null> {
   const db = getDb();
   if (!db) return null;
 
-  const promptHash = hashPrompt(input);
+  const promptHash = hashPrompt(input, scope);
   const [row] = await db
     .update(analysisResultCache)
     .set({
@@ -60,12 +63,16 @@ export async function readAnalysisResultCache<T>(input: string): Promise<T | nul
   return row ? row.result as T : null;
 }
 
-export async function writeAnalysisResultCache(input: string, result: unknown) {
+export async function writeAnalysisResultCache(
+  input: string,
+  result: unknown,
+  scope = "default"
+) {
   const db = getDb();
   if (!db) return;
 
   const now = new Date();
-  const promptHash = hashPrompt(input);
+  const promptHash = hashPrompt(input, scope);
   await db
     .insert(analysisResultCache)
     .values({
@@ -209,9 +216,9 @@ export async function writeDiscoveryCandidateCache(
     });
 }
 
-function hashPrompt(input: string) {
+function hashPrompt(input: string, scope: string) {
   return createHash("sha256")
-    .update(`${ANALYSIS_CACHE_VERSION}\n${normalizePrompt(input)}`)
+    .update(`${ANALYSIS_CACHE_VERSION}\n${scope}\n${normalizePrompt(input)}`)
     .digest("hex");
 }
 

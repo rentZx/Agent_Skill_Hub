@@ -5,12 +5,17 @@ import type {
   CapabilitySeed,
   ResourceRole
 } from "@/lib/capability-engine";
+import {
+  llmProviderDefinitions,
+  type LlmProvider,
+  type LlmRuntimeConfig
+} from "@/lib/llm-config";
 
-type DeepSeekResponse = {
+type CompatibleChatResponse = {
   choices?: Array<{ message?: { content?: string | null } }>;
 };
 
-export type DeepSeekProjectAnalysis = {
+export type LlmProjectAnalysis = {
   industry?: string;
   projectType?: string;
   platform?: string;
@@ -29,7 +34,7 @@ export type DeepSeekProjectAnalysis = {
   repositoryHints?: string[];
 };
 
-export type DeepSeekRerankItem = {
+export type LlmRerankItem = {
   id: string;
   score: number;
   reason: string;
@@ -38,22 +43,25 @@ export type DeepSeekRerankItem = {
   role?: ResourceRole;
 };
 
-export async function analyzeWithDeepSeek(
-  input: string,
-  timeoutMs = 15000
-): Promise<DeepSeekProjectAnalysis | null> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
+export class LlmProviderRequestError extends Error {
+  constructor(
+    public readonly provider: LlmProvider,
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "LlmProviderRequestError";
+  }
+}
 
-  const response = await fetch(`${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
-      temperature: 0.1,
-      max_tokens: 1800,
-      response_format: { type: "json_object" },
-      messages: [
+export async function analyzeWithLlm(
+  input: string,
+  config: LlmRuntimeConfig,
+  timeoutMs = 15000
+): Promise<LlmProjectAnalysis> {
+  const content = await requestChatCompletion(
+    config,
+    [
         {
           role: "system",
           content: "你是软件架构分析器和 GitHub 检索规划器。只输出合法 JSON，不编造外部资源事实。根据用户需求提取行业、项目类型、平台、目标用户、核心功能、推荐技术栈、复杂度、8-20 个英文 slug 标签，以及 4-10 个可验证的项目能力。除 tags、capabilities.keywords、capabilities.negativeKeywords、capabilities.preferredTypes、capabilities.resourceRoles 和 searchQueries 必须使用英文外，其他用户可见字段必须使用简体中文。coreFeatures 必须来自用户原始需求。能力必须是单个开源资源可独立证明的原子能力，禁止把交互方式和业务动作组合成“语音查价格”“语音查库存”等端到端能力；这种需求应拆成库存系统、语音识别、受控业务查询。先识别业务闭环中的核心系统、核心数据或核心算法，再识别语音、实时接口、自动化、UI 等支撑能力。短视频生成需求必须拆出脚本生成、素材获取或生成、配音、字幕、视频合成与渲染；除非用户明确要求对话或工具调用，否则不要添加 natural-language-query、tool-calling 等能力。capabilities 每项必须包含 id、label、description、required、priority、resourceRoles、keywords、negativeKeywords、preferredTypes。priority 只能是 core、required、optional；至少 1 项且最多 3 项为 core。语音识别、MCP、UI、项目模板和开发工具不能标为 core；文本转语音只有在用户明确要求语音播报、语音回复或视频配音时才是 required，否则为 optional。resourceRoles 只能使用 domain_system、domain_data、domain_algorithm、speech_to_text、text_to_speech、agent_tool、mcp_integration、ui_library、project_template、developer_tool。preferredTypes 只能使用 agent_skill、mcp_server、github_plugin、ui_component、template_repo。keywords 应描述资源 README 中可验证的具体能力，不可只写 AI、Agent、React、API、management 等通用词；negativeKeywords 必须列出常见误匹配，例如语音识别需要排除 AI companion、voice changer，视频生成需要排除 ERP、inventory management、generic agent framework。searchQueries 输出 4-8 条按 core、required 能力拆分的 GitHub 英文检索短语，不包含搜索语法，不得直接编造仓库名。constraints 输出用户提出的硬约束。JSON 字段必须是 industry, projectType, platform, targetUsers, coreFeatures, frontend, backend, database, orm, deploy, difficulty, tags, capabilities, constraints, searchQueries。"
@@ -63,17 +71,10 @@ export async function analyzeWithDeepSeek(
           content: "补充并覆盖上一条的检索输出约束：searchQueries 每条使用 2-5 个英文词，至少两条使用科学术语、行业术语或专业同义词。JSON 还必须包含 repositoryHints 数组，最多 5 个可能真实存在且高度相关的 GitHub owner/repo 候选；它们仅是待 GitHub API 验证的假设，不能当作已验证事实。"
         },
         { role: "user", content: `请分析以下项目需求，并输出 JSON：${input}` }
-      ]
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(timeoutMs)
-  });
-
-  if (!response.ok) throw new Error(`DeepSeek API request failed: ${response.status}`);
-  const payload = (await response.json()) as DeepSeekResponse;
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) return null;
-  const parsed = parseJsonObject<DeepSeekProjectAnalysis>(content);
+    ],
+    timeoutMs
+  );
+  const parsed = parseJsonObject<LlmProjectAnalysis>(content);
   return {
     ...parsed,
     coreFeatures: cleanList(parsed.coreFeatures, 8),
@@ -85,7 +86,7 @@ export async function analyzeWithDeepSeek(
   };
 }
 
-export async function rerankWithDeepSeek(input: string, candidates: Array<{
+export async function rerankWithLlm(config: LlmRuntimeConfig, input: string, candidates: Array<{
   id: string;
   name: string;
   type: string;
@@ -102,37 +103,23 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
   description: string;
   priority?: CapabilityPriority;
   resourceRoles?: ResourceRole[];
-}> = [], timeoutMs = 15000): Promise<DeepSeekRerankItem[]> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey || candidates.length === 0) return [];
+}> = [], timeoutMs = 15000): Promise<LlmRerankItem[]> {
+  if (candidates.length === 0) return [];
 
-  const response = await fetch(`${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
-      temperature: 0.1,
-      max_tokens: 1800,
-      response_format: { type: "json_object" },
-      messages: [
+  const content = await requestChatCompletion(
+    config,
+    [
         {
           role: "system",
           content: "你是资源组合推荐重排器。只输出合法 JSON，不能编造资源事实。根据项目需求和 requiredCapabilities 为每个候选打 0-100 的适配分，并判断是否应进入最终资源组合。必须逐项给出 coveredCapabilities，且只能填写输入中存在、并被候选 evidence、description、tags 或 matchedCapabilities 直接证明的能力 id。role 必须与能力的 resourceRoles 一致。硬规则：候选至少覆盖一项 core 或 required 能力才可 recommended=true；只命中 optional 能力，或只命中 Python、React、AI、Agent、GitHub、自动化、SaaS、模板等通用词时必须拒绝。通用 UI 组件库仅可作为 ui_library 支撑项，不能冒充业务核心。AI 陪伴、虚拟角色、变声产品不能视为语音识别；通用 SaaS 模板不能视为库存、金融、菜谱等领域系统。短视频项目中，ERP 的 asset management 不等于媒体素材管理，通用 Agent Tool 或 Laravel Agent 不等于视频生成；候选必须直接声明脚本、视频素材、配音、字幕、视频编辑、合成或渲染中的至少一项。优先使用 evidence 和 matchedCapabilities；没有仓库证据时只能依据 name、description 和 tags，不得推断未声明功能。score 低于 55、没有可验证必要能力或 reason 表示不建议使用时，recommended 必须为 false。reason 使用中文且控制在 80 个汉字以内，具体说明能接入的开发环节和能力边界，不要重复分数、可信度或风险。必须返回 {\"items\":[{\"id\":\"原始id\",\"score\":数字,\"recommended\":布尔值,\"coveredCapabilities\":[\"能力id\"],\"role\":\"资源角色\",\"reason\":\"具体理由\"}]}。可信度和风险只作为输入参考，不要修改它们。"
         },
         { role: "user", content: JSON.stringify({ project: input, requiredCapabilities, candidates }) }
-      ]
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(timeoutMs)
-  });
-
-  if (!response.ok) throw new Error(`DeepSeek rerank failed: ${response.status}`);
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) return [];
-  const parsed = parseJsonObject<{ items?: Array<Partial<DeepSeekRerankItem>> }>(content);
+    ],
+    timeoutMs
+  );
+  const parsed = parseJsonObject<{ items?: Array<Partial<LlmRerankItem>> }>(content);
   return (parsed.items ?? [])
-    .filter((item): item is Partial<DeepSeekRerankItem> & { id: string; score: number } =>
+    .filter((item): item is Partial<LlmRerankItem> & { id: string; score: number } =>
       typeof item?.id === "string" && typeof item?.score === "number"
     )
     .map((item) => {
@@ -151,6 +138,81 @@ export async function rerankWithDeepSeek(input: string, candidates: Array<{
           : score >= 55 && !hasNegativeRecommendation(reason)
       };
     });
+}
+
+export function getPublicLlmErrorMessage(error: unknown) {
+  if (!(error instanceof LlmProviderRequestError)) {
+    return "模型服务请求失败，请检查网络后重试。";
+  }
+
+  const label = llmProviderDefinitions[error.provider].shortLabel;
+  if (error.status === 401 || error.status === 403) {
+    return `${label} API Key 无效、已失效或没有当前模型权限。`;
+  }
+  if (error.status === 429) {
+    return `${label} 请求过于频繁或账户额度不足，请稍后重试。`;
+  }
+  if (error.status === 400 || error.status === 404) {
+    return `${label} 拒绝了请求，请检查模型 ID 是否可用。`;
+  }
+  if (error.status === 408 || error.status === 504) {
+    return `${label} 响应超时，请稍后重试。`;
+  }
+  return `${label} 暂时不可用（HTTP ${error.status}）。`;
+}
+
+async function requestChatCompletion(
+  config: LlmRuntimeConfig,
+  messages: Array<{ role: "system" | "user"; content: string }>,
+  timeoutMs: number
+) {
+  const definition = llmProviderDefinitions[config.provider];
+  const baseBody = {
+    model: config.model,
+    messages,
+    ...(config.provider === "openai"
+      ? { max_completion_tokens: 1800 }
+      : { max_tokens: 1800 })
+  };
+  const request = async (jsonMode: boolean) => fetch(definition.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      ...baseBody,
+      ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+
+  let response: Response;
+  try {
+    response = await request(true);
+    if (response.status === 400) response = await request(false);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new LlmProviderRequestError(config.provider, 504, "Provider request timed out.");
+    }
+    throw new LlmProviderRequestError(config.provider, 503, "Provider request failed.");
+  }
+
+  if (!response.ok) {
+    throw new LlmProviderRequestError(
+      config.provider,
+      response.status,
+      `Provider request failed with status ${response.status}.`
+    );
+  }
+
+  const payload = await response.json() as CompatibleChatResponse;
+  const content = payload.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new LlmProviderRequestError(config.provider, 502, "Provider returned an empty response.");
+  }
+  return content;
 }
 
 function cleanList(value: unknown, limit: number) {
