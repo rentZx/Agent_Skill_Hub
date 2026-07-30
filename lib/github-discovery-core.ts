@@ -497,8 +497,13 @@ function buildPlannedQueries(
   capabilities: CapabilityRequirement[],
   profile: DiscoveryProfile | null
 ) {
-  const planned = searchQueries
+  const normalizedPlanned = searchQueries
     .map((query) => query.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const planned = normalizedPlanned
+    .map((query) => `${query} in:name,description,readme archived:false fork:false`);
+  const relaxedPlanned = normalizedPlanned
+    .map(buildRelaxedSearchTerm)
     .filter(Boolean)
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
   const profileQueries = profile?.queries.slice(0, 2) ?? [];
@@ -511,7 +516,12 @@ function buildPlannedQueries(
       ...fallbackQueries
     ])).slice(0, 6);
   }
-  return interleaveQueries(planned, adaptiveQueries, fallbackQueries).slice(0, 8);
+  return interleaveQueries(
+    planned,
+    relaxedPlanned,
+    adaptiveQueries,
+    fallbackQueries
+  ).slice(0, 8);
 }
 
 function interleaveQueries(...groups: string[][]) {
