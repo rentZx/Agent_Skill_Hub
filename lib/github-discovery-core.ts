@@ -1,5 +1,8 @@
 import { assessRiskLevel } from "./github-import";
-import type { CapabilityRequirement } from "./capability-engine";
+import {
+  isGenericCapabilityId,
+  type CapabilityRequirement
+} from "./capability-engine";
 import type { Resource, ResourceType, RiskLevel } from "./types";
 
 type GitHubSearchItem = {
@@ -518,11 +521,26 @@ function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
         .filter(isSpecificDiscoveryKeyword)
         .slice(0, 2);
 
-      return specificKeywords.map((keyword) =>
-        `${quoteSearchTerm(keyword)} in:name,description,readme archived:false fork:false`
-      );
+      const primary = specificKeywords[0];
+      if (!primary) return [];
+      const relaxed = buildRelaxedSearchTerm(primary);
+      return Array.from(new Set([
+        quoteSearchTerm(primary),
+        relaxed,
+        specificKeywords[1] ? quoteSearchTerm(specificKeywords[1]) : ""
+      ]))
+        .filter(Boolean)
+        .map((query) => `${query} in:name,description,readme archived:false fork:false`);
     })
     .slice(0, 6);
+}
+
+function buildRelaxedSearchTerm(keyword: string) {
+  const tokens = keyword
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3 && !genericCapabilityTokens.has(token));
+  return tokens.length >= 2 ? tokens.slice(0, 3).join(" ") : "";
 }
 
 function isSpecificDiscoveryKeyword(keyword: string) {
@@ -657,7 +675,7 @@ async function inspectRepository(
 }
 
 function hasColdStartEvidence(evidence: RepositoryEvidence) {
-  if (evidence.matchedCapabilities.length === 0) return false;
+  if (!evidence.matchedCapabilities.some((id) => !isGenericCapabilityId(id))) return false;
   return evidence.hasSkillMd
     || evidence.hasMcpManifest
     || evidence.hasPackageJson
@@ -888,7 +906,7 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   if (/(超市|货物|商品价格|库存|库位|货架|仓库|inventory.management|stock.control|warehouse.location)/i.test(source)) {
     return inventoryVoiceDiscoveryProfile;
   }
-  if (/(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/i.test(source)) {
+  if (/(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|market.data|quantitative.trading)/i.test(source)) {
     return stockDiscoveryProfile;
   }
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {

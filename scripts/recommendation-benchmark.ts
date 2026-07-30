@@ -269,7 +269,18 @@ const unknownDomainGraph = buildCapabilityGraph("开发一个鸟类鸣声识别�
 const uiOnlyRecommendation = buildProjectRecommendation(
   "开发一个鸟类鸣声识别软件",
   [
-    resource("shadcn/ui", "ui_component", "Generic React UI component library", ["shadcn", "ui", "components"])
+    resource("shadcn/ui", "ui_component", "Generic React UI component library", ["shadcn", "ui", "components"]),
+    {
+      ...resource(
+        "Generic Workflow Tool",
+        "agent_skill",
+        "Generic workflow automation for any software project",
+        ["workflow", "automation"]
+      ),
+      source: "github_live",
+      has_skill_md: true,
+      matched_capabilities: ["workflow-automation"]
+    }
   ],
   {
     projectType: "鸟类鸣声识别工具",

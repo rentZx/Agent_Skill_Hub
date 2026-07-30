@@ -4,6 +4,7 @@ import type {
   CapabilityPriority,
   ResourceRole
 } from "@/lib/capability-engine";
+import { isGenericCapabilityId } from "@/lib/capability-engine";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import {
@@ -428,19 +429,23 @@ function suppressUngroundedFallbacks(groups: RecommendationGroup[]) {
   const hasEvidenceBackedDomainResource = groups
     .filter((group) => group.id !== "risk-alerts")
     .some((group) => group.items.some((item) =>
-      item.matchKind === "domain" && item.matchedCapabilityIds.length > 0
+      item.matchKind === "domain" && hasDomainCapabilityEvidence(item)
     ));
   if (hasEvidenceBackedDomainResource) return groups;
 
   return groups.map((group) => {
     if (group.id === "risk-alerts") return group;
-    const items = group.items.filter((item) => item.matchedCapabilityIds.length > 0);
+    const items = group.items.filter(hasDomainCapabilityEvidence);
     return {
       ...group,
       items,
       gap: items.length > 0 ? undefined : group.gap
     };
   });
+}
+
+export function hasDomainCapabilityEvidence(item: RecommendedResource) {
+  return item.matchedCapabilityIds.some((id) => !isGenericCapabilityId(id));
 }
 
 function buildProjectUnderstanding(

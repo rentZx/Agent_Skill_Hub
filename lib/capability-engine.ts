@@ -37,6 +37,20 @@ export type CapabilitySeed = Partial<Omit<CapabilityRequirement, "preferredTypes
   preferredTypes?: string[];
 };
 
+const genericCapabilityIds = new Set([
+  "domain-data",
+  "domain-rules",
+  "personalized-recommendation",
+  "real-time-integration",
+  "visualization",
+  "web-research",
+  "workflow-automation"
+]);
+
+export function isGenericCapabilityId(id: string) {
+  return genericCapabilityIds.has(id);
+}
+
 type CapabilityGraphInput = {
   projectType?: string;
   coreFeatures?: string[];

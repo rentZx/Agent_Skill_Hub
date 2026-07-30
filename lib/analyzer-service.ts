@@ -5,7 +5,10 @@ import { buildCapabilityGraph } from "@/lib/capability-engine";
 import { discoverGitHubResources } from "@/lib/github-discovery-core";
 import { analyzeProject, buildAnalyzerPrompt, hasKnownProjectRule } from "@/lib/project-analyzer";
 import type { AnalyzerResult } from "@/lib/project-analyzer";
-import { rebuildCodexPrompt } from "@/lib/recommendation";
+import {
+  hasDomainCapabilityEvidence,
+  rebuildCodexPrompt
+} from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import { assessRequirementClarity } from "@/lib/requirement-clarity";
 import {
@@ -489,7 +492,7 @@ function addFoundationalUiFallback(
   const hasEvidenceBackedDomainResource = groups
     .filter((group) => group.id !== "risk-alerts")
     .some((group) => group.items.some((item) =>
-      item.matchKind === "domain" && item.matchedCapabilityIds.length > 0
+      item.matchKind === "domain" && hasDomainCapabilityEvidence(item)
     ));
   if (!hasEvidenceBackedDomainResource) return groups;
 
