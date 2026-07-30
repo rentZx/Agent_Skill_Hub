@@ -486,6 +486,12 @@ function addFoundationalUiFallback(
 ) {
   const uiGroup = groups.find((group) => group.id === "ui-libraries");
   if (!uiGroup || uiGroup.items.length > 0) return groups;
+  const hasEvidenceBackedDomainResource = groups
+    .filter((group) => group.id !== "risk-alerts")
+    .some((group) => group.items.some((item) =>
+      item.matchKind === "domain" && item.matchedCapabilityIds.length > 0
+    ));
+  if (!hasEvidenceBackedDomainResource) return groups;
 
   const originalUiGroup = original.groups.find((group) => group.id === "ui-libraries");
   const candidate = originalUiGroup?.items.find((item) =>

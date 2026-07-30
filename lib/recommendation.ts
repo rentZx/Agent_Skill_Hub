@@ -410,17 +410,37 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
     };
   });
 
-  const gaps = buildGaps(groups, modules, context.capabilityGraph);
+  const groundedGroups = suppressUngroundedFallbacks(groups);
+  const gaps = buildGaps(groundedGroups, modules, context.capabilityGraph);
 
   return {
     clarity,
     understanding,
     keywords,
     modules,
-    groups,
+    groups: groundedGroups,
     gaps,
-    codexPrompt: buildCodexPrompt(input, understanding, modules, groups, gaps, clarity)
+    codexPrompt: buildCodexPrompt(input, understanding, modules, groundedGroups, gaps, clarity)
   };
+}
+
+function suppressUngroundedFallbacks(groups: RecommendationGroup[]) {
+  const hasEvidenceBackedDomainResource = groups
+    .filter((group) => group.id !== "risk-alerts")
+    .some((group) => group.items.some((item) =>
+      item.matchKind === "domain" && item.matchedCapabilityIds.length > 0
+    ));
+  if (hasEvidenceBackedDomainResource) return groups;
+
+  return groups.map((group) => {
+    if (group.id === "risk-alerts") return group;
+    const items = group.items.filter((item) => item.matchedCapabilityIds.length > 0);
+    return {
+      ...group,
+      items,
+      gap: items.length > 0 ? undefined : group.gap
+    };
+  });
 }
 
 function buildProjectUnderstanding(
@@ -538,7 +558,9 @@ function scoreResources(
       const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
       const matchedCapabilities = resource.source === "resource_model_v2"
         ? textualCapabilityMatches.filter((capability) => inspectedCapabilityHits.has(capability.id))
-        : textualCapabilityMatches;
+        : resource.source === "github_live" && inspectedCapabilityHits.size > 0
+          ? (capabilityGraph?.capabilities ?? []).filter((capability) => inspectedCapabilityHits.has(capability.id))
+          : textualCapabilityMatches;
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
       const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];
       const matchedCore = matchedCapabilities.filter((capability) => capability.priority === "core");

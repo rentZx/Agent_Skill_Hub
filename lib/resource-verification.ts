@@ -44,6 +44,9 @@ export function getResourceVerification(resource: Resource): ResourceVerificatio
     if (resource.has_github_action) {
       return verification("verified", "GitHub 插件已验证", "已发现 action.yml、action.yaml 或 GitHub App 证据。", true);
     }
+    if (resource.artifact_kind === "dataset" && (resource.matched_capabilities?.length ?? 0) > 0) {
+      return verification("package_verified", "数据集已验证", "已发现数据集文件、说明和领域能力证据。", true);
+    }
     if (
       (resource.has_project_manifest || resource.has_package_json)
       && (resource.matched_capabilities?.length ?? 0) > 0

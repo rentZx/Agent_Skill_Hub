@@ -28,6 +28,8 @@ type RepositoryEvidence = {
   hasPackageJson: boolean;
   hasProjectManifest: boolean;
   hasGitHubAction: boolean;
+  hasDatasetEvidence: boolean;
+  hasReusableUi: boolean;
   matchedCapabilities: string[];
   evidenceFiles: string[];
   summary: string;
@@ -386,7 +388,13 @@ export async function discoverGitHubResources(
   context: DiscoveryContext = {}
 ): Promise<Resource[]> {
   const profile = getDiscoveryProfile(input, tags);
-  const queries = buildPlannedQueries(input, tags, context.searchQueries ?? [], profile);
+  const queries = buildPlannedQueries(
+    input,
+    tags,
+    context.searchQueries ?? [],
+    context.capabilities ?? [],
+    profile
+  );
   const [initialResults, preferredResults] = await Promise.all([
     Promise.all(queries.map((query) => searchRepositories(query))),
     Promise.all((profile?.repositories ?? []).map((repository) => fetchRepository(repository)))
@@ -423,8 +431,9 @@ export async function discoverGitHubResources(
       scoreRepositoryRelevance(left, relevanceTerms, preferredNames)
     )
     .slice(0, 24);
+  const inspectionLimit = profile ? 6 : 12;
   const evidenceEntries = await Promise.all(
-    ranked.slice(0, 6).map(async (item) => [
+    ranked.slice(0, inspectionLimit).map(async (item) => [
       item.full_name.toLowerCase(),
       await inspectRepository(item, context.capabilities ?? [])
     ] as const)
@@ -432,6 +441,11 @@ export async function discoverGitHubResources(
   const evidenceByRepository = new Map(evidenceEntries);
 
   return ranked
+    .filter((item) => {
+      if (profile) return true;
+      const evidence = evidenceByRepository.get(item.full_name.toLowerCase());
+      return evidence ? hasColdStartEvidence(evidence) : false;
+    })
     .map((item) => {
       const key = item.full_name.toLowerCase();
       return toResource(item, tags, {
@@ -473,17 +487,55 @@ function buildQueries(input: string, tags: string[]) {
   return Array.from(new Set([...focusedQueries, inputQuery])).filter(Boolean).slice(0, 6);
 }
 
-function buildPlannedQueries(input: string, tags: string[], searchQueries: string[], profile: DiscoveryProfile | null) {
+function buildPlannedQueries(
+  input: string,
+  tags: string[],
+  searchQueries: string[],
+  capabilities: CapabilityRequirement[],
+  profile: DiscoveryProfile | null
+) {
   const planned = searchQueries
     .map((query) => query.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
   const profileQueries = profile?.queries.slice(0, 2) ?? [];
+  const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
   return Array.from(new Set([
+    ...adaptiveQueries,
     ...planned,
     ...profileQueries,
     ...buildQueries(input, tags)
-  ])).slice(0, 6);
+  ])).slice(0, profile ? 6 : 8);
+}
+
+function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
+  return capabilities
+    .filter((capability) => capability.priority !== "optional")
+    .sort((left, right) => capabilityPriority(right.priority) - capabilityPriority(left.priority))
+    .flatMap((capability) => {
+      const specificKeywords = capability.keywords
+        .map((keyword) => keyword.toLowerCase().trim())
+        .filter(isSpecificDiscoveryKeyword)
+        .slice(0, 2);
+
+      return specificKeywords.map((keyword) =>
+        `${quoteSearchTerm(keyword)} in:name,description,readme archived:false fork:false`
+      );
+    })
+    .slice(0, 6);
+}
+
+function isSpecificDiscoveryKeyword(keyword: string) {
+  const normalized = keyword.replace(/[-_]+/g, " ").trim();
+  if (normalized.length < 5 || normalized.length > 64) return false;
+  return ![
+    "api", "app", "application", "ai", "agent", "database", "frontend", "backend",
+    "management", "platform", "software", "system", "tool", "web"
+  ].includes(normalized);
+}
+
+function capabilityPriority(priority: CapabilityRequirement["priority"]) {
+  return priority === "core" ? 3 : priority === "required" ? 2 : 1;
 }
 
 function buildFallbackQuery(input: string, tags: string[]) {
@@ -565,8 +617,15 @@ async function inspectRepository(
     ...inspection.paths.slice(0, 500),
     inspection.readme.slice(0, 24000)
   ].join(" ").toLowerCase();
+  const hasDatasetEvidence = /\b(dataset|training data|benchmark dataset|annotated images?|annotations?)\b/i.test(evidenceSource)
+    && normalizedPaths.some((path) =>
+      /(^|\/)(data|dataset|datasets|annotations?)(\/|$)/.test(path)
+      || /\.(csv|jsonl|parquet|tfrecord|arrow)$/.test(path)
+    );
+  const hasReusableUi = hasPackageJson
+    && /\b(component library|web[- ]?component|ui library|design system|react components?|vue components?|svelte components?)\b/i.test(evidenceSource);
   const matched = capabilities.filter((capability) =>
-    capability.keywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
+    capability.keywords.some((keyword) => matchesCapabilityKeyword(evidenceSource, keyword))
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
   );
   const evidenceFiles = inspection.paths.filter((path) =>
@@ -578,6 +637,8 @@ async function inspectRepository(
     hasPackageJson ? "检测到 package.json" : "",
     hasProjectManifest && !hasPackageJson ? "检测到项目清单" : "",
     hasGitHubAction ? "检测到 GitHub Action" : "",
+    hasDatasetEvidence ? "检测到数据集说明和数据文件" : "",
+    hasReusableUi ? "检测到可复用 UI 组件" : "",
     matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : ""
   ].filter(Boolean);
 
@@ -587,10 +648,23 @@ async function inspectRepository(
     hasPackageJson,
     hasProjectManifest,
     hasGitHubAction,
+    hasDatasetEvidence,
+    hasReusableUi,
     matchedCapabilities: matched.map((capability) => capability.id),
     evidenceFiles,
     summary: signals.length > 0 ? `仓库证据：${signals.join("；")}。` : "仓库证据：未检测到明确的 Skill、MCP 或核心能力文件信号。"
   };
+}
+
+function hasColdStartEvidence(evidence: RepositoryEvidence) {
+  if (evidence.matchedCapabilities.length === 0) return false;
+  return evidence.hasSkillMd
+    || evidence.hasMcpManifest
+    || evidence.hasPackageJson
+    || evidence.hasProjectManifest
+    || evidence.hasGitHubAction
+    || evidence.hasDatasetEvidence
+    || evidence.hasReusableUi;
 }
 
 async function getRepositoryInspection(item: GitHubSearchItem) {
@@ -653,6 +727,32 @@ function matchesEvidenceTerm(source: string, term: string) {
   const normalizedSource = source.replace(/[-_]+/g, " ");
   const normalizedTerm = normalized.replace(/[-_]+/g, " ");
   return source.includes(normalized) || normalizedSource.includes(normalizedTerm);
+}
+
+const genericCapabilityTokens = new Set([
+  "api", "app", "application", "classification", "data", "dataset", "detection",
+  "framework", "identification", "library", "management", "model", "open", "platform",
+  "recognition", "service", "software", "system", "tool"
+]);
+
+function matchesCapabilityKeyword(source: string, keyword: string) {
+  if (matchesEvidenceTerm(source, keyword)) return true;
+
+  const tokens = keyword
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3 && !genericCapabilityTokens.has(token));
+  if (tokens.length < 2) return false;
+
+  const sourceTokens = source.split(/[^a-z0-9]+/).filter(Boolean);
+  const matchedTokens = tokens.filter((token) =>
+    sourceTokens.some((sourceToken) =>
+      sourceToken === token
+      || (Math.min(sourceToken.length, token.length) >= 6
+        && (sourceToken.startsWith(token) || token.startsWith(sourceToken)))
+    )
+  );
+  return matchedTokens.length >= 2;
 }
 
 function isAiPluginLike(item: GitHubSearchItem) {
@@ -723,6 +823,7 @@ function toResource(
     has_package_json: overrides.evidence?.hasPackageJson,
     has_project_manifest: overrides.evidence?.hasProjectManifest,
     has_github_action: overrides.evidence?.hasGitHubAction,
+    artifact_kind: overrides.evidence?.hasDatasetEvidence ? "dataset" : undefined,
     matched_capabilities: overrides.evidence?.matchedCapabilities,
     evidence_summary: overrides.evidence?.summary,
     source: "github_live",
@@ -743,6 +844,8 @@ function inferEvidenceType(fallback: ResourceType, evidence?: RepositoryEvidence
   if (evidence?.hasSkillMd) return "agent_skill";
   if (evidence?.hasMcpManifest) return "mcp_server";
   if (evidence?.hasGitHubAction) return "github_plugin";
+  if (evidence?.hasDatasetEvidence) return "github_plugin";
+  if (evidence?.hasReusableUi) return "ui_component";
   return fallback;
 }
 

@@ -22,6 +22,11 @@ const npmMcp = resource("@example/mcp-server", "mcp_server", "https://github.com
 const curatedTemplate = resource("Curated Domain Template", "template_repo", "https://github.com/example/domain-template", {
   source: "curated_seed"
 });
+const verifiedLiveDataset = resource("Bird Audio Dataset", "github_plugin", "https://github.com/example/bird-audio", {
+  source: "github_live",
+  artifact_kind: "dataset",
+  matched_capabilities: ["bird-sound-recognition"]
+});
 
 assert.equal(getResourceVerification(verifiedSkill).status, "verified");
 assert(isResourceRecommendationEligible(verifiedSkill), "检测到 SKILL.md 的 Skill 应允许推荐");
@@ -29,6 +34,7 @@ assert(!isResourceRecommendationEligible(fakeSkill), "缺少 SKILL.md 的自动 
 assert(!isResourceRecommendationEligible(fakeMcp), "缺少 MCP 证据的热门仓库不应进入推荐");
 assert(isResourceRecommendationEligible(npmMcp), "具有 npm 包和 MCP 标识的服务器应允许推荐");
 assert(isResourceRecommendationEligible(curatedTemplate), "人工精选资源应允许推荐");
+assert(isResourceRecommendationEligible(verifiedLiveDataset), "具有数据文件和领域能力证据的联网数据集应允许推荐");
 
 const verifiedRootSkill = resource("Root Skill", "agent_skill", "https://github.com/example/conflict", {
   has_skill_md: true,

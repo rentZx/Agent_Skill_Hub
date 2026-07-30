@@ -253,6 +253,67 @@ assert(weatherCapabilityIds.has("weather-forecast-data"), "天气：规则能力
 assert(weatherCapabilityIds.has("historical-weather"), "天气：应保留历史天气能力");
 assert(!weatherCapabilityIds.has("technical-analysis"), "天气：不应接受股票技术分析能力");
 
+const unknownDomainGraph = buildCapabilityGraph("开发一个鸟类鸣声识别软件", {
+  projectType: "鸟类鸣声识别工具",
+  coreFeatures: ["上传录音并识别鸟类物种"],
+  capabilities: [
+    capability(
+      "bird-sound-recognition",
+      "鸟类鸣声识别",
+      ["bird sound recognition", "bird audio classification", "bioacoustic classification"],
+      "core",
+      ["domain_algorithm", "domain_data"]
+    )
+  ]
+});
+const uiOnlyRecommendation = buildProjectRecommendation(
+  "开发一个鸟类鸣声识别软件",
+  [
+    resource("shadcn/ui", "ui_component", "Generic React UI component library", ["shadcn", "ui", "components"])
+  ],
+  {
+    projectType: "鸟类鸣声识别工具",
+    coreFeatures: ["上传录音并识别鸟类物种"],
+    capabilityGraph: unknownDomainGraph
+  }
+);
+assert.equal(
+  uiOnlyRecommendation.groups.flatMap((group) => group.items).length,
+  0,
+  "陌生领域：没有领域证据时不能只返回通用 UI"
+);
+assert(
+  uiOnlyRecommendation.gaps.some((gap) => gap.includes("鸟类鸣声识别")),
+  "陌生领域：领域资源不足时应明确显示核心能力缺口"
+);
+const inspectedLiveBirdSkill: Resource = {
+  ...resource(
+    "birdnet-go",
+    "agent_skill",
+    "Real-time avian diversity monitoring from microphone audio",
+    ["bioacoustics", "birds"]
+  ),
+  source: "github_live",
+  has_skill_md: true,
+  matched_capabilities: ["bird-sound-recognition"],
+  evidence_summary: "README 和 SKILL.md 已证明鸟类鸣声识别能力。"
+};
+const inspectedLiveRecommendation = buildProjectRecommendation(
+  "开发一个鸟类鸣声识别软件",
+  [inspectedLiveBirdSkill],
+  {
+    projectType: "鸟类鸣声识别工具",
+    coreFeatures: ["上传录音并识别鸟类物种"],
+    capabilityGraph: unknownDomainGraph
+  }
+);
+assert(
+  inspectedLiveRecommendation.groups.some((group) =>
+    group.items.some((item) => item.resource.name === "birdnet-go")
+  ),
+  "陌生领域：GitHub README/SKILL.md 已验证的能力必须进入评分结果"
+);
+
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
 assert(
