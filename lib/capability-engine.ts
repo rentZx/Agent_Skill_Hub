@@ -637,7 +637,7 @@ function isSeededCapabilityCompatible(capability: CapabilityRequirement, source:
   const domainChecks = [
     {
       capability: /(stock.market|technical.analysis|candlestick|macd|quantitative.backtesting)/,
-      intent: /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|financial.data|market.data|quantitative.trading)/
+      intent: /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|market.data|quantitative.trading)/
     },
     {
       capability: /(weather.forecast|historical.weather|current.weather|climate.data)/,

@@ -325,6 +325,40 @@ assert(
   "陌生领域：GitHub README/SKILL.md 已验证的能力必须进入评分结果"
 );
 
+const invoiceGraph = buildCapabilityGraph(
+  "开发一个发票 OCR 识别和结构化提取系统",
+  {
+    projectType: "发票识别系统",
+    tags: ["financial-data", "ocr"],
+    capabilities: [
+      capability(
+        "technical-analysis",
+        "股票技术分析",
+        ["technical analysis", "financial data"],
+        "core",
+        ["domain_algorithm"]
+      ),
+      capability(
+        "invoice-ocr",
+        "发票 OCR",
+        ["invoice ocr", "invoice data extraction"],
+        "core",
+        ["domain_data"]
+      )
+    ]
+  }
+);
+assert(
+  !invoiceGraph.capabilities.some((item) => item.id === "technical-analysis"),
+  "陌生领域：financial-data 不能让发票 OCR 误入股票技术分析能力"
+);
+assert(
+  invoiceGraph.capabilities.some((item) =>
+    item.id === "invoice-ocr" || item.id === "document-processing"
+  ),
+  "陌生领域：应保留规范化后的发票 OCR / 文档抽取能力"
+);
+
 assert.notEqual(assessRequirementClarity("2D转3D").confidence, "low", "2D转3D：明确转换任务不应判为模糊主题");
 assert.notEqual(assessRequirementClarity("炒股软件").confidence, "low", "炒股软件：明确产品类型不应判为模糊主题");
 assert(
