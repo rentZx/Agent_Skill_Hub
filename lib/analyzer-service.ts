@@ -1,7 +1,12 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { analyzeWithLlm, rerankWithLlm } from "@/lib/llm";
+import {
+  analyzeWithLlm,
+  isTimeoutError,
+  LlmProviderRequestError,
+  rerankWithLlm
+} from "@/lib/llm";
 import { buildCapabilityGraph } from "@/lib/capability-engine";
 import type { LlmProvider, LlmRuntimeConfig } from "@/lib/llm-config";
 import {
@@ -32,6 +37,7 @@ export type AnalyzerRuntimeResult = AnalyzerResult & {
   discoveredCount: number;
   selectedDiscoveredCount: number;
   selectedCatalogCount: number;
+  modelStatus: "completed" | "fallback";
   cacheStatus: "hit" | "miss";
 };
 
@@ -136,6 +142,20 @@ async function analyzeProjectUncached(
 
   const candidateResources = mergeResources(resources, discovered);
   const fallback = analyzeProject(input, candidateResources, {}, capabilityGraph);
+  if (!ai) {
+    return {
+      ...fallback,
+      source: llm.provider,
+      modelStatus: "fallback",
+      discoveredCount: discovered.length,
+      selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered),
+      selectedCatalogCount: countSelectedCatalogResources(
+        fallback.recommendation,
+        discovered,
+        resources
+      )
+    };
+  }
 
   try {
     const enriched = analyzeProject(input, candidateResources, isLowConfidence
@@ -197,6 +217,7 @@ async function analyzeProjectUncached(
     return {
       ...enriched,
       source: llm.provider,
+      modelStatus: "completed",
       discoveredCount: discovered.length,
       selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
       selectedCatalogCount: countSelectedCatalogResources(recommendation, discovered, resources),
@@ -211,6 +232,7 @@ async function analyzeProjectUncached(
     return {
       ...fallback,
       source: llm.provider,
+      modelStatus: "fallback",
       discoveredCount: discovered.length,
       selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered),
       selectedCatalogCount: countSelectedCatalogResources(
@@ -277,11 +299,22 @@ function getSelectedResourceKeys(recommendation: AnalyzerResult["recommendation"
 }
 
 async function analyzeSafely(input: string, llm: LlmRuntimeConfig) {
-  return analyzeWithLlm(
-    input,
-    llm,
-    positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 10000)
-  );
+  try {
+    return await analyzeWithLlm(
+      input,
+      llm,
+      positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 10000)
+    );
+  } catch (error) {
+    if (
+      isTimeoutError(error)
+      || (error instanceof LlmProviderRequestError && error.status >= 500)
+    ) {
+      console.warn("Model analysis unavailable, using deterministic fallback.", error);
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function readDiscoveryCacheSafely(
@@ -301,7 +334,7 @@ async function readDiscoveryCacheSafely(
 
 function alignAiAnalysisWithKnownDomain(
   input: string,
-  ai: Awaited<ReturnType<typeof analyzeWithLlm>>,
+  ai: Awaited<ReturnType<typeof analyzeWithLlm>> | null,
   ruleAnalysis: AnalyzerResult["analysis"]
 ) {
   if (!ai || !hasKnownProjectRule(input)) return ai;

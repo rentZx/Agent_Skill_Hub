@@ -57,7 +57,9 @@ const genericCapabilityIds = new Set([
 ]);
 
 export function isGenericCapabilityId(id: string) {
-  return genericCapabilityIds.has(id);
+  return genericCapabilityIds.has(id)
+    || /^(?:user-)?auth(?:entication|orization)?$/.test(id)
+    || /^(?:role-based-access|access-control|login-system)$/.test(id);
 }
 
 type CapabilityGraphInput = {
@@ -662,6 +664,12 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
 
 function isSeededCapabilityCompatible(capability: CapabilityRequirement, source: string) {
   const capabilitySource = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+  if (
+    /(ingredient.recognition|food recognition|食材识别)/i.test(capabilitySource)
+    && !/(拍照|图片|图像|相机|摄像头|识别食材|ingredient recognition|food recognition|camera|image)/i.test(source)
+  ) {
+    return false;
+  }
   const domainChecks = [
     {
       capability: /(stock.market|technical.analysis|candlestick|macd|quantitative.backtesting)/,
@@ -715,7 +723,7 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
   }
   if (inferredRoles.includes("text_to_speech")) priority = "optional";
 
-  return {
+  return normalizeKnownCapabilityAlias({
     id: slugify(seed.id || label),
     label,
     description: seed.description?.trim() || `实现${label}并验证其能力边界。`,
@@ -725,6 +733,38 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
     keywords,
     negativeKeywords: cleanStrings(seed.negativeKeywords ?? [], 8),
     preferredTypes: preferredTypes.length > 0 ? preferredTypes : ["agent_skill", "mcp_server", "template_repo"]
+  });
+}
+
+function normalizeKnownCapabilityAlias(capability: CapabilityRequirement) {
+  const source = `${capability.id} ${capability.label} ${capability.keywords.join(" ")}`.toLowerCase();
+  const aliases: Array<[RegExp, string]> = [
+    [/(attendance tracking|attendance sheet|absence management|check-in|考勤|签到|缺勤)/i, "attendance-enrollment"],
+    [/(tuition|school fee|student billing|billing|invoice|payment records|fee collection|学费|缴费|收费|财务管理)/i, "tuition-billing"],
+    [/(dietary|allerg|忌口|过敏)/i, "dietary-filter"],
+    [/(course management|course scheduling|class scheduling|teacher scheduling|timetable|排课|课表)/i, "course-scheduling"],
+    [/(student records|student information|parent portal|enrollment management|学生档案|报名档案)/i, "student-records"]
+  ];
+  const aliasId = aliases.find(([pattern]) => pattern.test(source))?.[1];
+  if (!aliasId || aliasId === capability.id) return capability;
+
+  const pattern = capabilityPatterns.find((candidate) => candidate.id === aliasId);
+  if (!pattern) return { ...capability, id: aliasId };
+  const priority = priorityWeight(capability.priority) > priorityWeight(pattern.priority)
+    ? capability.priority
+    : pattern.priority;
+
+  return {
+    ...capability,
+    id: pattern.id,
+    label: pattern.label,
+    description: pattern.description,
+    required: priority !== "optional",
+    priority,
+    resourceRoles: Array.from(new Set([...pattern.resourceRoles, ...capability.resourceRoles])),
+    keywords: cleanStrings([...pattern.keywords, ...capability.keywords], 12),
+    negativeKeywords: cleanStrings([...(pattern.negativeKeywords ?? []), ...capability.negativeKeywords], 8),
+    preferredTypes: Array.from(new Set([...pattern.preferredTypes, ...capability.preferredTypes]))
   };
 }
 

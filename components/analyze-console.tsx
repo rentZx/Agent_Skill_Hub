@@ -41,6 +41,7 @@ export function AnalyzeConsole({
   const [discoveredCount, setDiscoveredCount] = useState(0);
   const [selectedDiscoveredCount, setSelectedDiscoveredCount] = useState(0);
   const [selectedCatalogCount, setSelectedCatalogCount] = useState(0);
+  const [modelStatus, setModelStatus] = useState<"completed" | "fallback">("completed");
   const [loading, setLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [error, setError] = useState("");
@@ -78,6 +79,7 @@ export function AnalyzeConsole({
           discoveredCount: number;
           selectedDiscoveredCount: number;
           selectedCatalogCount: number;
+          modelStatus: "completed" | "fallback";
         };
         error?: string;
       };
@@ -88,6 +90,7 @@ export function AnalyzeConsole({
       setDiscoveredCount(payload.result.discoveredCount ?? 0);
       setSelectedDiscoveredCount(payload.result.selectedDiscoveredCount ?? 0);
       setSelectedCatalogCount(payload.result.selectedCatalogCount ?? 0);
+      setModelStatus(payload.result.modelStatus ?? "completed");
       setHasAnalyzed(true);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "分析失败");
@@ -145,7 +148,9 @@ export function AnalyzeConsole({
             {error
               ? error
               : source
-                ? `${llmProviderDefinitions[source].shortLabel} 已完成需求分析：GitHub 候选池中 ${discoveredCount} 个通过验证，方案采用 ${selectedDiscoveredCount} 个联网资源和 ${selectedCatalogCount} 个资源库条目。`
+                ? modelStatus === "fallback"
+                  ? `${llmProviderDefinitions[source].shortLabel} 暂未返回可用分析，已使用规则引擎与资源库生成方案：采用 ${selectedDiscoveredCount} 个联网资源和 ${selectedCatalogCount} 个资源库条目。`
+                  : `${llmProviderDefinitions[source].shortLabel} 已完成需求分析：GitHub 候选池中 ${discoveredCount} 个通过验证，方案采用 ${selectedDiscoveredCount} 个联网资源和 ${selectedCatalogCount} 个资源库条目。`
                 : activeProvider
                   ? `已配置 ${llmProviderDefinitions[activeProvider].shortLabel}，输入需求后开始分析。`
                   : "尚未配置大模型。你仍可使用资源库和搜索功能。"}
