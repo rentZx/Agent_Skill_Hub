@@ -755,7 +755,8 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
       ...pattern,
       required: pattern.priority !== "optional",
       negativeKeywords: pattern.negativeKeywords ?? []
-    }));
+    }))
+    .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()));
 
   const featureCapabilities = (details.coreFeatures ?? [])
     .filter((feature) => !isGenericFeatureCapability(feature))
@@ -801,7 +802,11 @@ function isSeededCapabilityCompatible(capability: CapabilityRequirement, source:
   const domainChecks = [
     {
       capability: /(stock.market|technical.analysis|candlestick|macd|quantitative.backtesting)/,
-      intent: /(炒股|股票|股市|证券行情|a股|stock.market|stock.trading|market.data|quantitative.trading)/
+      intent: /(炒股|股票|股市|证券行情|a\s*股|stock.market|stock.trading|market.data|quantitative.trading)/
+    },
+    {
+      capability: /(inventory.management|stock.control|warehouse.location|item.pricing)/,
+      intent: /(超市|货物|商品价格|商品库存|库存|库位|货架|仓库|inventory.management|stock.control|warehouse.location)/
     },
     {
       capability: /(weather.forecast|historical.weather|current.weather|climate.data)/,
