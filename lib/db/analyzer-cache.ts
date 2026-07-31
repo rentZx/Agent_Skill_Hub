@@ -19,10 +19,11 @@ import {
   analysisResultCache,
   discoveryCandidateCache
 } from "@/lib/db/schema";
+import { DISCOVERY_CLASSIFIER_VERSION } from "@/lib/github-discovery-core";
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v10";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v11";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -141,6 +142,9 @@ export async function readDiscoveryCandidateCache(
 
   return rows
     .map((row) => row.resource as Resource)
+    .filter((resource) =>
+      resource.discovery_classifier_version === DISCOVERY_CLASSIFIER_VERSION
+    )
     .filter((resource) => {
       const capabilityHits = (resource.matched_capabilities ?? [])
         .filter((id) => specificCapabilityIds.has(id)).length;

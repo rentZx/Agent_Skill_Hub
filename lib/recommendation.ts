@@ -749,6 +749,9 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
   if (/(education-management|student-records|course-scheduling|attendance-enrollment|tuition-billing|school management|student information|class scheduling|timetabling|画室|教务|排课|学生档案)/i.test(graph)) {
     return /(school[- ]management|education[- ]management|school[- ]erp|student[- ]information|student[- ]management|student scheduling|course scheduling|class scheduling|teacher scheduling|timetabling|attendance system|student attendance|enrollment|tuition|school fee|fee management|parent portal|\blms\b|\bsis\b|教务|学生管理|排课|考勤)/i.test(haystack);
   }
+  if (/(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(graph)) {
+    return /(integrated[- ]library[- ]system|library[- ]management|library[- ]circulation|isbn|cataloging|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(haystack);
+  }
 
   if (/(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(graph)) {
     return /(recipe|recipes|ingredient|cooking|meal planning|servings|nutrition|菜谱|食材|烹饪)/i.test(haystack);
@@ -813,6 +816,7 @@ function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
   return /(education-management|student-records|course-scheduling|attendance-enrollment|tuition-billing|school management|student information|class scheduling|timetabling|画室|教务|排课|学生档案)/i.test(source)
+    || /(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(source)
     || /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
     || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
     || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)

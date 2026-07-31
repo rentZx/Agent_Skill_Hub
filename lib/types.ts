@@ -48,6 +48,7 @@ export type SeedResource = {
   is_curated?: boolean;
   matched_capabilities?: string[];
   evidence_summary?: string;
+  discovery_classifier_version?: string;
 };
 
 export type Resource = SeedResource & {

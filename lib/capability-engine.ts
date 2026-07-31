@@ -327,7 +327,7 @@ const capabilityPatterns: Array<{
     id: "speech-to-text",
     label: "语音识别与文字转写",
     description: "把用户语音稳定转写为可执行查询，支持中文、流式输入和错误恢复。",
-    terms: ["语音聊天", "语音查询", "语音输入", "语音对话", "speech-to-text", "speech recognition", "asr"],
+    terms: ["语音聊天", "语音查询", "语音输入", "语音对话", "录音转写", "会议转写", "speech-to-text", "speech recognition", "asr"],
     keywords: ["speech-to-text", "automatic speech recognition", "chinese asr", "streaming asr", "voice transcription"],
     negativeKeywords: ["ai companion", "virtual character", "voice changer", "vtuber"],
     preferredTypes: ["github_plugin", "template_repo", "mcp_server", "agent_skill"],
@@ -578,12 +578,26 @@ const capabilityPatterns: Array<{
     terms: ["发票", "票据", "收据", "费用审核", "invoice ocr", "receipt ocr", "invoice extraction"],
     keywords: [
       "invoice ocr", "invoice data extraction", "receipt data extraction",
-      "invoice parser", "document layout analysis"
+      "invoice parser", "invoice line item extraction"
     ],
     negativeKeywords: ["stock market", "technical analysis", "trading", "school billing"],
     preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
     priority: "core",
     resourceRoles: ["domain_data", "domain_algorithm"]
+  },
+  {
+    id: "document-ocr-engine",
+    label: "文档 OCR 引擎",
+    description: "对图片和 PDF 执行文字识别、版面分析、表格识别与结构化输出。",
+    terms: ["发票", "票据", "收据", "ocr", "invoice ocr", "receipt ocr", "document ocr"],
+    keywords: [
+      "document ocr toolkit", "multilingual ocr", "document layout analysis",
+      "table recognition", "structured document extraction"
+    ],
+    negativeKeywords: ["invoice demo only", "browser extension"],
+    preferredTypes: ["github_plugin", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm", "developer_tool"]
   },
   {
     id: "visual-product-search",
@@ -593,14 +607,48 @@ const capabilityPatterns: Array<{
       "以图搜图", "图片搜索商品", "相似图片", "视觉搜索", "商品图片检索",
       "visual product search", "reverse image search", "image similarity search"
     ],
-    keywords: [
-      "visual product search", "reverse image search", "image similarity search",
-      "clip embeddings", "multimodal vector search"
+    keywords: ["visual product search", "product image retrieval", "similar product search"],
+    negativeKeywords: [
+      "text search only", "image gallery only", "stock photo downloader",
+      "osint", "search engines", "browser extension", "google lens", "tineye"
     ],
-    negativeKeywords: ["text search only", "image gallery only", "stock photo downloader"],
     preferredTypes: ["github_plugin", "template_repo", "mcp_server"],
     priority: "core",
     resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
+    id: "multimodal-image-embeddings",
+    label: "商品图片向量化",
+    description: "使用视觉或多模态模型把商品图片编码为可比较的特征向量。",
+    terms: [
+      "以图搜图", "图片搜索商品", "相似图片", "视觉搜索", "商品图片检索",
+      "visual product search", "reverse image search", "image similarity search"
+    ],
+    keywords: [
+      "contrastive language image pretraining", "vision language model",
+      "image text embeddings", "openai clip"
+    ],
+    negativeKeywords: ["image generation only", "image caption only"],
+    preferredTypes: ["github_plugin", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm"]
+  },
+  {
+    id: "vector-similarity-index",
+    label: "图片向量索引与近邻检索",
+    description: "保存商品图片向量，并执行高性能相似度搜索、过滤和召回。",
+    terms: [
+      "以图搜图", "图片搜索商品", "相似图片", "视觉搜索", "商品图片检索",
+      "visual product search", "reverse image search", "image similarity search"
+    ],
+    keywords: [
+      "vector database", "vector similarity search", "nearest neighbor search",
+      "qdrant vector search", "milvus vector database"
+    ],
+    negativeKeywords: ["text search engine only", "image gallery"],
+    preferredTypes: ["github_plugin", "template_repo", "mcp_server"],
+    priority: "required",
+    resourceRoles: ["domain_data", "domain_algorithm"]
   },
   {
     id: "domain-data",

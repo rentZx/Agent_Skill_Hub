@@ -381,6 +381,10 @@ assert(
   ),
   "陌生领域：应保留规范化后的发票 OCR / 文档抽取能力"
 );
+assert(
+  invoiceGraph.capabilities.some((item) => item.id === "document-ocr-engine"),
+  "陌生领域：发票需求应同时召回成熟文档 OCR 引擎"
+);
 const libraryGraph = buildCapabilityGraph("开发图书馆系统，支持 ISBN 编目、借还书、读者、条码和 RFID");
 assert(
   libraryGraph.capabilities.some((item) => item.id === "library-circulation"),
@@ -403,6 +407,14 @@ const visualSearchGraph = buildCapabilityGraph("开发电商以图搜图，根�
 assert(
   visualSearchGraph.capabilities.some((item) => item.id === "visual-product-search"),
   "陌生领域：以图搜图需求应生成视觉相似度检索能力"
+);
+assert(
+  visualSearchGraph.capabilities.some((item) => item.id === "multimodal-image-embeddings"),
+  "陌生领域：以图搜图需求应拆出图片向量化能力"
+);
+assert(
+  visualSearchGraph.capabilities.some((item) => item.id === "vector-similarity-index"),
+  "陌生领域：以图搜图需求应拆出向量索引能力"
 );
 assert(
   visualSearchGraph.searchQueries.some((query) => /visual product search|reverse image search/i.test(query)),

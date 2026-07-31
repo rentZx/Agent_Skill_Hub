@@ -46,6 +46,8 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v2";
+
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
     "\"AI short video generator\" subtitles voiceover in:name,description,readme archived:false fork:false",
@@ -363,11 +365,11 @@ function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
       return { primary: keywords[0] ?? "", secondary: keywords[1] ?? "" };
     })
     .filter((entry) => entry.primary);
-  const terms = [
-    ...ranked.map((entry) => quoteSearchTerm(entry.primary)),
-    ...ranked.map((entry) => buildRelaxedSearchTerm(entry.primary)),
-    ...ranked.map((entry) => entry.secondary ? quoteSearchTerm(entry.secondary) : "")
-  ];
+  const terms = ranked.flatMap((entry) => [
+    quoteSearchTerm(entry.primary),
+    buildRelaxedSearchTerm(entry.primary),
+    entry.secondary ? quoteSearchTerm(entry.secondary) : ""
+  ]);
   return Array.from(new Set(terms))
     .filter(Boolean)
     .slice(0, 6)
@@ -712,6 +714,7 @@ function toResource(
     artifact_kind: overrides.evidence?.hasDatasetEvidence ? "dataset" : undefined,
     matched_capabilities: overrides.evidence?.matchedCapabilities,
     evidence_summary: overrides.evidence?.summary,
+    discovery_classifier_version: DISCOVERY_CLASSIFIER_VERSION,
     source: "github_live",
     last_updated: (item.pushed_at ?? new Date().toISOString()).slice(0, 10)
   };
