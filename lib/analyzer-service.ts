@@ -15,7 +15,8 @@ import { analyzeProject, buildAnalyzerPrompt, hasKnownProjectRule } from "@/lib/
 import type { AnalyzerResult } from "@/lib/project-analyzer";
 import {
   hasDomainCapabilityEvidence,
-  rebuildCodexPrompt
+  rebuildCodexPrompt,
+  rebuildRecommendationGaps
 } from "@/lib/recommendation";
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import { assessRequirementClarity } from "@/lib/requirement-clarity";
@@ -162,11 +163,17 @@ async function analyzeProjectUncached(
       {},
       preliminaryGraph
     ).recommendation;
+    const groundedGroups = mergeCatalogBaselineItems(
+      reranked.groups,
+      catalogRecommendation
+    );
     const groundedRecommendation = {
       ...reranked,
-      groups: mergeCatalogBaselineItems(
-        reranked.groups,
-        catalogRecommendation
+      groups: groundedGroups,
+      gaps: rebuildRecommendationGaps(
+        groundedGroups,
+        reranked.modules,
+        capabilityGraph
       )
     };
     const analysis = isLowConfidence ? enriched.analysis : {

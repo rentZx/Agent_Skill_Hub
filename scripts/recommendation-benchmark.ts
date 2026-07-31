@@ -422,6 +422,70 @@ assert(
   "AI 短视频生成：不应保留模型臆造的聊天或消息能力"
 );
 
+const artStudioPrompt = "我要开发一个画室管理系统";
+const artStudioGraph = buildCapabilityGraph(artStudioPrompt, {
+  projectType: "教育培训管理系统",
+  coreFeatures: ["课程与班级管理", "学生档案", "教师排课", "收费与订单管理"],
+  capabilities: [
+    capability("course-management", "课程管理", ["course management", "class scheduling"]),
+    capability("portfolio-management", "作品集管理", ["student portfolio", "artwork portfolio"]),
+    capability("billing-management", "收费与订单管理", ["tuition management", "fee management"])
+  ]
+});
+const weakSchoolUi: Resource = {
+  ...resource(
+    "school-erp-ui-shared",
+    "ui_component",
+    "Shared Tailwind UI components for School ERP",
+    ["school-erp", "ui", "components"]
+  ),
+  risk_level: "medium",
+  trust_score: 58,
+  fit_score: 76
+};
+const artStudioRecommendation = buildProjectRecommendation(
+  artStudioPrompt,
+  [
+    resource(
+      "Frappe Education",
+      "template_repo",
+      "Education management with students, courses, class scheduling, attendance and fee management",
+      ["education-management", "course-scheduling", "student-records", "tuition-billing"]
+    ),
+    resource(
+      "RosarioSIS",
+      "template_repo",
+      "Student information system with enrollment, attendance, courses and grades",
+      ["education-management", "student-records", "attendance-enrollment"]
+    ),
+    weakSchoolUi,
+    resource(
+      "MoneyPrinterTurbo",
+      "template_repo",
+      "AI short video generation with subtitles and voiceover",
+      ["short-video", "video-generation"]
+    )
+  ],
+  {
+    projectType: "教育培训管理系统",
+    coreFeatures: ["课程与班级管理", "学生档案", "教师排课", "收费与订单管理"],
+    capabilityGraph: artStudioGraph
+  }
+);
+const artStudioItems = artStudioRecommendation.groups.flatMap((group) => group.items);
+assert(
+  !artStudioItems.some((item) => item.resource.name === "school-erp-ui-shared"),
+  "画室管理：中风险且低可信的 npm UI 包不应进入默认方案"
+);
+assert(
+  !artStudioItems.some((item) => item.alternative.includes("MoneyPrinterTurbo")),
+  "画室管理：替代方案不得跨到短视频领域"
+);
+assert(
+  !artStudioRecommendation.gaps.some((gap) => /课程管理|学生档案|教师排课|收费与订单管理/.test(gap)),
+  `画室管理：已被教育模板覆盖的能力不应继续报缺口；结果=${JSON.stringify(artStudioRecommendation.gaps)}`
+);
+
 console.log(`Recommendation benchmark passed: ${cases.length} cases.`);
 
 function capability(

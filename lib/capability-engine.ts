@@ -264,7 +264,7 @@ const capabilityPatterns: Array<{
     label: "课程、班级与教师排课",
     description: "管理课程、班级、教室和教师时间，检测排课冲突并提供日历或课表视图。",
     terms: ["画室", "排课", "课程与班级", "教师排课", "课表", "course scheduling", "class scheduling", "timetabling"],
-    keywords: ["course scheduling", "class scheduling", "student scheduling", "teacher scheduling", "timetabling", "class calendar"],
+    keywords: ["course management", "course scheduling", "class scheduling", "student scheduling", "teacher scheduling", "timetabling", "class calendar"],
     negativeKeywords: ["task scheduler", "job scheduler", "social media calendar", "generic calendar only"],
     preferredTypes: ["template_repo", "github_plugin", "ui_component"],
     priority: "core",
@@ -622,6 +622,17 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     }));
 
   const featureCapabilities = (details.coreFeatures ?? [])
+    .filter((feature) => !patterned.some((pattern) =>
+      pattern.terms.some((term) => {
+        const normalizedFeature = normalizeTerm(feature);
+        const normalizedPatternTerm = normalizeTerm(term);
+        return normalizedPatternTerm.length >= 2
+          && (
+            normalizedFeature.includes(normalizedPatternTerm)
+            || normalizedPatternTerm.includes(normalizedFeature)
+          );
+      })
+    ))
     .map((feature, index) => capabilityFromFeature(feature, index))
     .filter((capability) => ![...seeded, ...patterned].some((existing) => capabilitiesOverlap(existing, capability)));
 

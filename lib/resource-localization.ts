@@ -22,6 +22,11 @@ const typeLabels: Record<ResourceType, string> = {
 
 const topicRules: TopicRule[] = [
   {
+    terms: ["school management", "school-management", "school erp", "student information system", "rosariosis", "frappe education"],
+    label: "教育培训与教务管理",
+    purpose: "用于管理课程、班级、教师、学生、考勤和收费等教育培训业务。"
+  },
+  {
     terms: ["moneyprinterturbo", "moneyprinter", "ai-video-generator", "short-video", "text-to-video", "video-composition"],
     label: "AI 短视频脚本、素材、配音、字幕与合成",
     purpose: "用于把主题或文案转换为分镜脚本，组织图片或视频素材，生成配音和字幕，并合成可导出的竖屏短视频。"

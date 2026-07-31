@@ -372,6 +372,11 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => group.riskOnly ? item.resource.risk_level === "high" : item.resource.risk_level !== "high")
+      .filter((item) =>
+        group.riskOnly
+        || item.resource.risk_level === "low"
+        || item.resource.trust_score >= 65
+      )
       .filter((item) => !selectedIds.has(item.resource.id))
       .filter((item) => clarity.confidence !== "low" || item.matchedCapabilityIds.length > 0)
       .filter((item) => group.riskOnly || item.hasProjectSignal);
@@ -380,6 +385,10 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       .filter((item) => !group.riskOnly && !item.hasProjectSignal)
       .filter((item) => group.types.includes(item.resource.type))
       .filter((item) => item.resource.risk_level !== "high")
+      .filter((item) =>
+        item.resource.risk_level === "low"
+        || item.resource.trust_score >= 65
+      )
       .filter((item) => !group.requiredTags || hasAnyTag(item.resource, group.requiredTags))
       .filter((item) => baselineTagsByGroup[group.id]?.some((tag) => hasAnyTag(item.resource, [tag])))
       .filter((item) => !selectedIds.has(item.resource.id))
@@ -399,7 +408,10 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       stage: buildStage(item.resource, scoringModules),
       install: item.resource.install_command,
       risk: item.resource.risk_level,
-      alternative: buildAlternative(item.resource, resources),
+      alternative: buildAlternative(
+        item.resource,
+        candidates.map((candidate) => candidate.resource)
+      ),
       matchKind: (group.riskOnly ? "risk" : item.hasProjectSignal ? "domain" : "baseline") as RecommendedResource["matchKind"]
     }));
 
@@ -447,6 +459,14 @@ function suppressUngroundedFallbacks(groups: RecommendationGroup[]) {
 
 export function hasDomainCapabilityEvidence(item: RecommendedResource) {
   return item.matchedCapabilityIds.some((id) => !isGenericCapabilityId(id));
+}
+
+export function rebuildRecommendationGaps(
+  groups: RecommendationGroup[],
+  modules: CapabilityModule[],
+  capabilityGraph?: CapabilityGraph
+) {
+  return buildGaps(groups, modules, capabilityGraph);
 }
 
 function buildProjectUnderstanding(
@@ -928,6 +948,9 @@ function priorityWeight(priority: CapabilityPriority) {
 }
 
 function buildReason(resource: Resource, modules: CapabilityModule[], keywords: string[]) {
+  if (isOfficialShadcnUi(resource)) {
+    return "提供表单、数据表格、弹窗和响应式布局，可搭建管理后台；不包含具体业务逻辑。";
+  }
   if (resource.evidence_summary && resource.matched_capabilities?.length) {
     return getLocalizedRecommendationReason(resource);
   }
@@ -936,6 +959,8 @@ function buildReason(resource: Resource, modules: CapabilityModule[], keywords: 
   );
   const moduleLabel = matchedModules[0]?.label ?? typeLabels[resource.type];
   const keywordHit = keywords.find((keyword) =>
+    !isGenericReasonKeyword(keyword)
+    &&
     `${resource.name} ${resource.description} ${resource.tags.join(" ")}`.toLowerCase().includes(keyword.toLowerCase())
   );
 
@@ -968,10 +993,10 @@ function buildAlternative(resource: Resource, resources: Resource[]) {
     .sort((a, b) => b.trust_score + b.fit_score - (a.trust_score + a.fit_score))[0];
 
   if (sameType) {
-    return `${sameType.name}，或先用本地实现替代后再接入外部服务。`;
+    return sameType.name;
   }
 
-  return "当前资源库没有同类型低风险替代项，建议先用本地轻量实现并记录缺口。";
+  return "暂无同类低风险替代项。";
 }
 
 function buildGap(groupTitle: string, types: ResourceType[]) {
@@ -986,14 +1011,42 @@ function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], c
   const coveredCapabilityIds = new Set(
     groups.flatMap((group) => group.items.flatMap((item) => item.matchedCapabilityIds))
   );
+  const selectedItems = groups.flatMap((group) => group.items);
   const capabilityGaps = (capabilityGraph?.capabilities ?? [])
     .filter((capability) => capability.priority !== "optional")
-    .filter((capability) => !coveredCapabilityIds.has(capability.id))
+    .filter((capability) =>
+      !coveredCapabilityIds.has(capability.id)
+      && !selectedItems.some((item) =>
+        matchesCapabilityEvidence(
+          resourceSearchText(item.resource),
+          capability,
+          capabilityGraph
+        )
+      )
+    )
     .map((capability) =>
       `${capability.priority === "core" ? "核心" : "必需"}能力“${capability.label}”暂无经证据验证的匹配资源。`
     );
 
   return Array.from(new Set([...capabilityGaps, ...moduleGaps]));
+}
+
+function resourceSearchText(resource: Resource) {
+  return [
+    resource.name,
+    resource.description,
+    resource.readme_summary ?? "",
+    ...resource.tags,
+    ...resource.use_cases
+  ].join(" ").toLowerCase();
+}
+
+function isGenericReasonKeyword(keyword: string) {
+  return [
+    "web", "web-app", "web application", "saas", "dashboard", "postgresql", "postgres",
+    "next", "nextjs", "next.js", "react", "node", "nodejs", "typescript", "javascript",
+    "api", "frontend", "backend", "database", "system", "平台", "系统", "项目", "应用"
+  ].includes(keyword.toLowerCase());
 }
 
 function buildCodexPrompt(
