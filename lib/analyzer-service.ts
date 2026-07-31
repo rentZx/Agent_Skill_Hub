@@ -372,7 +372,7 @@ async function discoverSafely(
 ) {
   const timeoutMs = positiveInteger(
     process.env.ANALYZE_GITHUB_TIMEOUT_MS,
-    9000
+    15000
   );
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

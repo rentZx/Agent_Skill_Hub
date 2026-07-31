@@ -36,6 +36,7 @@ type RepositoryEvidence = {
   hasGitHubAction: boolean;
   hasDatasetEvidence: boolean;
   hasReusableUi: boolean;
+  hasReadmeUsage: boolean;
   matchedCapabilities: string[];
   evidenceFiles: string[];
   summary: string;
@@ -46,7 +47,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v3";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v4";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -242,7 +243,7 @@ export async function discoverGitHubResources(
   );
   const evidenceEntries = await mapWithConcurrency(
     candidates.slice(0, inspectionLimit),
-    2,
+    4,
     async (item) => [
       item.full_name.toLowerCase(),
       await inspectRepository(item, context.capabilities ?? [], context.signal)
@@ -512,6 +513,8 @@ async function inspectRepository(
     );
   const hasReusableUi = hasPackageJson
     && /\b(component library|web[- ]?component|ui library|design system|react components?|vue components?|svelte components?)\b/i.test(evidenceSource);
+  const hasReadmeUsage = inspection.readme.length >= 300
+    && /\b(installation|installing|getting started|quick start|quickstart|usage|docker compose|npm install|pip install|developer handbook)\b/i.test(inspection.readme);
   const matched = capabilities.filter((capability) =>
     capability.keywords.some((keyword) => matchesCapabilityKeyword(evidenceSource, keyword))
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
@@ -528,6 +531,7 @@ async function inspectRepository(
     hasGitHubAction ? "检测到 GitHub Action" : "",
     hasDatasetEvidence ? "检测到数据集说明和数据文件" : "",
     hasReusableUi ? "检测到可复用 UI 组件" : "",
+    hasReadmeUsage ? "README 包含安装或使用说明" : "",
     matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : ""
   ].filter(Boolean);
 
@@ -539,6 +543,7 @@ async function inspectRepository(
     hasGitHubAction,
     hasDatasetEvidence,
     hasReusableUi,
+    hasReadmeUsage,
     matchedCapabilities: matched.map((capability) => capability.id),
     evidenceFiles,
     summary: signals.length > 0 ? `仓库证据：${signals.join("；")}。` : "仓库证据：未检测到明确的 Skill、MCP 或核心能力文件信号。"
@@ -553,7 +558,8 @@ function hasColdStartEvidence(evidence: RepositoryEvidence) {
     || evidence.hasProjectManifest
     || evidence.hasGitHubAction
     || evidence.hasDatasetEvidence
-    || evidence.hasReusableUi;
+    || evidence.hasReusableUi
+    || evidence.hasReadmeUsage;
 }
 
 async function getRepositoryInspection(item: GitHubSearchItem, signal?: AbortSignal) {
@@ -593,7 +599,7 @@ async function fetchRepositoryTree(
   try {
     const response = await fetch(
       `https://api.github.com/repos/${repositoryPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-      { headers, cache: "no-store", signal: requestSignal(signal, 5000) }
+      { headers, cache: "no-store", signal: requestSignal(signal, 1500) }
     );
     if (!response.ok) return [];
     const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }> };
@@ -613,7 +619,7 @@ async function fetchRepositoryReadme(fullName: string, signal?: AbortSignal) {
     const response = await fetch(`https://api.github.com/repos/${repositoryPath}/readme`, {
       headers,
       cache: "no-store",
-      signal: requestSignal(signal, 5000)
+      signal: requestSignal(signal, 3000)
     });
     if (!response.ok) return "";
     return (await response.text()).slice(0, 40000);

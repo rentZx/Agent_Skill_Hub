@@ -771,6 +771,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
       })
     ))
     .map((feature, index) => capabilityFromFeature(feature, index))
+    .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()))
     .filter((capability) => ![...seeded, ...patterned].some((existing) => capabilitiesOverlap(existing, capability)));
 
   const capabilities = filterCapabilitiesForDomain(
