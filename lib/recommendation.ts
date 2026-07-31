@@ -583,11 +583,16 @@ function scoreResources(
       const hasVerifiedV2DomainEvidence = resource.source === "resource_model_v2"
         && resource.verification_status === "verified"
         && Array.from(inspectedCapabilityHits).some((id) => !isGenericCapabilityId(id));
+      const exactEvidenceMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
+        inspectedCapabilityHits.has(capability.id)
+      );
       const matchedCapabilities = resource.source === "resource_model_v2"
-        ? textualCapabilityMatches.filter((capability) =>
-            inspectedCapabilityHits.has(capability.id)
-            || (hasVerifiedV2DomainEvidence && !isGenericCapabilityId(capability.id))
-          )
+        ? Array.from(new Map([
+            ...exactEvidenceMatches,
+            ...textualCapabilityMatches.filter((capability) =>
+              hasVerifiedV2DomainEvidence && !isGenericCapabilityId(capability.id)
+            )
+          ].map((capability) => [capability.id, capability])).values())
         : resource.source === "github_live" && inspectedCapabilityHits.size > 0
           ? (capabilityGraph?.capabilities ?? []).filter((capability) => inspectedCapabilityHits.has(capability.id))
           : textualCapabilityMatches;
