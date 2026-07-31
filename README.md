@@ -41,6 +41,20 @@ The V1.1 Project Analyzer is available at `/analyze`. It runs locally without an
 
 ## Server Deployment
 
+The current production entry point is `https://49.233.197.213`. The legacy
+`http://49.233.197.213:3004` entry point redirects to HTTPS.
+
+Because the deployment does not currently use a domain, TLS uses a trusted
+Let’s Encrypt short-lived IP address certificate. Certbot checks renewal on a
+systemd timer and reloads Nginx through
+`/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`.
+
+Tracked deployment templates:
+
+- `deploy/nginx/agent-skill-hub-ip-https.conf`
+- `deploy/nginx/short-hunter-workspace.conf`
+- `deploy/nginx/reload-nginx-after-certbot.sh`
+
 The production service uses `/opt/apps/agent-skill-hub`, PM2, and port `3003`. The GitHub Actions workflow deploys pushes to `main` after these repository secrets are configured:
 
 - `SERVER_HOST`: server IP or hostname.

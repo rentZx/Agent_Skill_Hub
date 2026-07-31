@@ -12,7 +12,9 @@
 
 ## Required Before Public Launch
 
-1. Put the public site behind a domain with HTTPS. Do not collect project descriptions over plain HTTP.
+1. Keep the public site behind trusted HTTPS. The current deployment uses a
+   short-lived Let’s Encrypt IP address certificate with automated renewal;
+   do not collect model keys or project descriptions over plain HTTP.
 2. Keep the admin surface disabled until a real administrator authentication flow, server-side authorization, audit log, and CSRF protection exist.
 3. Replace the in-memory API limiter with a shared limiter such as Redis when more than one application process is used.
 4. Publish a privacy notice explaining that project descriptions may be sent to the user-selected model provider and that capability searches may be sent to GitHub.

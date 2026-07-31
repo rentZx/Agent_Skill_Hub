@@ -229,7 +229,10 @@ The V2 migration is additive and idempotent. Existing pages remain compatible wi
 - Bind the Next.js process to localhost behind Nginx. Done in the PM2 ecosystem configuration.
 - Add browser security headers and external URL validation. Done.
 - Keep production dependency vulnerabilities at zero. Done.
-- Configure a domain, HTTPS, privacy notice, shared rate limiting, and monitoring before public launch.
+- Trusted HTTPS is configured with an automatically renewed Let’s Encrypt IP
+  address certificate. A branded domain and any required filing can be added
+  later; privacy notice, shared rate limiting, and monitoring remain required
+  before broad public launch.
 
 ## Acceptance Criteria
 
