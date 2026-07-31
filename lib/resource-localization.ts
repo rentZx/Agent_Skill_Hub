@@ -20,11 +20,42 @@ const typeLabels: Record<ResourceType, string> = {
   template_repo: "项目模板仓库"
 };
 
+const exactResourceDescriptions: Record<string, string> = {
+  img2threejs: "根据单张参考图生成可编辑的 Three.js 场景，并支持在网页中继续调整和预览。",
+  triposr: "从单张图片快速重建带纹理的三维网格，适合作为图片转 3D 的模型推理底座。",
+  instantmesh: "通过稀疏视角生成和网格重建，把单张图片转换为可导出的三维模型。",
+  "stable-fast-3d": "从单张图片快速生成带 UV 和材质的三维资产，适合需要低延迟模型生成的流程。",
+  akshare: "提供 A 股、港股、美股、基金、期货及宏观数据接口，可作为行情与财务数据源。",
+  daily_stock_analysis: "集成多源行情、新闻和大模型分析，可参考其每日股票研究、看板与推送流程。",
+  mootdx: "读取通达信实时行情、分钟线和本地数据，可作为 A 股盘中行情的补充数据源。",
+  rqalpha: "提供量化策略回测、事件驱动交易和绩效分析，适合验证股票分析与交易策略。",
+  howtocook: "提供结构化中文菜谱、食材用量和制作步骤，可整理成本地菜谱基础数据。",
+  mealie: "提供菜谱导入、份量换算、餐食计划和购物清单，可参考完整的家庭菜谱管理流程。",
+  "howtocook-mcp": "把 HowToCook 中文菜谱封装为 MCP 查询工具，可供 Agent 检索菜品、食材和步骤。",
+  funasr: "提供中文语音识别、实时转写和语音端点检测，可把语音查询转换为库存检索文本。",
+  "faster-whisper": "基于 CTranslate2 加速 Whisper 转写，适合离线录音识别和带时间戳的字幕生成。",
+  inventree: "提供零件、库存、仓库位置、采购和库存变更管理，可作为商品库存系统参考实现。",
+  erpnext: "覆盖商品、库存、仓库、采购、销售和财务流程，适合参考完整 ERP 数据模型。",
+  "short-video-maker": "通过 MCP 编排背景视频、配音、字幕和音乐，并向 Agent 返回合成后的短视频。",
+  moneyprinterturbo: "根据主题自动生成文案、素材、配音、字幕和竖屏视频，可作为短视频流水线底座。",
+  moneyprinter: "自动组织脚本、素材、旁白和视频合成，适合参考无人工出镜短视频的生成流程。"
+};
+
 const topicRules: TopicRule[] = [
   {
     terms: ["school management", "school-management", "school erp", "student information system", "rosariosis", "frappe education"],
     label: "教育培训与教务管理",
     purpose: "用于管理课程、班级、教师、学生、考勤和收费等教育培训业务。"
+  },
+  {
+    terms: ["speech-to-text", "speech recognition", "automatic-speech-recognition", "chinese-asr", "funasr", "faster-whisper", "whisper"],
+    label: "语音识别与音频转写",
+    purpose: "用于把中文或多语言语音转换为文本，支持录音转写或实时语音查询。"
+  },
+  {
+    terms: ["inventory-management", "inventory management", "stock control", "warehouse location", "inventree", "erpnext"],
+    label: "库存、商品与库位管理",
+    purpose: "用于管理商品、价格、库存数量和仓库位置，并提供可查询的库存数据。"
   },
   {
     terms: ["moneyprinterturbo", "moneyprinter", "ai-video-generator", "short-video", "text-to-video", "video-composition"],
@@ -144,6 +175,9 @@ const topicRules: TopicRule[] = [
 ];
 
 export function getLocalizedResourceDescription(resource: LocalizableResource) {
+  const exactDescription = getExactResourceDescription(resource);
+  if (exactDescription) return exactDescription;
+
   const originalDescription = getChineseDescription(resource);
   if (originalDescription) return conciseText(originalDescription, resource.name);
 
@@ -181,6 +215,9 @@ export function getLocalizedRecommendationReason(
   const topic = inferTopicRules(resource)[0];
   if (specificReason) return conciseText(specificReason, resource.name);
 
+  const exactDescription = getExactResourceDescription(resource);
+  if (exactDescription) return exactDescription;
+
   const description = getChineseDescription(resource);
   if (description) return conciseText(description, resource.name);
 
@@ -199,7 +236,19 @@ function getChineseDescription(resource: LocalizableResource) {
     .map((value) => value?.replace(/\s+/g, " ").trim())
     .filter((value): value is string => Boolean(value));
 
-  return candidates.find((value) => /[\u4e00-\u9fff]/.test(value) && value.length >= 12);
+  return candidates.find((value) => {
+    const chineseCount = value.match(/[\u4e00-\u9fff]/g)?.length ?? 0;
+    const latinCount = value.match(/[a-z]/gi)?.length ?? 0;
+    return chineseCount >= 8
+      && (
+        /^[\u4e00-\u9fff]/.test(value)
+        || chineseCount >= latinCount * 0.35
+      );
+  });
+}
+
+function getExactResourceDescription(resource: LocalizableResource) {
+  return exactResourceDescriptions[resource.name.toLowerCase()];
 }
 
 function normalizeAiReason(reason: string | undefined, resourceName: string) {
@@ -236,12 +285,11 @@ function conciseText(value: string, resourceName: string) {
     .replace(/可用于当前项目的对应开发环节[，。]?/g, "")
     .replace(/。。+/g, "。")
     .trim();
-  const firstTwoSentences = normalized
+  const sentences = normalized
     .split(/(?<=[。！？])/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("");
-  const text = firstTwoSentences || normalized;
+    .filter(Boolean);
+  const firstSentence = sentences[0] ?? "";
+  const text = firstSentence.length >= 18 ? firstSentence : sentences.slice(0, 2).join("") || normalized;
   const shortened = text.length > 88 ? `${text.slice(0, 87).replace(/[，、；：\s]+$/g, "")}…` : text;
   return /[。！？…]$/.test(shortened) ? shortened : `${shortened}。`;
 }

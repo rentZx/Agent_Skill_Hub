@@ -425,7 +425,7 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
   });
 
   const groundedGroups = suppressUngroundedFallbacks(groups);
-  const gaps = buildGaps(groundedGroups, modules, context.capabilityGraph);
+  const gaps = buildGaps(groundedGroups, context.capabilityGraph);
 
   return {
     clarity,
@@ -463,10 +463,9 @@ export function hasDomainCapabilityEvidence(item: RecommendedResource) {
 
 export function rebuildRecommendationGaps(
   groups: RecommendationGroup[],
-  modules: CapabilityModule[],
   capabilityGraph?: CapabilityGraph
 ) {
-  return buildGaps(groups, modules, capabilityGraph);
+  return buildGaps(groups, capabilityGraph);
 }
 
 function buildProjectUnderstanding(
@@ -582,8 +581,14 @@ function scoreResources(
         matchesCapabilityEvidence(haystack, capability, capabilityGraph)
       );
       const inspectedCapabilityHits = new Set(resource.matched_capabilities ?? []);
+      const hasVerifiedV2DomainEvidence = resource.source === "resource_model_v2"
+        && resource.verification_status === "verified"
+        && Array.from(inspectedCapabilityHits).some((id) => !isGenericCapabilityId(id));
       const matchedCapabilities = resource.source === "resource_model_v2"
-        ? textualCapabilityMatches.filter((capability) => inspectedCapabilityHits.has(capability.id))
+        ? textualCapabilityMatches.filter((capability) =>
+            inspectedCapabilityHits.has(capability.id)
+            || (hasVerifiedV2DomainEvidence && !isGenericCapabilityId(capability.id))
+          )
         : resource.source === "github_live" && inspectedCapabilityHits.size > 0
           ? (capabilityGraph?.capabilities ?? []).filter((capability) => inspectedCapabilityHits.has(capability.id))
           : textualCapabilityMatches;
@@ -1003,17 +1008,14 @@ function buildGap(groupTitle: string, types: ResourceType[]) {
   return `${groupTitle} 暂无强匹配资源。资源库需要补充 ${types.map((type) => typeLabels[type]).join(" / ")} 类型的高可信条目。`;
 }
 
-function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], capabilityGraph?: CapabilityGraph) {
-  const moduleGaps = modules
-    .filter((module) => module.id === "document-parsing")
-    .map(() => "当前资源库缺少专门的 PDF/Word/Excel 文档解析 Skill 或 MCP Server，可后续补充 documents/spreadsheets/pdf 类资源。");
-
+function buildGaps(groups: RecommendationGroup[], capabilityGraph?: CapabilityGraph) {
   const coveredCapabilityIds = new Set(
     groups.flatMap((group) => group.items.flatMap((item) => item.matchedCapabilityIds))
   );
   const selectedItems = groups.flatMap((group) => group.items);
   const capabilityGaps = (capabilityGraph?.capabilities ?? [])
     .filter((capability) => capability.priority !== "optional")
+    .filter((capability) => !isGenericCapabilityId(capability.id))
     .filter((capability) =>
       !coveredCapabilityIds.has(capability.id)
       && !selectedItems.some((item) =>
@@ -1028,7 +1030,7 @@ function buildGaps(groups: RecommendationGroup[], modules: CapabilityModule[], c
       `${capability.priority === "core" ? "核心" : "必需"}能力“${capability.label}”暂无经证据验证的匹配资源。`
     );
 
-  return Array.from(new Set([...capabilityGaps, ...moduleGaps]));
+  return Array.from(new Set(capabilityGaps));
 }
 
 function resourceSearchText(resource: Resource) {

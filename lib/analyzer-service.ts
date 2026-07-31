@@ -172,7 +172,6 @@ async function analyzeProjectUncached(
       groups: groundedGroups,
       gaps: rebuildRecommendationGaps(
         groundedGroups,
-        reranked.modules,
         capabilityGraph
       )
     };

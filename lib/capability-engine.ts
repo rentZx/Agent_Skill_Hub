@@ -112,7 +112,10 @@ const capabilityPatterns: Array<{
     id: "image-to-3d",
     label: "2D 图像转 3D 模型",
     description: "从二维图像估计几何、深度和材质，生成可预览或导出的三维模型。",
-    terms: ["2d 转 3d", "2d转3d", "2d-to-3d", "image-to-3d", "image to 3d", "二维图片", "三维模型"],
+    terms: [
+      "2d 转 3d", "2d转3d", "2d-to-3d", "image-to-3d", "image to 3d", "二维图片", "三维模型",
+      "上传二维参考图像", "估计深度", "几何结构", "导出 glb", "导出 obj", "导出 stl"
+    ],
     keywords: [
       "image-to-3d",
       "single image to 3d",
@@ -186,7 +189,11 @@ const capabilityPatterns: Array<{
     id: "short-video-pipeline",
     label: "AI 短视频生成流水线",
     description: "把主题或文案转换为脚本、素材、配音、字幕和可导出的竖屏短视频。",
-    terms: ["短视频", "视频生成", "文生视频", "文本转视频", "ai视频", "ai 视频", "short video", "text-to-video", "video generation"],
+    terms: [
+      "短视频", "视频生成", "文生视频", "文本转视频", "ai视频", "ai 视频",
+      "分镜脚本", "视频素材", "视频与图片素材", "图片素材", "竖屏视频", "批量任务",
+      "short video", "text-to-video", "video generation"
+    ],
     keywords: ["ai short video generator", "short video generation", "text-to-video", "script generation", "stock footage", "video composition", "vertical video", "youtube shorts", "instagram reels", "tiktok video"],
     negativeKeywords: ["erp", "enterprise resource planning", "inventory management", "accounting", "procurement", "generic agent framework", "laravel agent"],
     preferredTypes: ["template_repo", "github_plugin", "agent_skill", "mcp_server"],
@@ -209,7 +216,7 @@ const capabilityPatterns: Array<{
     label: "自动字幕与时间轴对齐",
     description: "从音频生成字幕，并把文本与视频时间轴对齐。",
     terms: ["字幕", "自动字幕", "caption", "subtitles", "speech-to-text"],
-    keywords: ["automatic subtitles", "video captions", "caption alignment", "speech-to-text", "automatic speech recognition"],
+    keywords: ["automatic subtitles", "subtitles", "video captions", "caption alignment", "speech-to-text", "automatic speech recognition"],
     negativeKeywords: ["voice changer", "ai companion", "erp", "inventory management"],
     preferredTypes: ["github_plugin", "template_repo", "mcp_server", "agent_skill"],
     priority: "required",
@@ -296,8 +303,8 @@ const capabilityPatterns: Array<{
     id: "tuition-billing",
     label: "学费、缴费与欠费记录",
     description: "记录课程定价、缴费、退款、优惠和欠费状态，并将账务记录关联到学生与班级。",
-    terms: ["画室", "缴费记录", "学费", "收费", "欠费", "tuition", "school fees"],
-    keywords: ["tuition management", "school fee management", "student billing", "payment tracking", "fee collection"],
+    terms: ["画室", "缴费记录", "学费", "收费", "欠费", "费用管理", "tuition", "school fees"],
+    keywords: ["tuition management", "school fee management", "student billing", "payment tracking", "fee collection", "费用管理", "收费管理"],
     negativeKeywords: ["generic pricing page", "crypto payment", "payment button only"],
     preferredTypes: ["template_repo", "github_plugin"],
     priority: "required",
@@ -307,7 +314,7 @@ const capabilityPatterns: Array<{
     id: "inventory-management",
     label: "商品库存与库位管理",
     description: "管理商品档案、价格、库存数量、仓库或货架位置，并支持实时查询。",
-    terms: ["超市", "货物", "商品价格", "库存", "库位", "货架", "仓库", "inventory", "warehouse", "stock control"],
+    terms: ["超市", "货物", "商品价格", "商品档案", "销售价格", "库存", "库位", "货架", "仓库", "inventory", "warehouse", "stock control"],
     keywords: ["inventory management", "stock control", "warehouse location", "product catalog", "item pricing"],
     negativeKeywords: ["ecommerce storefront only", "shelf image generation", "virtual shelf"],
     preferredTypes: ["template_repo", "github_plugin", "mcp_server"],
@@ -622,6 +629,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     }));
 
   const featureCapabilities = (details.coreFeatures ?? [])
+    .filter((feature) => !isGenericFeatureCapability(feature))
     .filter((feature) => !patterned.some((pattern) =>
       pattern.terms.some((term) => {
         const normalizedFeature = normalizeTerm(feature);
@@ -744,6 +752,18 @@ function extractFeatureKeywords(feature: string) {
     .map((term) => term.replace(/^(根据|支持|实现|提供|展示|进行|可以|能够)/, "").trim())
     .filter((term) => term.length >= 2 && term.length <= 12);
   return cleanStrings([feature.trim(), ...english, ...chineseTerms], 8);
+}
+
+function isGenericFeatureCapability(feature: string) {
+  const normalized = normalizeTerm(feature);
+  return [
+    "用户输入",
+    "业务数据管理",
+    "搜索与筛选",
+    "后台管理",
+    "结果导出",
+    "返回有数据依据的查询结果"
+  ].some((term) => normalized === normalizeTerm(term));
 }
 
 function buildSearchQueries(capabilities: CapabilityRequirement[], suggested: string[]) {

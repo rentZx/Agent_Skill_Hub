@@ -23,6 +23,7 @@ const cases = [
     mustInclude: ["img2threejs"],
     targetPool: ["stable-fast-3d", "InstantMesh", "TripoSR"],
     minTargetMatches: 1,
+    mustCover: ["image-to-3d"],
     forbidden: ["Auto-claude-code-research-in-sleep", "mediapipe", "ARIS"]
   },
   {
@@ -31,6 +32,7 @@ const cases = [
     mustInclude: [],
     targetPool: ["daily_stock_analysis", "akshare", "mootdx", "qlib", "rqalpha", "TradingAgents-CN"],
     minTargetMatches: 2,
+    mustCover: ["stock-market-data", "technical-analysis"],
     forbidden: ["Generic Agent Starter", "PuroAir", "FunASR"]
   },
   {
@@ -39,6 +41,7 @@ const cases = [
     mustInclude: ["HowToCook"],
     targetPool: ["HowToCook-mcp", "mealie", "recipes", "grocy", "Recipe-AI-Easy-Recipes"],
     minTargetMatches: 1,
+    mustCover: ["recipe-data"],
     forbidden: [
       "Supabase pgvector Starter",
       "Vercel AI SDK Starter",
@@ -54,6 +57,7 @@ const cases = [
     mustInclude: ["InvenTree"],
     targetPool: ["FunASR", "faster-whisper", "Agentic Shelf", "erpnext"],
     minTargetMatches: 1,
+    mustCover: ["inventory-management", "speech-to-text"],
     forbidden: ["AIRI", "next-saas-starter", "react-responsive-overflow-list"]
   },
   {
@@ -62,6 +66,7 @@ const cases = [
     mustInclude: ["MoneyPrinterTurbo"],
     targetPool: ["short-video-maker", "MoneyPrinter", "Text-To-Video-AI"],
     minTargetMatches: 1,
+    mustCover: ["short-video-pipeline", "auto-caption", "voiceover"],
     forbidden: ["erpnext", "neuron-tool-creator", "img2threejs"]
   },
   {
@@ -70,6 +75,7 @@ const cases = [
     mustInclude: [],
     targetPool: ["education", "Frappe Education", "core", "Gibbon 学校管理平台", "RosarioSIS", "UniTime", "UniTime 排课系统", "FullCalendar"],
     minTargetMatches: 3,
+    mustCover: ["education-management", "course-scheduling", "tuition-billing"],
     forbidden: ["@heymantle/react", "MoneyPrinterTurbo", "InvenTree", "FunASR"]
   },
   {
@@ -78,6 +84,7 @@ const cases = [
     mustInclude: ["Open-Meteo 天气服务"],
     targetPool: [],
     minTargetMatches: 0,
+    mustCover: ["weather-forecast-data", "historical-weather"],
     forbidden: ["HowToCook", "MoneyPrinterTurbo", "FunASR"]
   },
   {
@@ -86,6 +93,7 @@ const cases = [
     mustInclude: ["OpenNutriTracker 饮食记录"],
     targetPool: ["Open Food Facts 食品数据库", "FoodYou 饮食日志", "wger 健身与营养管理"],
     minTargetMatches: 1,
+    mustCover: ["food-diary", "nutrition-database"],
     forbidden: ["HowToCook", "MoneyPrinterTurbo", "mootdx"]
   },
   {
@@ -94,6 +102,7 @@ const cases = [
     mustInclude: ["wger 健身与营养管理"],
     targetPool: ["FitTrackee 运动记录"],
     minTargetMatches: 1,
+    mustCover: ["workout-planning", "workout-tracking"],
     forbidden: ["Open-Meteo 天气服务", "MoneyPrinterTurbo", "akshare"]
   },
   {
@@ -102,6 +111,7 @@ const cases = [
     mustInclude: ["AI Taxonomist 植物识别组件"],
     targetPool: ["PlantNet-300K 植物图像数据集", "HortusFox 植物管理系统", "Pl@ntNet 植物识别 API 示例"],
     minTargetMatches: 2,
+    mustCover: ["plant-species-identification", "plant-species-dataset"],
     forbidden: ["PlantVillage 植物病害数据集", "Plant-Disease-Detection", "MoneyPrinterTurbo"]
   }
 ];
@@ -123,7 +133,11 @@ async function main() {
         name: item.resource.name,
         kind: item.resource.artifact_kind,
         score: item.score,
-        matchedCapabilities: item.matchedCapabilityIds
+        matchedCapabilities: item.matchedCapabilityIds,
+        risk: item.resource.risk_level,
+        trust: item.resource.trust_score,
+        why: item.why,
+        alternative: item.alternative
       }))
     );
     const names = items.map((item) => item.name.toLowerCase());
@@ -138,6 +152,62 @@ async function main() {
     if (forbiddenMatches.length > 0) {
       failures.push(`${testCase.name}: 命中无关资源 ${forbiddenMatches.join(", ")}`);
     }
+    const duplicateNames = names.filter((name, index) => names.indexOf(name) !== index);
+    if (duplicateNames.length > 0) {
+      failures.push(`${testCase.name}: 重复推荐 ${Array.from(new Set(duplicateNames)).join(", ")}`);
+    }
+
+    const defaultItems = items.filter((item) => item.group !== "risk-alerts");
+    const misplacedHighRisk = defaultItems.filter((item) => item.risk === "high");
+    if (misplacedHighRisk.length > 0) {
+      failures.push(`${testCase.name}: 高风险资源进入默认方案 ${misplacedHighRisk.map((item) => item.name).join(", ")}`);
+    }
+    const weakMediumRisk = defaultItems.filter((item) => item.risk === "medium" && item.trust < 65);
+    if (weakMediumRisk.length > 0) {
+      failures.push(`${testCase.name}: 低可信中风险资源进入默认方案 ${weakMediumRisk.map((item) => item.name).join(", ")}`);
+    }
+
+    const groupNames = new Map<string, Set<string>>();
+    items.forEach((item) => {
+      const entries = groupNames.get(item.group) ?? new Set<string>();
+      entries.add(item.name.toLowerCase());
+      groupNames.set(item.group, entries);
+    });
+    const unrelatedAlternatives = defaultItems.filter((item) =>
+      item.alternative !== "暂无同类低风险替代项。"
+      && !groupNames.get(item.group)?.has(item.alternative.toLowerCase())
+    );
+    if (unrelatedAlternatives.length > 0) {
+      failures.push(`${testCase.name}: 替代项不在同组候选中 ${unrelatedAlternatives
+        .map((item) => `${item.name}->${item.alternative}`)
+        .join(", ")}`);
+    }
+
+    const verboseReasons = items.filter((item) =>
+      item.why.length > 90
+      || /本次方案适配度|风险依据|GitHub Stars|资源基础质量|旧模型声明类型|接入前/.test(item.why)
+    );
+    if (verboseReasons.length > 0) {
+      failures.push(`${testCase.name}: 推荐说明冗长或泄漏内部证据 ${verboseReasons.map((item) => item.name).join(", ")}`);
+    }
+    const domainReasons = items
+      .filter((item) => item.name.toLowerCase() !== "shadcn/ui")
+      .map((item) => item.why);
+    const duplicateReasons = domainReasons.filter((reason, index) => domainReasons.indexOf(reason) !== index);
+    if (duplicateReasons.length > 0) {
+      failures.push(`${testCase.name}: 不同领域资源使用了重复说明`);
+    }
+
+    const capabilityLabels = new Map(
+      capabilityGraph.capabilities.map((capability) => [capability.id, capability.label])
+    );
+    const falseGapLabels = testCase.mustCover
+      .map((id) => capabilityLabels.get(id))
+      .filter((label): label is string => Boolean(label))
+      .filter((label) => result.recommendation.gaps.some((gap) => gap.includes(`“${label}”`)));
+    if (falseGapLabels.length > 0) {
+      failures.push(`${testCase.name}: 已覆盖能力仍被报告为缺口 ${falseGapLabels.join(", ")}`);
+    }
 
     return {
       name: testCase.name,
@@ -146,6 +216,7 @@ async function main() {
       targetMatches,
       missing,
       forbiddenMatches,
+      gaps: result.recommendation.gaps,
       recommendations: items
     };
   });
