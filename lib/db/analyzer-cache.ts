@@ -10,7 +10,10 @@ import {
   or,
   sql
 } from "drizzle-orm";
-import type { CapabilityRequirement } from "@/lib/capability-engine";
+import {
+  isGenericCapabilityId,
+  type CapabilityRequirement
+} from "@/lib/capability-engine";
 import { getDb } from "@/lib/db/client";
 import {
   analysisResultCache,
@@ -19,7 +22,7 @@ import {
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v7";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v8";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -118,7 +121,11 @@ export async function readDiscoveryCandidateCache(
   if (matches.length === 0) return [];
 
   const rows = await db
-    .select({ resource: discoveryCandidateCache.resource })
+    .select({
+      resource: discoveryCandidateCache.resource,
+      projectTags: discoveryCandidateCache.projectTags,
+      capabilityIds: discoveryCandidateCache.capabilityIds
+    })
     .from(discoveryCandidateCache)
     .where(and(
       eq(discoveryCandidateCache.verificationStatus, "verified"),
@@ -131,7 +138,18 @@ export async function readDiscoveryCandidateCache(
     )
     .limit(Math.max(1, Math.min(limit, 64)));
 
+  const specificCapabilityIds = new Set(
+    capabilityIds.filter((id) => !isGenericCapabilityId(id))
+  );
+  const specificTags = new Set(tags.filter(isSpecificCacheTag));
+
   return rows
+    .filter((row) => {
+      const capabilityHits = row.capabilityIds.filter((id) => specificCapabilityIds.has(id)).length;
+      if (capabilityHits > 0) return true;
+      const tagHits = row.projectTags.filter((tag) => specificTags.has(tag)).length;
+      return tagHits >= 2;
+    })
     .map((row) => row.resource as Resource)
     .filter(isCachedResource)
     .filter(isResourceRecommendationEligible);
@@ -235,6 +253,15 @@ function normalizeTerms(values: string[]) {
       .map((value) => value.normalize("NFKC").trim().toLowerCase())
       .filter((value) => value.length >= 2 && value.length <= 120)
   )).slice(0, 80);
+}
+
+function isSpecificCacheTag(value: string) {
+  return value.length >= 4
+    && ![
+      "ai", "agent", "api", "app", "application", "backend", "database",
+      "frontend", "github", "management", "platform", "react", "saas",
+      "system", "tool", "tools", "web", "web-app"
+    ].includes(value);
 }
 
 function parseGitHubFullName(repoUrl: string) {
