@@ -22,7 +22,7 @@ import {
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v8";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v9";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -121,11 +121,7 @@ export async function readDiscoveryCandidateCache(
   if (matches.length === 0) return [];
 
   const rows = await db
-    .select({
-      resource: discoveryCandidateCache.resource,
-      projectTags: discoveryCandidateCache.projectTags,
-      capabilityIds: discoveryCandidateCache.capabilityIds
-    })
+    .select({ resource: discoveryCandidateCache.resource })
     .from(discoveryCandidateCache)
     .where(and(
       eq(discoveryCandidateCache.verificationStatus, "verified"),
@@ -144,13 +140,16 @@ export async function readDiscoveryCandidateCache(
   const specificTags = new Set(tags.filter(isSpecificCacheTag));
 
   return rows
-    .filter((row) => {
-      const capabilityHits = row.capabilityIds.filter((id) => specificCapabilityIds.has(id)).length;
+    .map((row) => row.resource as Resource)
+    .filter((resource) => {
+      const capabilityHits = (resource.matched_capabilities ?? [])
+        .filter((id) => specificCapabilityIds.has(id)).length;
       if (capabilityHits > 0) return true;
-      const tagHits = row.projectTags.filter((tag) => specificTags.has(tag)).length;
+      const tagHits = resource.tags
+        .map((tag) => tag.toLowerCase())
+        .filter((tag) => specificTags.has(tag)).length;
       return tagHits >= 2;
     })
-    .map((row) => row.resource as Resource)
     .filter(isCachedResource)
     .filter(isResourceRecommendationEligible);
 }
@@ -164,11 +163,6 @@ export async function writeDiscoveryCandidateCache(
   if (!db || verifiedResources.length === 0) return;
 
   const now = new Date();
-  const projectTags = normalizeTerms(context.tags);
-  const capabilityIds = normalizeTerms([
-    ...context.capabilities.map((capability) => capability.id),
-    ...verifiedResources.flatMap((resource) => resource.matched_capabilities ?? [])
-  ]);
   const rows = verifiedResources.flatMap((resource) => {
     const repositoryFullName = parseGitHubFullName(resource.repo_url);
     if (!repositoryFullName) return [];
@@ -176,8 +170,8 @@ export async function writeDiscoveryCandidateCache(
       repoUrl: resource.repo_url,
       repositoryFullName,
       resource,
-      projectTags,
-      capabilityIds,
+      projectTags: normalizeTerms(resource.tags),
+      capabilityIds: normalizeTerms(resource.matched_capabilities ?? []),
       capabilityContext: context.capabilities,
       searchQueries: normalizeTerms(context.searchQueries),
       verificationStatus: "verified",
@@ -205,18 +199,8 @@ export async function writeDiscoveryCandidateCache(
       set: {
         repositoryFullName: sql`excluded.repository_full_name`,
         resource: sql`excluded.resource`,
-        projectTags: sql`(
-          select array_agg(distinct value)
-          from unnest(
-            ${discoveryCandidateCache.projectTags} || excluded.project_tags
-          ) as value
-        )`,
-        capabilityIds: sql`(
-          select array_agg(distinct value)
-          from unnest(
-            ${discoveryCandidateCache.capabilityIds} || excluded.capability_ids
-          ) as value
-        )`,
+        projectTags: sql`excluded.project_tags`,
+        capabilityIds: sql`excluded.capability_ids`,
         capabilityContext: sql`excluded.capability_context`,
         searchQueries: sql`(
           select array_agg(distinct value)
