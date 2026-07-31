@@ -3,6 +3,7 @@ import {
   isGenericCapabilityId,
   type CapabilityRequirement
 } from "./capability-engine";
+import { isResourceRecommendationEligible } from "./resource-verification";
 import type { Resource, ResourceType, RiskLevel } from "./types";
 
 type GitHubSearchItem = {
@@ -482,7 +483,8 @@ export async function discoverGitHubResources(
         riskOverride: profile?.riskOverrides?.[key],
         evidence: evidenceByRepository.get(key)
       });
-    });
+    })
+    .filter(isResourceRecommendationEligible);
 }
 
 export async function verifyGitHubRepository(

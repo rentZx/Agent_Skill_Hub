@@ -40,6 +40,7 @@ export function AnalyzeConsole({
   const [activeProvider, setActiveProvider] = useState<LlmProvider | null>(null);
   const [discoveredCount, setDiscoveredCount] = useState(0);
   const [selectedDiscoveredCount, setSelectedDiscoveredCount] = useState(0);
+  const [selectedCatalogCount, setSelectedCatalogCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [error, setError] = useState("");
@@ -76,6 +77,7 @@ export function AnalyzeConsole({
           source: LlmProvider;
           discoveredCount: number;
           selectedDiscoveredCount: number;
+          selectedCatalogCount: number;
         };
         error?: string;
       };
@@ -85,6 +87,7 @@ export function AnalyzeConsole({
       setActiveProvider(payload.result.source);
       setDiscoveredCount(payload.result.discoveredCount ?? 0);
       setSelectedDiscoveredCount(payload.result.selectedDiscoveredCount ?? 0);
+      setSelectedCatalogCount(payload.result.selectedCatalogCount ?? 0);
       setHasAnalyzed(true);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "分析失败");
@@ -142,7 +145,7 @@ export function AnalyzeConsole({
             {error
               ? error
               : source
-                ? `${llmProviderDefinitions[source].shortLabel} 智能分析已启用：GitHub 返回 ${discoveredCount} 个初始候选，经领域匹配和仓库证据验证后 ${selectedDiscoveredCount} 个进入方案`
+                ? `${llmProviderDefinitions[source].shortLabel} 已完成需求分析：GitHub 候选池中 ${discoveredCount} 个通过验证，方案采用 ${selectedDiscoveredCount} 个联网资源和 ${selectedCatalogCount} 个资源库条目。`
                 : activeProvider
                   ? `已配置 ${llmProviderDefinitions[activeProvider].shortLabel}，输入需求后开始分析。`
                   : "尚未配置大模型。你仍可使用资源库和搜索功能。"}

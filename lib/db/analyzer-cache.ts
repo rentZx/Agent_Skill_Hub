@@ -16,9 +16,10 @@ import {
   analysisResultCache,
   discoveryCandidateCache
 } from "@/lib/db/schema";
+import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v2";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v3";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -132,7 +133,8 @@ export async function readDiscoveryCandidateCache(
 
   return rows
     .map((row) => row.resource as Resource)
-    .filter(isCachedResource);
+    .filter(isCachedResource)
+    .filter(isResourceRecommendationEligible);
 }
 
 export async function writeDiscoveryCandidateCache(
@@ -140,15 +142,16 @@ export async function writeDiscoveryCandidateCache(
   context: DiscoveryCacheContext
 ) {
   const db = getDb();
-  if (!db || resources.length === 0) return;
+  const verifiedResources = resources.filter(isResourceRecommendationEligible);
+  if (!db || verifiedResources.length === 0) return;
 
   const now = new Date();
   const projectTags = normalizeTerms(context.tags);
   const capabilityIds = normalizeTerms([
     ...context.capabilities.map((capability) => capability.id),
-    ...resources.flatMap((resource) => resource.matched_capabilities ?? [])
+    ...verifiedResources.flatMap((resource) => resource.matched_capabilities ?? [])
   ]);
-  const rows = resources.flatMap((resource) => {
+  const rows = verifiedResources.flatMap((resource) => {
     const repositoryFullName = parseGitHubFullName(resource.repo_url);
     if (!repositoryFullName) return [];
     return [{

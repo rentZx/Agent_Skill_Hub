@@ -20,6 +20,7 @@ import {
 import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 import { assessRequirementClarity } from "@/lib/requirement-clarity";
 import {
+  getCanonicalResourceKey,
   getResourceVerification,
   mergeCanonicalResources
 } from "@/lib/resource-verification";
@@ -29,6 +30,7 @@ export type AnalyzerRuntimeResult = AnalyzerResult & {
   source: LlmProvider;
   discoveredCount: number;
   selectedDiscoveredCount: number;
+  selectedCatalogCount: number;
   cacheStatus: "hit" | "miss";
 };
 
@@ -191,6 +193,7 @@ async function analyzeProjectUncached(
       source: llm.provider,
       discoveredCount: discovered.length,
       selectedDiscoveredCount: countSelectedDiscoveredResources(recommendation, discovered),
+      selectedCatalogCount: countSelectedCatalogResources(recommendation, discovered, resources),
       recommendation: {
         ...recommendation,
         codexPrompt: buildAnalyzerPrompt(input, analysis, recommendation.codexPrompt, recommendation.clarity)
@@ -203,7 +206,12 @@ async function analyzeProjectUncached(
       ...fallback,
       source: llm.provider,
       discoveredCount: discovered.length,
-      selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered)
+      selectedDiscoveredCount: countSelectedDiscoveredResources(fallback.recommendation, discovered),
+      selectedCatalogCount: countSelectedCatalogResources(
+        fallback.recommendation,
+        discovered,
+        resources
+      )
     };
   }
 }
@@ -236,14 +244,30 @@ function countSelectedDiscoveredResources(
   recommendation: AnalyzerResult["recommendation"],
   discovered: Resource[]
 ) {
-  const discoveredIds = new Set(discovered.map((resource) => resource.id));
-  const selectedIds = recommendation.groups
+  const discoveredKeys = new Set(discovered.map(getCanonicalResourceKey));
+  const selectedKeys = getSelectedResourceKeys(recommendation);
+  return selectedKeys.filter((key) => discoveredKeys.has(key)).length;
+}
+
+function countSelectedCatalogResources(
+  recommendation: AnalyzerResult["recommendation"],
+  discovered: Resource[],
+  catalog: Resource[]
+) {
+  const discoveredKeys = new Set(discovered.map(getCanonicalResourceKey));
+  const catalogKeys = new Set(catalog.map(getCanonicalResourceKey));
+  return getSelectedResourceKeys(recommendation)
+    .filter((key) => !discoveredKeys.has(key) && catalogKeys.has(key))
+    .length;
+}
+
+function getSelectedResourceKeys(recommendation: AnalyzerResult["recommendation"]) {
+  const selectedKeys = recommendation.groups
     .filter((group) => group.id !== "risk-alerts")
     .flatMap((group) => group.items)
-    .map((item) => item.resource.id)
-    .filter((id) => discoveredIds.has(id));
+    .map((item) => getCanonicalResourceKey(item.resource));
 
-  return new Set(selectedIds).size;
+  return Array.from(new Set(selectedKeys));
 }
 
 async function analyzeSafely(input: string, llm: LlmRuntimeConfig) {
