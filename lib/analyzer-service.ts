@@ -382,7 +382,7 @@ async function discoverSafely(
       searchQueries: capabilityGraph.searchQueries,
       inspectionLimit: positiveInteger(
         process.env.ANALYZE_GITHUB_INSPECTION_LIMIT,
-        8
+        10
       ),
       signal: controller.signal
     });

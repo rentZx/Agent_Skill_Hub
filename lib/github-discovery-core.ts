@@ -229,13 +229,19 @@ export async function discoverGitHubResources(
       scoreRepositoryRelevance(left, relevanceTerms)
     )
     .slice(0, 24);
+  const queryLeaders = roundRobin(
+    initialResults.map((items) => items.slice(0, 3))
+  );
+  const candidates = Array.from(new Map(
+    [...queryLeaders, ...ranked].map((item) => [item.full_name.toLowerCase(), item])
+  ).values()).slice(0, 24);
   const defaultInspectionLimit = profile ? 6 : 12;
   const inspectionLimit = Math.max(
     1,
     Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
   );
   const evidenceEntries = await mapWithConcurrency(
-    ranked.slice(0, inspectionLimit),
+    candidates.slice(0, inspectionLimit),
     2,
     async (item) => [
       item.full_name.toLowerCase(),
@@ -244,7 +250,7 @@ export async function discoverGitHubResources(
   );
   const evidenceByRepository = new Map(evidenceEntries);
 
-  return ranked
+  return candidates
     .filter((item) => {
       const evidence = evidenceByRepository.get(item.full_name.toLowerCase());
       return evidence ? hasColdStartEvidence(evidence) : false;
@@ -358,6 +364,17 @@ async function mapWithConcurrency<T, R>(
   );
   await Promise.all(workers);
   return results.filter((result): result is R => result !== undefined);
+}
+
+function roundRobin<T>(groups: T[][]) {
+  const results: T[] = [];
+  const maxLength = Math.max(0, ...groups.map((group) => group.length));
+  for (let index = 0; index < maxLength; index += 1) {
+    groups.forEach((group) => {
+      if (group[index] !== undefined) results.push(group[index]);
+    });
+  }
+  return results;
 }
 
 function buildColdStartQueries(capabilities: CapabilityRequirement[]) {

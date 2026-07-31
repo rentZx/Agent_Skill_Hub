@@ -645,7 +645,7 @@ const capabilityPatterns: Array<{
       "visual product search", "reverse image search", "image similarity search"
     ],
     keywords: [
-      "vector database", "vector similarity search", "nearest neighbor search",
+      "vector similarity search", "vector database", "nearest neighbor search",
       "qdrant vector search", "milvus vector database"
     ],
     negativeKeywords: ["text search engine only", "image gallery"],
