@@ -83,6 +83,9 @@ async function main() {
   if (options.onlyAutomated) {
     filters.push(sql`${resourceArtifacts.metadata}->'validation'->>'classifier_version' = 'resource-verifier-v1'`);
   }
+  if (options.excludeAutomated) {
+    filters.push(sql`coalesce(${resourceArtifacts.metadata}->'validation'->>'classifier_version', '') <> 'resource-verifier-v1'`);
+  }
   if (options.kind) {
     filters.push(eq(resourceArtifacts.kind, options.kind));
   }
@@ -560,7 +563,8 @@ async function getRepositorySnapshot(repositorySlug: string) {
 
 async function githubJson<T>(path: string): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: githubHeaders("application/vnd.github+json")
+    headers: githubHeaders("application/vnd.github+json"),
+    signal: AbortSignal.timeout(20_000)
   });
   if (!response.ok) throw new Error(`GitHub API ${response.status} for ${path}`);
   return response.json() as Promise<T>;
@@ -568,7 +572,8 @@ async function githubJson<T>(path: string): Promise<T> {
 
 async function githubText(path: string) {
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: githubHeaders("application/vnd.github.raw+json")
+    headers: githubHeaders("application/vnd.github.raw+json"),
+    signal: AbortSignal.timeout(20_000)
   });
   if (!response.ok) throw new Error(`GitHub API ${response.status} for ${path}`);
   return response.text();
@@ -655,6 +660,7 @@ function parseOptions(args: string[]) {
     status: status as VerificationStatus,
     dryRun: args.includes("--dry-run"),
     onlyAutomated: args.includes("--only-automated"),
+    excludeAutomated: args.includes("--exclude-automated"),
     kind: kind as ArtifactKind | undefined
   };
 }
