@@ -527,6 +527,82 @@ const capabilityPatterns: Array<{
     resourceRoles: ["domain_data", "domain_system"]
   },
   {
+    id: "library-circulation",
+    label: "图书编目、借阅与读者管理",
+    description: "围绕 ISBN 和书目记录管理馆藏、借还、预约、读者、逾期与罚款。",
+    terms: [
+      "图书馆", "图书管理", "isbn", "借书", "还书", "借阅", "读者管理",
+      "library system", "library management", "circulation", "patron management"
+    ],
+    keywords: [
+      "integrated library system", "library management system", "library circulation",
+      "isbn cataloging", "patron management", "bibliographic records"
+    ],
+    negativeKeywords: ["warehouse inventory", "manufacturing inventory", "parts inventory"],
+    preferredTypes: ["template_repo", "github_plugin", "mcp_server"],
+    priority: "core",
+    resourceRoles: ["domain_system", "domain_data"]
+  },
+  {
+    id: "speaker-diarization",
+    label: "会议转写与说话人分离",
+    description: "把会议录音转写为带时间戳的文本，并区分不同说话人。",
+    terms: [
+      "会议转写", "会议录音", "说话人分离", "说话人识别",
+      "meeting transcription", "speaker diarization", "speaker separation"
+    ],
+    keywords: [
+      "meeting transcription", "speaker diarization", "speaker segmentation",
+      "word level timestamps", "multi speaker transcription"
+    ],
+    negativeKeywords: ["text to speech", "voice changer", "music generation"],
+    preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["speech_to_text", "domain_algorithm"]
+  },
+  {
+    id: "meeting-summarization",
+    label: "会议摘要与行动项提取",
+    description: "从会议转写中生成摘要、决策记录、待办事项和责任人。",
+    terms: ["会议摘要", "会议纪要", "行动项", "待办事项", "meeting summary", "action items"],
+    keywords: ["meeting summarization", "meeting minutes", "action item extraction", "meeting notes"],
+    negativeKeywords: ["generic text summarizer only"],
+    preferredTypes: ["agent_skill", "github_plugin", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_algorithm", "agent_tool"]
+  },
+  {
+    id: "invoice-ocr",
+    label: "发票 OCR 与字段抽取",
+    description: "识别发票、收据或费用凭证，并抽取供应商、日期、金额、税额和明细。",
+    terms: ["发票", "票据", "收据", "费用审核", "invoice ocr", "receipt ocr", "invoice extraction"],
+    keywords: [
+      "invoice ocr", "invoice data extraction", "receipt data extraction",
+      "invoice parser", "document layout analysis"
+    ],
+    negativeKeywords: ["stock market", "technical analysis", "trading", "school billing"],
+    preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
+    priority: "core",
+    resourceRoles: ["domain_data", "domain_algorithm"]
+  },
+  {
+    id: "visual-product-search",
+    label: "商品图片相似度检索",
+    description: "把商品图片编码为向量，并按视觉相似度检索目录中的商品。",
+    terms: [
+      "以图搜图", "图片搜索商品", "相似图片", "视觉搜索", "商品图片检索",
+      "visual product search", "reverse image search", "image similarity search"
+    ],
+    keywords: [
+      "visual product search", "reverse image search", "image similarity search",
+      "clip embeddings", "multimodal vector search"
+    ],
+    negativeKeywords: ["text search only", "image gallery only", "stock photo downloader"],
+    preferredTypes: ["github_plugin", "template_repo", "mcp_server"],
+    priority: "core",
+    resourceRoles: ["domain_algorithm", "domain_data"]
+  },
+  {
     id: "domain-data",
     label: "领域数据与数据源",
     description: "获取、整理和查询项目核心业务数据，并保留数据来源与更新方式。",

@@ -24,7 +24,6 @@ type GitHubSearchItem = {
 type DiscoveryContext = {
   capabilities?: CapabilityRequirement[];
   searchQueries?: string[];
-  repositoryHints?: string[];
   inspectionLimit?: number;
   signal?: AbortSignal;
 };
@@ -44,11 +43,7 @@ type RepositoryEvidence = {
 
 type DiscoveryProfile = {
   queries: string[];
-  repositories: string[];
   relevanceTerms: string[];
-  typeOverrides: Record<string, ResourceType>;
-  tagOverrides: Record<string, string[]>;
-  riskOverrides?: Record<string, { level: RiskLevel; reason: string; license?: string }>;
 };
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
@@ -58,31 +53,10 @@ const shortVideoDiscoveryProfile: DiscoveryProfile = {
     "\"automated video creation\" TTS captions in:name,description,readme archived:false fork:false",
     "\"vertical video\" script footage subtitles in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "harry0703/MoneyPrinterTurbo",
-    "calesthio/OpenMontage",
-    "gyoridavid/short-video-maker",
-    "SamurAIGPT/Text-To-Video-AI",
-    "FujiwaraChoki/MoneyPrinter"
-  ],
   relevanceTerms: [
     "ai short video generator", "short video generation", "text-to-video", "script generation",
     "stock footage", "text-to-speech", "automatic subtitles", "video composition", "vertical video"
-  ],
-  typeOverrides: {
-    "harry0703/moneyprinterturbo": "template_repo",
-    "calesthio/openmontage": "agent_skill",
-    "gyoridavid/short-video-maker": "mcp_server",
-    "samuraigpt/text-to-video-ai": "template_repo",
-    "fujiwarachoki/moneyprinter": "template_repo"
-  },
-  tagOverrides: {
-    "harry0703/moneyprinterturbo": ["ai-video-generator", "short-video", "text-to-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition", "moviepy", "ffmpeg", "vertical-video"],
-    "calesthio/openmontage": ["agent-skill", "short-video", "script-generation", "asset-generation", "text-to-speech", "captions", "video-editing", "video-rendering", "remotion", "ffmpeg"],
-    "gyoridavid/short-video-maker": ["mcp-server", "short-video", "text-to-video", "text-to-speech", "captions", "background-video", "video-composition", "vertical-video"],
-    "samuraigpt/text-to-video-ai": ["text-to-video", "script-generation", "text-to-speech", "stock-footage", "captions", "vertical-video", "ffmpeg"],
-    "fujiwarachoki/moneyprinter": ["ai-video-generator", "short-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition"]
-  }
+  ]
 };
 
 const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
@@ -92,31 +66,10 @@ const inventoryVoiceDiscoveryProfile: DiscoveryProfile = {
     "\"Chinese ASR\" streaming speech-to-text in:name,description,readme archived:false fork:false",
     "\"speech recognition\" transcription in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "frappe/erpnext",
-    "inventree/InvenTree",
-    "modelscope/FunASR",
-    "SYSTRAN/faster-whisper",
-    "crystaldba/postgres-mcp"
-  ],
   relevanceTerms: [
     "inventory management", "stock control", "warehouse location", "product catalog", "item pricing",
     "speech-to-text", "automatic speech recognition", "chinese asr", "streaming asr", "voice transcription"
-  ],
-  typeOverrides: {
-    "frappe/erpnext": "template_repo",
-    "inventree/inventree": "template_repo",
-    "modelscope/funasr": "github_plugin",
-    "systran/faster-whisper": "github_plugin",
-    "crystaldba/postgres-mcp": "mcp_server"
-  },
-  tagOverrides: {
-    "frappe/erpnext": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "erp", "retail"],
-    "inventree/inventree": ["inventory-management", "stock-control", "warehouse-location", "product-catalog", "item-pricing", "inventory-api"],
-    "modelscope/funasr": ["speech-to-text", "automatic-speech-recognition", "chinese-asr", "streaming-asr", "voice-transcription"],
-    "systran/faster-whisper": ["speech-to-text", "automatic-speech-recognition", "voice-transcription", "whisper"],
-    "crystaldba/postgres-mcp": ["database-mcp", "postgres-mcp", "sql-tool", "natural-language-query", "database-analysis"]
-  }
+  ]
 };
 
 const stockDiscoveryProfile: DiscoveryProfile = {
@@ -126,32 +79,10 @@ const stockDiscoveryProfile: DiscoveryProfile = {
     "\"quantitative trading\" backtesting in:name,description,readme archived:false fork:false",
     "\"financial charts\" library in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "ZhuLinsen/daily_stock_analysis",
-    "akfamily/akshare",
-    "mootdx/mootdx",
-    "microsoft/qlib",
-    "ricequant/rqalpha",
-    "hsliuping/TradingAgents-CN",
-    "tradingview/lightweight-charts"
-  ],
   relevanceTerms: [
     "stock analysis", "stock market", "market data", "financial data", "real-time quotes", "a-share",
     "technical analysis", "quantitative trading", "backtesting", "trading strategy", "financial charts"
-  ],
-  typeOverrides: {
-    "zhulinsen/daily_stock_analysis": "agent_skill",
-    "tradingview/lightweight-charts": "ui_component"
-  },
-  tagOverrides: {
-    "zhulinsen/daily_stock_analysis": ["stock-market", "market-data", "real-time-quotes", "technical-analysis", "quantitative-trading", "agent-skill"],
-    "akfamily/akshare": ["financial-data", "a-share", "market-data", "stock-market"],
-    "mootdx/mootdx": ["market-data", "real-time-quotes", "a-share", "tongdaxin"],
-    "microsoft/qlib": ["quantitative-trading", "quant-research", "machine-learning", "backtesting"],
-    "ricequant/rqalpha": ["backtesting", "algorithmic-trading", "a-share", "trading-strategy"],
-    "hsliuping/tradingagents-cn": ["multi-agent-research", "stock-analysis", "quantitative-trading", "stock-market"],
-    "tradingview/lightweight-charts": ["financial-charts", "candlestick", "ui", "stock-market"]
-  }
+  ]
 };
 
 const recipeDiscoveryProfile: DiscoveryProfile = {
@@ -161,47 +92,10 @@ const recipeDiscoveryProfile: DiscoveryProfile = {
     "\"recipe mcp\" server in:name,description,readme archived:false fork:false",
     "\"personalized nutrition\" age dietary in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "Anduin2017/HowToCook",
-    "worryzyy/HowToCook-mcp",
-    "chitralputhran/Recipe-AI-Easy-Recipes",
-    "mealie-recipes/mealie",
-    "TandoorRecipes/recipes",
-    "grocy/grocy",
-    "magedbekheet/macrochefai",
-    "ShreyaKumar-dev/Caloriet"
-  ],
   relevanceTerms: [
     "recipe recommendation", "chinese recipes", "ingredients", "cooking steps", "servings", "portion scaling",
     "dietary restrictions", "food allergies", "personalized nutrition", "age", "meal planning", "recipe mcp"
-  ],
-  typeOverrides: {
-    "anduin2017/howtocook": "template_repo",
-    "worryzyy/howtocook-mcp": "mcp_server",
-    "chitralputhran/recipe-ai-easy-recipes": "template_repo",
-    "mealie-recipes/mealie": "template_repo",
-    "tandoorrecipes/recipes": "template_repo",
-    "grocy/grocy": "template_repo",
-    "magedbekheet/macrochefai": "template_repo",
-    "shreyakumar-dev/caloriet": "template_repo"
-  },
-  tagOverrides: {
-    "anduin2017/howtocook": ["chinese-recipes", "recipe", "ingredients", "cooking-steps", "recipe-dataset"],
-    "worryzyy/howtocook-mcp": ["recipe-mcp", "chinese-recipes", "recipe", "ingredients", "cooking-steps"],
-    "chitralputhran/recipe-ai-easy-recipes": ["ingredient-recommendation", "recipe", "cooking-steps", "nutrition", "shopping-list"],
-    "mealie-recipes/mealie": ["recipe", "meal-planning", "shopping-list", "servings", "recipe-import"],
-    "tandoorrecipes/recipes": ["recipe", "meal-planning", "shopping-list", "ingredients", "servings"],
-    "grocy/grocy": ["ingredients", "pantry", "meal-planning", "shopping-list", "food-inventory"],
-    "magedbekheet/macrochefai": ["personalized-nutrition", "age-aware", "ingredient-recommendation", "dietary-restrictions", "food-allergies", "health-conditions"],
-    "shreyakumar-dev/caloriet": ["personalized-nutrition", "age-aware", "dietary-restrictions", "ingredient-recommendation", "nutrition"]
-  },
-  riskOverrides: {
-    "tandoorrecipes/recipes": {
-      level: "medium",
-      license: "AGPL-3.0 + Commons Clause selling exception",
-      reason: "仓库采用 GNU AGPL v3，并附带 Commons Clause 销售例外；商业托管、销售和分发边界需要在接入前复核。"
-    }
-  }
+  ]
 };
 
 const plantIdentificationDiscoveryProfile: DiscoveryProfile = {
@@ -210,28 +104,10 @@ const plantIdentificationDiscoveryProfile: DiscoveryProfile = {
     "\"plant species recognition\" image classification in:name,description,readme archived:false fork:false",
     "\"Pl@ntNet API\" plant identification in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "plantnet/my.plantnet",
-    "plantnet/ai-taxonomist-webcomponent",
-    "plantnet/PlantNet-300K",
-    "danielbrendel/hortusfox-web"
-  ],
   relevanceTerms: [
     "plant identification", "plant species recognition", "plant image classification",
     "species classification", "plantnet api", "ai taxonomist", "plant image dataset"
-  ],
-  typeOverrides: {
-    "plantnet/my.plantnet": "github_plugin",
-    "plantnet/ai-taxonomist-webcomponent": "ui_component",
-    "plantnet/plantnet-300k": "github_plugin",
-    "danielbrendel/hortusfox-web": "template_repo"
-  },
-  tagOverrides: {
-    "plantnet/my.plantnet": ["plant-identification", "plant-species-recognition", "plant-identification-api", "plantnet-api", "image-upload", "species-classification"],
-    "plantnet/ai-taxonomist-webcomponent": ["plant-identification", "plant-species-recognition", "plant-identification-api", "ai-taxonomist", "web-component", "image-upload", "species-classification", "ui"],
-    "plantnet/plantnet-300k": ["plant-identification", "plant-species-recognition", "plant-image-dataset", "plant-species-dataset", "species-classification", "deep-learning", "pytorch"],
-    "danielbrendel/hortusfox-web": ["plant-management", "plant-identification", "plantnet-api", "plant-care", "self-hosted", "project-template"]
-  }
+  ]
 };
 
 const plantDiseaseDiscoveryProfile: DiscoveryProfile = {
@@ -239,19 +115,10 @@ const plantDiseaseDiscoveryProfile: DiscoveryProfile = {
     "\"plant disease detection\" leaf image classification in:name,description,readme archived:false fork:false",
     "\"crop disease\" PlantVillage model in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "spMohanty/PlantVillage-Dataset"
-  ],
   relevanceTerms: [
     "plant disease detection", "leaf disease classification", "crop disease recognition",
     "plant pathology", "plant disease dataset", "plantvillage"
-  ],
-  typeOverrides: {
-    "spmohanty/plantvillage-dataset": "github_plugin"
-  },
-  tagOverrides: {
-    "spmohanty/plantvillage-dataset": ["plant-disease-detection", "plant-disease-dataset", "leaf-disease", "crop-disease", "plant-pathology", "image-classification"]
-  }
+  ]
 };
 
 const weatherDiscoveryProfile: DiscoveryProfile = {
@@ -259,17 +126,10 @@ const weatherDiscoveryProfile: DiscoveryProfile = {
     "\"weather API\" forecast historical in:name,description,readme archived:false fork:false",
     "\"weather forecast\" hourly daily API in:name,description,readme archived:false fork:false"
   ],
-  repositories: ["open-meteo/open-meteo"],
   relevanceTerms: [
     "weather api", "weather forecast", "current weather", "hourly forecast",
     "daily forecast", "historical weather", "climate data"
-  ],
-  typeOverrides: {
-    "open-meteo/open-meteo": "github_plugin"
-  },
-  tagOverrides: {
-    "open-meteo/open-meteo": ["weather-api", "weather-forecast", "current-weather", "hourly-forecast", "historical-weather", "climate-data"]
-  }
+  ]
 };
 
 const nutritionTrackingDiscoveryProfile: DiscoveryProfile = {
@@ -277,28 +137,10 @@ const nutritionTrackingDiscoveryProfile: DiscoveryProfile = {
     "\"food diary\" nutrition tracker barcode in:name,description,readme archived:false fork:false",
     "\"calorie tracker\" \"Open Food Facts\" in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "openfoodfacts/openfoodfacts-server",
-    "simonoppowa/OpenNutriTracker",
-    "maksimowiczm/FoodYou",
-    "wger-project/wger"
-  ],
   relevanceTerms: [
     "food diary", "meal logging", "nutrition tracker", "calorie tracker",
     "nutrition database", "barcode food lookup", "open food facts"
-  ],
-  typeOverrides: {
-    "openfoodfacts/openfoodfacts-server": "github_plugin",
-    "simonoppowa/opennutritracker": "template_repo",
-    "maksimowiczm/foodyou": "template_repo",
-    "wger-project/wger": "template_repo"
-  },
-  tagOverrides: {
-    "openfoodfacts/openfoodfacts-server": ["nutrition-database", "food-products", "allergens", "barcode-food-lookup", "open-food-facts"],
-    "simonoppowa/opennutritracker": ["food-diary", "nutrition-tracker", "calorie-tracker", "barcode-food-lookup", "open-food-facts"],
-    "maksimowiczm/foodyou": ["food-diary", "meal-logging", "nutrition-tracker", "calorie-tracker"],
-    "wger-project/wger": ["workout-planning", "workout-tracking", "nutrition-tracker", "body-measurements", "weight-tracker"]
-  }
+  ]
 };
 
 const fitnessTrackingDiscoveryProfile: DiscoveryProfile = {
@@ -306,25 +148,10 @@ const fitnessTrackingDiscoveryProfile: DiscoveryProfile = {
     "\"workout tracker\" self-hosted in:name,description,readme archived:false fork:false",
     "\"fitness tracker\" workout planning body measurements in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "wger-project/wger",
-    "SamR1/FitTrackee",
-    "felixrieseberg/claude-coach"
-  ],
   relevanceTerms: [
     "workout planning", "workout routines", "workout tracker", "fitness tracker",
     "activity tracker", "exercise log", "body measurements", "weight tracker"
-  ],
-  typeOverrides: {
-    "wger-project/wger": "template_repo",
-    "samr1/fittrackee": "template_repo",
-    "felixrieseberg/claude-coach": "agent_skill"
-  },
-  tagOverrides: {
-    "wger-project/wger": ["workout-planning", "workout-tracking", "nutrition-tracker", "body-measurements", "weight-tracker"],
-    "samr1/fittrackee": ["workout-tracking", "activity-tracker", "fitness-tracker", "gps-tracking"],
-    "felixrieseberg/claude-coach": ["agent-skill", "fitness-coach", "training-plan", "workout-planning", "endurance"]
-  }
+  ]
 };
 
 const vehicleRoutingDiscoveryProfile: DiscoveryProfile = {
@@ -332,31 +159,10 @@ const vehicleRoutingDiscoveryProfile: DiscoveryProfile = {
     "\"vehicle routing problem\" capacity \"time windows\" in:name,description,readme archived:false fork:false",
     "\"route optimization\" delivery fleet vrptw in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "VROOM-Project/vroom",
-    "PyVRP/PyVRP",
-    "google/or-tools",
-    "graphhopper/jsprit",
-    "N-Wouda/ALNS"
-  ],
   relevanceTerms: [
     "vehicle routing problem", "vrp", "vrptw", "route optimization", "fleet routing",
     "vehicle capacity", "time windows", "pickup delivery", "delivery scheduling"
-  ],
-  typeOverrides: {
-    "vroom-project/vroom": "template_repo",
-    "pyvrp/pyvrp": "template_repo",
-    "google/or-tools": "template_repo",
-    "graphhopper/jsprit": "template_repo",
-    "n-wouda/alns": "template_repo"
-  },
-  tagOverrides: {
-    "vroom-project/vroom": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows", "pickup-delivery"],
-    "pyvrp/pyvrp": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows", "multi-depot"],
-    "google/or-tools": ["operations-research", "vehicle-routing", "route-optimization", "vrp", "constraint-programming"],
-    "graphhopper/jsprit": ["vehicle-routing", "route-optimization", "vrp", "vrptw", "vehicle-capacity", "time-windows"],
-    "n-wouda/alns": ["optimization", "vehicle-routing", "routing-algorithm", "operations-research"]
-  }
+  ]
 };
 
 const imageTo3dDiscoveryProfile: DiscoveryProfile = {
@@ -364,28 +170,10 @@ const imageTo3dDiscoveryProfile: DiscoveryProfile = {
     "\"image to 3d\" threejs in:name,description,readme archived:false fork:false",
     "\"single image\" \"3d model\" reconstruction in:name,description,readme archived:false fork:false"
   ],
-  repositories: [
-    "img2threejs/img2threejs",
-    "Stability-AI/stable-fast-3d",
-    "TencentARC/InstantMesh",
-    "VAST-AI-Research/TripoSR"
-  ],
   relevanceTerms: [
     "image to 3d", "single image 3d", "threejs", "depth estimation", "mesh generation",
     "3d reconstruction", "model viewer"
-  ],
-  typeOverrides: {
-    "img2threejs/img2threejs": "agent_skill",
-    "stability-ai/stable-fast-3d": "template_repo",
-    "tencentarc/instantmesh": "template_repo",
-    "vast-ai-research/triposr": "template_repo"
-  },
-  tagOverrides: {
-    "img2threejs/img2threejs": ["image-to-3d", "threejs", "webgl", "procedural-generation", "agent-skill"],
-    "stability-ai/stable-fast-3d": ["image-to-3d", "3d-reconstruction", "mesh-generation"],
-    "tencentarc/instantmesh": ["image-to-3d", "3d-reconstruction", "mesh-generation"],
-    "vast-ai-research/triposr": ["image-to-3d", "3d-reconstruction", "mesh-generation"]
-  }
+  ]
 };
 
 export async function discoverGitHubResources(
@@ -402,16 +190,11 @@ export async function discoverGitHubResources(
     context.capabilities ?? [],
     profile
   );
-  const repositoryHints = Array.from(new Set(context.repositoryHints ?? [])).slice(0, 5);
-  const [searchResults, repositoryResults] = await Promise.all([
-    Promise.allSettled(queries.map((query) => searchRepositories(query, 15, context.signal))),
-    Promise.allSettled(repositoryHints.map((repository) => fetchRepository(repository, context.signal)))
-  ]);
+  const searchResults = await Promise.allSettled(
+    queries.map((query) => searchRepositories(query, 15, context.signal))
+  );
   const initialResults = searchResults.flatMap((result) =>
     result.status === "fulfilled" ? [result.value] : []
-  );
-  const preferredResults = repositoryResults.flatMap((result) =>
-    result.status === "fulfilled" && result.value ? [result.value] : []
   );
   let results = initialResults;
   if (!context.signal?.aborted && results.flat().length < 12) {
@@ -425,16 +208,12 @@ export async function discoverGitHubResources(
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
-  const hintedNames = new Set(repositoryHints.map((repository) => repository.toLowerCase()));
   const unique = new Map<string, GitHubSearchItem>();
 
   results.flat().forEach((item) => {
-    if (!existingUrls.has(item.html_url) || hintedNames.has(item.full_name.toLowerCase())) {
+    if (!existingUrls.has(item.html_url)) {
       unique.set(item.full_name.toLowerCase(), item);
     }
-  });
-  preferredResults.forEach((item) => {
-    unique.set(item.full_name.toLowerCase(), item);
   });
 
   const relevanceTerms = Array.from(new Set([
@@ -658,13 +437,9 @@ async function fetchRepository(
       cache: "no-store",
       signal: requestSignal(signal, 8000)
     });
-    if (!response.ok) {
-      console.warn(`GitHub discovery failed for repository ${fullName}: ${response.status}`);
-      return null;
-    }
+    if (!response.ok) return null;
     return await response.json() as GitHubSearchItem;
-  } catch (error) {
-    console.warn(`GitHub discovery timed out for repository ${fullName}.`, error);
+  } catch {
     return null;
   }
 }

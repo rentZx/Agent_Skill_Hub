@@ -781,6 +781,20 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
 function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: CapabilityGraph) {
   if (!capabilityGraph) return false;
   const source = `${resource.name} ${resource.description} ${resource.tags.join(" ")} ${resource.use_cases.join(" ")}`.toLowerCase();
+  const graph = `${capabilityGraph.domain} ${capabilityGraph.capabilities
+    .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
+    .join(" ")}`.toLowerCase();
+  if (/(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(graph)) {
+    const hasLibraryEvidence = /(integrated[- ]library[- ]system|library[- ]management|library[- ]circulation|isbn|cataloging|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(source);
+    const genericInventoryOnly = /(inventory|warehouse|stock control|manufacturing|parts management)/i.test(source)
+      && !hasLibraryEvidence;
+    if (genericInventoryOnly) return true;
+  }
+  if (/(invoice.ocr|invoice.data.extraction|receipt.data.extraction|发票|票据|收据)/i.test(graph)) {
+    if (/(stock[- ]market|technical[- ]analysis|quantitative[- ]trading|candlestick|\bmacd\b|\brsi\b)/i.test(source)) {
+      return true;
+    }
+  }
   if (resource.type === "ui_component") {
     return isStrictKnownDomainGraph(capabilityGraph)
       && !isOfficialShadcnUi(resource)

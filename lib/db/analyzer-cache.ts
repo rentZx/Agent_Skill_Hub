@@ -22,7 +22,7 @@ import {
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v9";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v10";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,

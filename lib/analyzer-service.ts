@@ -123,8 +123,7 @@ async function analyzeProjectUncached(
       input,
       discoveryTags,
       resources,
-      capabilityGraph,
-      ai?.repositoryHints ?? []
+      capabilityGraph
     );
     discovered = mergeCanonicalResources([...discovered, ...liveDiscovered]);
     if (liveDiscovered.length > 0) {
@@ -369,12 +368,11 @@ async function discoverSafely(
   input: string,
   tags: string[],
   resources: Resource[],
-  capabilityGraph: ReturnType<typeof buildCapabilityGraph>,
-  repositoryHints: string[] = []
+  capabilityGraph: ReturnType<typeof buildCapabilityGraph>
 ) {
   const timeoutMs = positiveInteger(
     process.env.ANALYZE_GITHUB_TIMEOUT_MS,
-    3500
+    9000
   );
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -382,10 +380,9 @@ async function discoverSafely(
     return await discoverGitHubResources(input, tags, resources, {
       capabilities: capabilityGraph.capabilities,
       searchQueries: capabilityGraph.searchQueries,
-      repositoryHints,
       inspectionLimit: positiveInteger(
         process.env.ANALYZE_GITHUB_INSPECTION_LIMIT,
-        6
+        8
       ),
       signal: controller.signal
     });

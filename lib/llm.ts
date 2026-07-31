@@ -68,7 +68,7 @@ export async function analyzeWithLlm(
         },
         {
           role: "system",
-          content: "补充并覆盖上一条的检索输出约束：searchQueries 每条使用 2-5 个英文词，至少两条使用科学术语、行业术语或专业同义词。JSON 还必须包含 repositoryHints 数组，最多 5 个可能真实存在且高度相关的 GitHub owner/repo 候选；它们仅是待 GitHub API 验证的假设，不能当作已验证事实。"
+          content: "补充并覆盖上一条的检索输出约束：searchQueries 每条使用 2-5 个英文词，至少两条使用科学术语、行业术语或专业同义词。不要猜测具体仓库名，资源候选必须由 GitHub 搜索和仓库证据验证产生。"
         },
         { role: "user", content: `请分析以下项目需求，并输出 JSON：${input}` }
     ],

@@ -381,6 +381,33 @@ assert(
   ),
   "陌生领域：应保留规范化后的发票 OCR / 文档抽取能力"
 );
+const libraryGraph = buildCapabilityGraph("开发图书馆系统，支持 ISBN 编目、借还书、读者、条码和 RFID");
+assert(
+  libraryGraph.capabilities.some((item) => item.id === "library-circulation"),
+  "陌生领域：图书馆需求应生成编目、流通与读者管理能力"
+);
+assert(
+  libraryGraph.searchQueries.some((query) => /integrated library system|library management system/i.test(query)),
+  "陌生领域：图书馆需求应生成可发现 Koha、SLiMS 等项目的检索词"
+);
+const meetingGraph = buildCapabilityGraph("开发会议录音转写工具，区分说话人并生成摘要和行动项");
+assert(
+  meetingGraph.capabilities.some((item) => item.id === "speaker-diarization"),
+  "陌生领域：会议需求应生成说话人分离能力"
+);
+assert(
+  meetingGraph.capabilities.some((item) => item.id === "meeting-summarization"),
+  "陌生领域：会议需求应生成会议摘要与行动项能力"
+);
+const visualSearchGraph = buildCapabilityGraph("开发电商以图搜图，根据商品图片查找相似商品");
+assert(
+  visualSearchGraph.capabilities.some((item) => item.id === "visual-product-search"),
+  "陌生领域：以图搜图需求应生成视觉相似度检索能力"
+);
+assert(
+  visualSearchGraph.searchQueries.some((query) => /visual product search|reverse image search/i.test(query)),
+  "陌生领域：以图搜图需求应生成 CLIP / 向量检索方向的检索词"
+);
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
 assert(isGenericCapabilityId("model-training-pipeline"), "陌生领域：模型训练流水线不能独立证明领域适配");

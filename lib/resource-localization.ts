@@ -32,7 +32,7 @@ const exactResourceDescriptions: Record<string, string> = {
   howtocook: "提供结构化中文菜谱、食材用量和制作步骤，可整理成本地菜谱基础数据。",
   mealie: "提供菜谱导入、份量换算、餐食计划和购物清单，可参考完整的家庭菜谱管理流程。",
   "howtocook-mcp": "把 HowToCook 中文菜谱封装为 MCP 查询工具，可供 Agent 检索菜品、食材和步骤。",
-  funasr: "提供中文语音识别、实时转写和语音端点检测，可把语音查询转换为库存检索文本。",
+  funasr: "提供中文语音识别、实时转写和语音端点检测；适合语音转文字，但不负责说话人分离或会议摘要。",
   "faster-whisper": "基于 CTranslate2 加速 Whisper 转写，适合离线录音识别和带时间戳的字幕生成。",
   inventree: "提供零件、库存、仓库位置、采购和库存变更管理，可作为商品库存系统参考实现。",
   erpnext: "覆盖商品、库存、仓库、采购、销售和财务流程，适合参考完整 ERP 数据模型。",
