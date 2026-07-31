@@ -252,10 +252,16 @@ function classifyArtifact(
   ) {
     return classified("ui_library", 90, "README 声明 UI 组件库或设计系统，并存在项目清单。");
   }
-  if (
-    /\bdataset\b|data set|open data|training data/.test(repositoryIdentity)
-    && paths.some((path) => /\.(csv|parquet|jsonl|arrow)$/.test(path))
-  ) {
+  const hasDatasetIdentity = /\bdataset\b|data set|open data|training data/.test(repositoryIdentity);
+  const hasDatasetFiles = paths.some((path) =>
+    /\.(csv|parquet|jsonl|arrow|ndjson)$/i.test(path)
+    || /(^|\/)(dataset|metadata|labels|classes)\.json$/i.test(path)
+  );
+  const hasStrongDatasetDeclaration = /\bdataset\b/.test(repositoryName)
+    || topics.has("dataset")
+    || topics.has("image-dataset")
+    || /\b(?:this|the) (?:repository|project) (?:contains|provides|is) (?:an? )?.{0,40}\bdataset\b/.test(readmeLead);
+  if (hasDatasetIdentity && (hasDatasetFiles || hasStrongDatasetDeclaration)) {
     return classified("dataset", 88, "README 与仓库文件共同表明这是数据集。");
   }
   if (isTemplateIdentity && paths.some(isProjectManifest)) {
