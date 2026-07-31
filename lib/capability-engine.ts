@@ -591,7 +591,7 @@ const capabilityPatterns: Array<{
     description: "对图片和 PDF 执行文字识别、版面分析、表格识别与结构化输出。",
     terms: ["发票", "票据", "收据", "ocr", "invoice ocr", "receipt ocr", "document ocr"],
     keywords: [
-      "document ocr toolkit", "multilingual ocr", "document layout analysis",
+      "ocr toolkit", "multilingual ocr", "document layout analysis",
       "table recognition", "structured document extraction"
     ],
     negativeKeywords: ["invoice demo only", "browser extension"],
@@ -628,7 +628,10 @@ const capabilityPatterns: Array<{
       "contrastive language image pretraining", "vision language model",
       "image text embeddings", "openai clip"
     ],
-    negativeKeywords: ["image generation only", "image caption only"],
+    negativeKeywords: [
+      "image generation only", "image caption only", "browser extension",
+      "search engines", "google lens", "tineye", "osint"
+    ],
     preferredTypes: ["github_plugin", "template_repo"],
     priority: "required",
     resourceRoles: ["domain_algorithm"]
@@ -744,7 +747,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
   const seeded = (details.capabilities ?? [])
     .map(normalizeCapabilitySeed)
     .filter((capability): capability is CapabilityRequirement => Boolean(capability))
-    .filter((capability) => isSeededCapabilityCompatible(capability, source));
+    .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()));
 
   const patterned = capabilityPatterns
     .filter((pattern) => pattern.terms.some((term) => source.includes(term.toLowerCase())))

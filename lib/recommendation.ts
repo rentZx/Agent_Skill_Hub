@@ -750,7 +750,8 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
     return /(school[- ]management|education[- ]management|school[- ]erp|student[- ]information|student[- ]management|student scheduling|course scheduling|class scheduling|teacher scheduling|timetabling|attendance system|student attendance|enrollment|tuition|school fee|fee management|parent portal|\blms\b|\bsis\b|教务|学生管理|排课|考勤)/i.test(haystack);
   }
   if (/(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(graph)) {
-    return /(integrated[- ]library[- ]system|library[- ]management|library[- ]circulation|isbn|cataloging|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(haystack);
+    return /(integrated[- ]library[- ]system|library[- ]circulation|isbn|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(haystack)
+      || (/\blibrary\b/i.test(haystack) && /\b(cataloging|circulation|patron|holdings)\b/i.test(haystack));
   }
 
   if (/(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(graph)) {
@@ -788,7 +789,8 @@ function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: Capab
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
   if (/(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(graph)) {
-    const hasLibraryEvidence = /(integrated[- ]library[- ]system|library[- ]management|library[- ]circulation|isbn|cataloging|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(source);
+    const hasLibraryEvidence = /(integrated[- ]library[- ]system|library[- ]circulation|isbn|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(source)
+      || (/\blibrary\b/i.test(source) && /\b(cataloging|circulation|patron|holdings)\b/i.test(source));
     const genericInventoryOnly = /(inventory|warehouse|stock control|manufacturing|parts management)/i.test(source)
       && !hasLibraryEvidence;
     if (genericInventoryOnly) return true;

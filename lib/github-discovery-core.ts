@@ -46,7 +46,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v2";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v3";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -327,12 +327,12 @@ function buildPlannedQueries(
       ...fallbackQueries
     ])).slice(0, 4);
   }
-  return interleaveQueries(
-    planned,
-    relaxedPlanned,
-    adaptiveQueries,
-    fallbackQueries
-  ).slice(0, 4);
+  return Array.from(new Set([
+    ...adaptiveQueries.slice(0, 3),
+    ...planned.slice(0, 1),
+    ...relaxedPlanned.slice(0, 1),
+    ...fallbackQueries
+  ])).slice(0, 4);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -360,21 +360,6 @@ async function mapWithConcurrency<T, R>(
   return results.filter((result): result is R => result !== undefined);
 }
 
-function interleaveQueries(...groups: string[][]) {
-  const result: string[] = [];
-  const seen = new Set<string>();
-  const maxLength = Math.max(0, ...groups.map((group) => group.length));
-  for (let index = 0; index < maxLength; index += 1) {
-    for (const group of groups) {
-      const query = group[index];
-      if (!query || seen.has(query)) continue;
-      seen.add(query);
-      result.push(query);
-    }
-  }
-  return result;
-}
-
 function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
   const ranked = capabilities
     .filter((capability) => capability.priority !== "optional")
@@ -388,11 +373,11 @@ function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
       return { primary: keywords[0] ?? "", secondary: keywords[1] ?? "" };
     })
     .filter((entry) => entry.primary);
-  const terms = ranked.flatMap((entry) => [
-    quoteSearchTerm(entry.primary),
-    buildRelaxedSearchTerm(entry.primary),
-    entry.secondary ? quoteSearchTerm(entry.secondary) : ""
-  ]);
+  const terms = [
+    ...ranked.map((entry) => quoteSearchTerm(entry.primary)),
+    ...ranked.map((entry) => entry.secondary ? quoteSearchTerm(entry.secondary) : ""),
+    ...ranked.map((entry) => buildRelaxedSearchTerm(entry.primary))
+  ];
   return Array.from(new Set(terms))
     .filter(Boolean)
     .slice(0, 6)
