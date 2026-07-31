@@ -74,7 +74,7 @@ export async function analyzeWithLlm(
     ],
     timeoutMs
   );
-  const parsed = parseJsonObject<LlmProjectAnalysis>(content);
+  const parsed = parseProviderJson<LlmProjectAnalysis>(content, config.provider);
   return {
     ...parsed,
     coreFeatures: cleanList(parsed.coreFeatures, 8),
@@ -117,7 +117,10 @@ export async function rerankWithLlm(config: LlmRuntimeConfig, input: string, can
     ],
     timeoutMs
   );
-  const parsed = parseJsonObject<{ items?: Array<Partial<LlmRerankItem>> }>(content);
+  const parsed = parseProviderJson<{ items?: Array<Partial<LlmRerankItem>> }>(
+    content,
+    config.provider
+  );
   return (parsed.items ?? [])
     .filter((item): item is Partial<LlmRerankItem> & { id: string; score: number } =>
       typeof item?.id === "string" && typeof item?.score === "number"
@@ -152,6 +155,9 @@ export function getPublicLlmErrorMessage(error: unknown) {
   if (error.status === 429) {
     return `${label} 请求过于频繁或账户额度不足，请稍后重试。`;
   }
+  if (error.status === 402) {
+    return `${label} 账户余额或可用额度不足，请充值或检查账户状态。`;
+  }
   if (error.status === 400 || error.status === 404) {
     return `${label} 拒绝了请求，请检查模型 ID 是否可用。`;
   }
@@ -170,34 +176,58 @@ async function requestChatCompletion(
   const baseBody = {
     model: config.model,
     messages,
+    ...(config.provider === "deepseek"
+      ? { thinking: { type: "disabled" } }
+      : {}),
     ...(config.provider === "openai"
-      ? { max_completion_tokens: 1800 }
-      : { max_tokens: 1800 })
+      ? { max_completion_tokens: 1400 }
+      : { max_tokens: 1400 })
   };
-  const request = async (jsonMode: boolean) => fetch(definition.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      ...baseBody,
-      ...(jsonMode ? { response_format: { type: "json_object" } } : {})
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(timeoutMs)
-  });
-
-  let response: Response;
-  try {
-    response = await request(true);
-    if (response.status === 400) response = await request(false);
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "TimeoutError") {
-      throw new LlmProviderRequestError(config.provider, 504, "Provider request timed out.");
+  const request = async (jsonMode: boolean) => {
+    let response: Response;
+    try {
+      response = await fetch(definition.endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...baseBody,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (error) {
+      throw normalizeProviderRequestError(config.provider, error);
     }
-    throw new LlmProviderRequestError(config.provider, 503, "Provider request failed.");
-  }
+
+    if (!response.ok) return { response, payload: null };
+    try {
+      return {
+        response,
+        payload: await response.json() as CompatibleChatResponse
+      };
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new LlmProviderRequestError(
+          config.provider,
+          504,
+          "Provider response timed out."
+        );
+      }
+      throw new LlmProviderRequestError(
+        config.provider,
+        502,
+        "Provider returned invalid JSON."
+      );
+    }
+  };
+
+  let result = await request(true);
+  if (result.response.status === 400) result = await request(false);
+  const { response, payload } = result;
 
   if (!response.ok) {
     throw new LlmProviderRequestError(
@@ -207,12 +237,37 @@ async function requestChatCompletion(
     );
   }
 
-  const payload = await response.json() as CompatibleChatResponse;
-  const content = payload.choices?.[0]?.message?.content;
+  const content = payload?.choices?.[0]?.message?.content;
   if (!content) {
     throw new LlmProviderRequestError(config.provider, 502, "Provider returned an empty response.");
   }
   return content;
+}
+
+function normalizeProviderRequestError(provider: LlmProvider, error: unknown) {
+  if (error instanceof LlmProviderRequestError) return error;
+  if (isTimeoutError(error)) {
+    return new LlmProviderRequestError(provider, 504, "Provider request timed out.");
+  }
+  return new LlmProviderRequestError(provider, 503, "Provider request failed.");
+}
+
+export function isTimeoutError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+function parseProviderJson<T>(content: string, provider: LlmProvider) {
+  try {
+    return parseJsonObject<T>(content);
+  } catch {
+    throw new LlmProviderRequestError(
+      provider,
+      502,
+      "Provider returned invalid structured output."
+    );
+  }
 }
 
 function cleanList(value: unknown, limit: number) {

@@ -250,7 +250,7 @@ async function analyzeSafely(input: string, llm: LlmRuntimeConfig) {
   return analyzeWithLlm(
     input,
     llm,
-    positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 5000)
+    positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 10000)
   );
 }
 

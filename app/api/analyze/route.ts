@@ -4,6 +4,7 @@ import { analyzeProjectWithAI } from "@/lib/analyzer-service";
 import { parseLlmRuntimeConfig } from "@/lib/llm-config";
 import {
   getPublicLlmErrorMessage,
+  isTimeoutError,
   LlmProviderRequestError
 } from "@/lib/llm";
 import { getResources } from "@/lib/resources";
@@ -101,7 +102,22 @@ export async function POST(request: Request) {
           code: "LLM_PROVIDER_ERROR",
           requestId
         },
-        { status: error.status === 429 ? 429 : 502 }
+        {
+          status: [400, 401, 402, 403, 404, 429, 504].includes(error.status)
+            ? error.status
+            : 502
+        }
+      );
+    }
+    if (isTimeoutError(error)) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: "项目分析超时，请稍后重试。",
+          code: "ANALYSIS_TIMEOUT",
+          requestId
+        },
+        { status: 504 }
       );
     }
 
