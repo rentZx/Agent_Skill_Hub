@@ -268,9 +268,6 @@ function classifyVerification(
   signals: ReturnType<typeof collectSignals>,
   kind: ResourceArtifactKind
 ) {
-  if (signals.isCurated) {
-    return { status: "verified" as const, confidence: 95, directEvidence: "manual_review" };
-  }
   if (kind === "agent_skill" && signals.hasSkillMd) {
     return { status: "verified" as const, confidence: 98, directEvidence: "skill_manifest" };
   }

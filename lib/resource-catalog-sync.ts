@@ -100,7 +100,8 @@ const githubQueries: GitHubCatalogConfig[] = [
   { type: "template_repo", query: "org:vercel nextjs examples", tags: ["nextjs", "vercel", "examples"] }
 ];
 
-const curatedGitHubAnchors: CuratedGitHubAnchor[] = [
+// Historical migration data only. Runtime synchronization no longer reads this list.
+export const deprecatedCuratedGitHubAnchors: CuratedGitHubAnchor[] = [
   { repository: "harry0703/MoneyPrinterTurbo", type: "template_repo", tags: ["ai-video-generator", "short-video", "text-to-video", "script-generation", "stock-footage", "text-to-speech", "subtitles", "video-composition", "moviepy", "ffmpeg", "vertical-video"] },
   { repository: "gyoridavid/short-video-maker", type: "mcp_server", tags: ["mcp-server", "short-video", "text-to-video", "text-to-speech", "captions", "background-video", "video-composition", "vertical-video"] },
   { repository: "SamurAIGPT/Text-To-Video-AI", type: "template_repo", tags: ["text-to-video", "script-generation", "text-to-speech", "stock-footage", "captions", "vertical-video", "ffmpeg"] },
@@ -175,7 +176,7 @@ export async function syncResourceCatalog(options: CatalogSyncOptions = {}) {
 }
 
 async function syncGitHubCatalog(limit: number) {
-  const candidates: CatalogCandidate[] = await syncCuratedGitHubAnchors();
+  const candidates: CatalogCandidate[] = [];
 
   for (const config of githubQueries) {
     try {
@@ -188,23 +189,6 @@ async function syncGitHubCatalog(limit: number) {
   }
 
   return candidates;
-}
-
-async function syncCuratedGitHubAnchors() {
-  const results = await Promise.all(curatedGitHubAnchors.map(async (anchor) => {
-    try {
-      const repository = await fetchGitHubRepository(anchor.repository);
-      return mapGitHubRepository(repository, {
-        ...anchor,
-        query: `curated:${anchor.repository}`
-      });
-    } catch (error) {
-      console.warn(`Curated GitHub repository failed: ${anchor.repository}`, error);
-      return null;
-    }
-  }));
-
-  return results.filter((candidate): candidate is CatalogCandidate => Boolean(candidate));
 }
 
 async function syncGitHubSkillFiles(limit: number) {

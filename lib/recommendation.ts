@@ -576,7 +576,6 @@ function scoreResources(
       const normalizedModuleTags = moduleTags.map((tag) => tag.toLowerCase());
       const tagHits = resource.tags.filter((tag) => normalizedModuleTags.includes(tag.toLowerCase()) && meaningfulKeywords.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase()))).length;
       const typeBoost = scoringModuleTypes.includes(resource.type) ? 8 : 0;
-      const curatedBoost = Math.min(20, Math.max(0, resource.ai_recommendation_weight ?? 0) * 0.2);
       const textualCapabilityMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         matchesCapabilityEvidence(haystack, capability, capabilityGraph)
       );
@@ -644,7 +643,6 @@ function scoreResources(
         moduleKeywordHits * 2 +
         tagHits * 4 +
         Math.min(typeBoost, 5) +
-        curatedBoost +
         capabilityCoverage * 35 +
         matchedCore.length * 18 +
         matchedRequired.length * 10 +

@@ -402,10 +402,7 @@ export async function discoverGitHubResources(
     context.capabilities ?? [],
     profile
   );
-  const repositoryHints = Array.from(new Set([
-    ...(profile?.repositories ?? []),
-    ...(context.repositoryHints ?? [])
-  ])).slice(0, 10);
+  const repositoryHints = Array.from(new Set(context.repositoryHints ?? [])).slice(0, 5);
   const [searchResults, repositoryResults] = await Promise.all([
     Promise.allSettled(queries.map((query) => searchRepositories(query, 15, context.signal))),
     Promise.allSettled(repositoryHints.map((repository) => fetchRepository(repository, context.signal)))
@@ -428,11 +425,11 @@ export async function discoverGitHubResources(
     }
   }
   const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
-  const preferredNames = new Set(repositoryHints.map((repository) => repository.toLowerCase()));
+  const hintedNames = new Set(repositoryHints.map((repository) => repository.toLowerCase()));
   const unique = new Map<string, GitHubSearchItem>();
 
   results.flat().forEach((item) => {
-    if (!existingUrls.has(item.html_url) || preferredNames.has(item.full_name.toLowerCase())) {
+    if (!existingUrls.has(item.html_url) || hintedNames.has(item.full_name.toLowerCase())) {
       unique.set(item.full_name.toLowerCase(), item);
     }
   });
@@ -448,8 +445,8 @@ export async function discoverGitHubResources(
   ]));
   const ranked = Array.from(unique.values())
     .sort((left, right) =>
-      scoreRepositoryRelevance(right, relevanceTerms, preferredNames) -
-      scoreRepositoryRelevance(left, relevanceTerms, preferredNames)
+      scoreRepositoryRelevance(right, relevanceTerms) -
+      scoreRepositoryRelevance(left, relevanceTerms)
     )
     .slice(0, 24);
   const defaultInspectionLimit = profile ? 6 : 12;
@@ -470,17 +467,12 @@ export async function discoverGitHubResources(
 
   return ranked
     .filter((item) => {
-      if (profile) return true;
       const evidence = evidenceByRepository.get(item.full_name.toLowerCase());
       return evidence ? hasColdStartEvidence(evidence) : false;
     })
     .map((item) => {
       const key = item.full_name.toLowerCase();
       return toResource(item, tags, {
-        typeOverride: profile?.typeOverrides[key],
-        tagOverrides: profile?.tagOverrides[key],
-        recommendationWeight: preferredNames.has(key) ? 100 : undefined,
-        riskOverride: profile?.riskOverrides?.[key],
         evidence: evidenceByRepository.get(key)
       });
     })
@@ -497,7 +489,6 @@ export async function verifyGitHubRepository(
   const evidence = await inspectRepository(item, capabilities);
   if (!hasColdStartEvidence(evidence)) return null;
   return toResource(item, projectTags, {
-    recommendationWeight: 100,
     evidence
   });
 }
@@ -991,13 +982,12 @@ function quoteSearchTerm(term: string) {
   return /[\s-]/.test(term) ? `"${term}"` : term;
 }
 
-function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[], preferredNames = new Set<string>()) {
+function scoreRepositoryRelevance(item: GitHubSearchItem, terms: string[]) {
   const text = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`.toLowerCase();
   const directHits = terms.filter((term) => matchesDiscoveryTerm(text, term)).length;
   const tokenHits = terms.flatMap((term) => term.split(/[\s-]+/)).filter((term) => term.length > 1 && text.includes(term)).length;
   const popularity = Math.log10(Math.max(item.stargazers_count, 1)) * 4;
-  const preferredBoost = preferredNames.has(item.full_name.toLowerCase()) ? 500 : 0;
-  return directHits * 45 + tokenHits * 5 + popularity + preferredBoost;
+  return directHits * 45 + tokenHits * 5 + popularity;
 }
 
 function getDiscoveryProfile(input: string, tags: string[]) {

@@ -15,13 +15,9 @@ export type ResourceVerification = {
 
 export function getResourceVerification(resource: Resource): ResourceVerification {
   if (resource.source === "resource_model_v2") {
-    return resource.verification_status === "verified"
+    return resource.verification_status === "verified" && hasDirectTypeEvidence(resource)
       ? verification("verified", "V2 已验证", "该制品已通过 V2 类型证据校验。", true)
-      : verification("unverified", "V2 待验证", "该制品尚未通过 V2 类型证据校验。", false);
-  }
-
-  if (resource.source === "curated_seed" || resource.is_curated || resource.source === "benchmark") {
-    return verification("curated", "人工精选", "资源类型经过人工精选或领域锚点确认。", true);
+      : verification("unverified", "V2 待验证", "该制品缺少可复核的结构或能力证据。", false);
   }
 
   if (resource.type === "agent_skill") {
@@ -122,10 +118,6 @@ function compareResourceEvidence(left: Resource, right: Resource) {
   const rightSource = sourceWeight(right);
   if (leftSource !== rightSource) return leftSource - rightSource;
 
-  const leftRecommendation = left.ai_recommendation_weight ?? 0;
-  const rightRecommendation = right.ai_recommendation_weight ?? 0;
-  if (leftRecommendation !== rightRecommendation) return leftRecommendation - rightRecommendation;
-
   return left.fit_score + left.trust_score - (right.fit_score + right.trust_score);
 }
 
@@ -158,11 +150,35 @@ function sourceWeight(resource: Resource) {
   if (resource.source === "resource_model_v2" && resource.verification_status === "verified") return 7;
   if (resource.source === "github_live") return 6;
   if (resource.source === "mcp_registry") return 5;
-  if (resource.source === "curated_seed" || resource.is_curated) return 5;
   if (resource.source === "npm_catalog") return 4;
   if (resource.source === "github_catalog") return 3;
   if (resource.source === "github_top_ai") return 0;
   return 2;
+}
+
+function hasDirectTypeEvidence(resource: Resource) {
+  if (resource.type === "agent_skill") return Boolean(resource.has_skill_md);
+  if (resource.type === "mcp_server") {
+    return Boolean(resource.has_mcp_manifest)
+      || Boolean(resource.has_package_json && hasMcpSignal(resource));
+  }
+  if (resource.type === "ui_component") {
+    return Boolean(
+      (resource.has_package_json || resource.has_project_manifest)
+      && hasUiLibrarySignal(resource)
+    );
+  }
+  if (resource.type === "template_repo") {
+    return Boolean(resource.has_project_manifest || resource.has_package_json);
+  }
+  if (resource.has_github_action) return true;
+  if (resource.artifact_kind === "dataset") {
+    return (resource.matched_capabilities?.length ?? 0) > 0;
+  }
+  return Boolean(
+    (resource.has_project_manifest || resource.has_package_json)
+    && (resource.matched_capabilities?.length ?? 0) > 0
+  );
 }
 
 function hasMcpSignal(resource: Resource) {

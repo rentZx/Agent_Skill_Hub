@@ -526,6 +526,11 @@ function resource(name: string, type: ResourceType, description: string, tags: s
     fit_score: 80,
     repo_url: `https://github.com/example/${slug}`,
     source: "benchmark",
-    last_updated: "2026-07-27"
+    last_updated: "2026-07-27",
+    has_skill_md: type === "agent_skill",
+    has_mcp_manifest: type === "mcp_server",
+    has_project_manifest: type === "template_repo" || type === "github_plugin",
+    has_package_json: type === "ui_component",
+    matched_capabilities: type === "github_plugin" ? tags : []
   };
 }
