@@ -53,8 +53,9 @@ export const resourceCapabilityDefinitions: ResourceCapabilityDefinition[] = [
     ["video rendering"], ["video composition"], ["video editing"], ["ffmpeg", "video"]
   ]),
   capability("auto-caption", "自动字幕", "从音频生成字幕并对齐视频时间轴。", "video", "domain_algorithm", [
-    ["automatic subtitles"], ["video captions"], ["caption alignment"], ["subtitle generation"],
-    ["subtitles", "video"], ["captions", "video"], ["captions", "ffmpeg"]
+    ["automatic subtitles"], ["automatic captions"], ["video captions"], ["caption alignment"],
+    ["subtitle generation"], ["timed captions"], ["subtitles", "video"], ["captions", "video"],
+    ["captions", "ffmpeg"]
   ]),
   capability("education-management", "教育培训管理", "管理学校或培训机构的学生、教师、课程和教务流程。", "education", "domain_system", [
     ["school management"], ["education management"], ["school erp"], ["student information system"]

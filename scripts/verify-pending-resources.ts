@@ -89,6 +89,9 @@ async function main() {
   if (options.kind) {
     filters.push(eq(resourceArtifacts.kind, options.kind));
   }
+  if (options.repository) {
+    filters.push(sql`lower(${resourceRepositories.canonicalUrl}) = ${`https://github.com/${options.repository.toLowerCase()}`}`);
+  }
 
   const rows = await db
     .select({
@@ -644,6 +647,7 @@ function parseOptions(args: string[]) {
     throw new Error("--status must be pending, verified, rejected, or stale.");
   }
   const kind = readArg(args, "kind");
+  const repository = readArg(args, "repo");
   const artifactKinds: ArtifactKind[] = [
     "agent_skill",
     "mcp_server",
@@ -667,6 +671,7 @@ function parseOptions(args: string[]) {
     dryRun: args.includes("--dry-run"),
     onlyAutomated: args.includes("--only-automated"),
     excludeAutomated: args.includes("--exclude-automated"),
+    repository,
     kind: kind as ArtifactKind | undefined
   };
 }
