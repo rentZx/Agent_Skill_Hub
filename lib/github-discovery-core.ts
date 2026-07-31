@@ -192,11 +192,10 @@ export async function discoverGitHubResources(
     context.capabilities ?? [],
     profile
   );
-  const searchResults = await Promise.allSettled(
-    queries.map((query) => searchRepositories(query, 15, context.signal))
-  );
-  const initialResults = searchResults.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : []
+  const initialResults = await mapWithConcurrency(
+    queries,
+    2,
+    (query) => searchRepositories(query, 15, context.signal)
   );
   let results = initialResults;
   if (!context.signal?.aborted && results.flat().length < 12) {
@@ -235,14 +234,13 @@ export async function discoverGitHubResources(
     1,
     Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
   );
-  const evidenceResults = await Promise.allSettled(
-    ranked.slice(0, inspectionLimit).map(async (item) => [
+  const evidenceEntries = await mapWithConcurrency(
+    ranked.slice(0, inspectionLimit),
+    2,
+    async (item) => [
       item.full_name.toLowerCase(),
       await inspectRepository(item, context.capabilities ?? [], context.signal)
-    ] as const)
-  );
-  const evidenceEntries = evidenceResults.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : []
+    ] as const
   );
   const evidenceByRepository = new Map(evidenceEntries);
 
@@ -327,14 +325,39 @@ function buildPlannedQueries(
       ...planned,
       ...profileQueries,
       ...fallbackQueries
-    ])).slice(0, 6);
+    ])).slice(0, 4);
   }
   return interleaveQueries(
     planned,
     relaxedPlanned,
     adaptiveQueries,
     fallbackQueries
-  ).slice(0, 8);
+  ).slice(0, 4);
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        try {
+          results[index] = await mapper(items[index]);
+        } catch {
+          // Individual GitHub failures must not discard completed evidence.
+        }
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results.filter((result): result is R => result !== undefined);
 }
 
 function interleaveQueries(...groups: string[][]) {
