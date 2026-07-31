@@ -12,6 +12,7 @@ import {
   type RequirementClarity
 } from "@/lib/requirement-clarity";
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
+import { getLocalizedRecommendationReason } from "@/lib/resource-localization";
 
 export type ProjectUnderstanding = {
   projectType: string;
@@ -928,7 +929,7 @@ function priorityWeight(priority: CapabilityPriority) {
 
 function buildReason(resource: Resource, modules: CapabilityModule[], keywords: string[]) {
   if (resource.evidence_summary && resource.matched_capabilities?.length) {
-    return `${resource.evidence_summary}可信度 ${resource.trust_score}/100，资源基础质量 ${resource.fit_score}/100，风险为 ${resource.risk_level}；风险依据：${getRiskReason(resource)}`;
+    return getLocalizedRecommendationReason(resource);
   }
   const matchedModules = modules.filter((module) =>
     module.preferredTypes.includes(resource.type) || resource.tags.some((tag) => module.preferredTags.includes(tag))
@@ -937,17 +938,20 @@ function buildReason(resource: Resource, modules: CapabilityModule[], keywords: 
   const keywordHit = keywords.find((keyword) =>
     `${resource.name} ${resource.description} ${resource.tags.join(" ")}`.toLowerCase().includes(keyword.toLowerCase())
   );
-  const trustSignal = `可信度 ${resource.trust_score}/100，资源基础质量 ${resource.fit_score}/100，风险为 ${resource.risk_level}；风险依据：${getRiskReason(resource)}`;
 
   if (matchedModules.length === 0) {
-    return `基础工程能力候选；${trustSignal}，用于补齐项目开发、验证或交付环节。`;
+    return getLocalizedRecommendationReason(resource);
   }
 
   if (keywordHit) {
-    return `匹配“${keywordHit}”及${moduleLabel}环节；${trustSignal}，适合作为优先候选。`;
+    return getLocalizedRecommendationReason(
+      resource,
+      undefined,
+      `支持${moduleLabel}，与需求中的“${keywordHit}”能力直接相关。`
+    );
   }
 
-  return `覆盖${moduleLabel}能力；${trustSignal}，与当前能力组合的基础设施需求一致。`;
+  return getLocalizedRecommendationReason(resource, undefined, `用于${moduleLabel}。`);
 }
 
 function buildStage(resource: Resource, modules: CapabilityModule[]) {

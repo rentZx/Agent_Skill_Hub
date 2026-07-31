@@ -140,12 +140,12 @@ const topicRules: TopicRule[] = [
 
 export function getLocalizedResourceDescription(resource: LocalizableResource) {
   const originalDescription = getChineseDescription(resource);
-  if (originalDescription) return originalDescription;
+  if (originalDescription) return conciseText(originalDescription, resource.name);
 
   const topic = inferTopicRules(resource)[0];
-  if (topic) return `${resource.name} ${topic.purpose}`;
+  if (topic) return conciseText(topic.purpose, resource.name);
 
-  return `${resource.name} 是一个${typeLabels[resource.type]}。当前元数据没有提供足够具体的中文功能说明，接入前需要核对仓库 README 和实际能力边界。`;
+  return `暂无具体中文说明，请查看仓库 README 确认其${typeLabels[resource.type]}能力。`;
 }
 
 export function getLocalizedUseCases(resource: LocalizableResource) {
@@ -172,24 +172,21 @@ export function getLocalizedRecommendationReason(
   score?: number,
   aiReason?: string
 ) {
-  const specificReason = normalizeAiReason(aiReason);
+  const specificReason = normalizeAiReason(aiReason, resource.name);
   const topic = inferTopicRules(resource)[0];
-  const matchStatement = typeof score === "number" && score < 40
-    ? "但与当前需求的直接匹配较弱。"
-    : typeof score === "number" && score < 65
-      ? "与当前需求存在部分能力交集，但不应作为核心依赖。"
-      : topic
-        ? `当前需求直接命中其“${topic.label}”能力。`
-        : "与当前需求中的相关能力标签匹配。";
-  const fallbackReason = topic
-    ? `${resource.name} ${topic.purpose}${matchStatement}`
-    : `${resource.name} 是一个${typeLabels[resource.type]}，${matchStatement}`;
-  const reason = specificReason
-    ? `${specificReason.startsWith(resource.name) ? "" : `${resource.name}：`}${specificReason}`
-    : fallbackReason;
-  const scoreText = typeof score === "number" ? `本次方案适配度为 ${Math.round(score)}/100。` : "";
+  if (specificReason) return conciseText(specificReason, resource.name);
 
-  return `${reason}${scoreText}`.replace(/。。+/g, "。");
+  const description = getChineseDescription(resource);
+  if (description) return conciseText(description, resource.name);
+
+  if (topic) {
+    const boundary = typeof score === "number" && score < 65
+      ? "仅适合作为辅助能力。"
+      : "";
+    return conciseText(`${topic.purpose}${boundary}`, resource.name);
+  }
+
+  return `可补充${typeLabels[resource.type]}能力，具体适用范围需以仓库 README 为准。`;
 }
 
 function getChineseDescription(resource: LocalizableResource) {
@@ -200,11 +197,52 @@ function getChineseDescription(resource: LocalizableResource) {
   return candidates.find((value) => /[\u4e00-\u9fff]/.test(value) && value.length >= 12);
 }
 
-function normalizeAiReason(reason?: string) {
+function normalizeAiReason(reason: string | undefined, resourceName: string) {
   if (!reason) return "";
-  const normalized = reason.replace(/\s+/g, " ").trim();
+  const internalEvidencePatterns = [
+    /旧模型声明类型/i,
+    /README、标签或仓库结构明确命中/i,
+    /人工精选或领域锚点/i,
+    /许可证[：:]/i,
+    /最近维护[：:]/i,
+    /GitHub Stars[：:]/i,
+    /可信度\s*\d+/i,
+    /资源基础质量\s*\d+/i,
+    /风险(?:为|等级|依据|信号)[：:\s]/i
+  ];
+  const normalized = reason
+    .replace(/\s+/g, " ")
+    .replace(new RegExp(`^${escapeRegExp(resourceName)}\\s*[：:]\\s*`, "i"), "")
+    .replace(/本次方案适配度为\s*\d+\s*\/\s*100[。.]?/gi, "")
+    .replace(/接入前应?[^。！？]*[。！？]?/g, "")
+    .replace(/可用于当前项目的对应开发环节[，。]?/g, "")
+    .trim();
   if (!/[\u4e00-\u9fff]/.test(normalized) || normalized.length < 8) return "";
-  return /[。！？]$/.test(normalized) ? normalized : `${normalized}。`;
+  if (internalEvidencePatterns.some((pattern) => pattern.test(normalized))) return "";
+  return normalized;
+}
+
+function conciseText(value: string, resourceName: string) {
+  const normalized = value
+    .replace(/\s+/g, " ")
+    .replace(new RegExp(`^${escapeRegExp(resourceName)}\\s*(?:是一个|[：:])?\\s*`, "i"), "")
+    .replace(/本次方案适配度为\s*\d+\s*\/\s*100[。.]?/gi, "")
+    .replace(/接入前应?[^。！？]*[。！？]?/g, "")
+    .replace(/可用于当前项目的对应开发环节[，。]?/g, "")
+    .replace(/。。+/g, "。")
+    .trim();
+  const firstTwoSentences = normalized
+    .split(/(?<=[。！？])/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("");
+  const text = firstTwoSentences || normalized;
+  const shortened = text.length > 88 ? `${text.slice(0, 87).replace(/[，、；：\s]+$/g, "")}…` : text;
+  return /[。！？…]$/.test(shortened) ? shortened : `${shortened}。`;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function inferTopicRules(resource: LocalizableResource) {

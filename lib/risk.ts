@@ -43,7 +43,7 @@ export function getRiskReason(resource: RiskResource) {
       return `${evidence.join("；")}。风险信号：${Array.from(new Set(warnings)).join("；")}。`;
     }
 
-    return `${evidence.join("；")}。未命中许可证缺失、长期停更或社区验证不足等主要风险条件。`;
+    return `${evidence.join("；")}。`;
   }
 
   if (resource.risk_reason) return resource.risk_reason;

@@ -9,6 +9,7 @@ import {
 import { buildProjectRecommendation } from "../lib/recommendation";
 import { hasKnownProjectRule } from "../lib/project-analyzer";
 import { assessRequirementClarity } from "../lib/requirement-clarity";
+import { getLocalizedRecommendationReason } from "../lib/resource-localization";
 import type { Resource, ResourceType } from "../lib/types";
 
 type BenchmarkCase = {
@@ -325,6 +326,27 @@ assert(
   ),
   "陌生领域：GitHub README/SKILL.md 已验证的能力必须进入评分结果"
 );
+
+const conciseWeatherReason = getLocalizedRecommendationReason(
+  resource(
+    "Weather API",
+    "github_plugin",
+    "提供实时天气、逐小时预报和历史天气查询。",
+    ["weather-api", "hourly-forecast", "historical-weather"]
+  ),
+  90,
+  "旧模型声明类型：github_plugin；README、标签或仓库结构明确命中“天气预报数据”：weather api、weather forecast；该资源属于人工精选或领域锚点。；许可证：AGPL-3.0；已记录最近维护时间。；GitHub Stars：5946"
+);
+assert.equal(
+  conciseWeatherReason,
+  "提供实时天气、逐小时预报和历史天气查询。",
+  "推荐理由不应展示内部评分证据"
+);
+assert(
+  !/适配度|可信度|基础质量|风险依据|GitHub Stars|接入前/.test(conciseWeatherReason),
+  "推荐理由不应重复徽标或风险信息"
+);
+assert(conciseWeatherReason.length <= 90, "推荐理由应保持简短");
 
 const invoiceGraph = buildCapabilityGraph(
   "开发一个发票 OCR 识别和结构化提取系统",
