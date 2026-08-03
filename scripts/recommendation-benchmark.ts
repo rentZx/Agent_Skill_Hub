@@ -572,8 +572,16 @@ assert(
   "通用寻路算法不能冒充室内导航引擎"
 );
 assert(
-  isCapabilityEvidenceSufficient("indoor-path-routing", "Indoor navigation and wayfinding over multi-floor building maps"),
+  isCapabilityEvidenceSufficient("indoor-path-routing", "Indoor navigation routing system with Dijkstra pathfinding over multi-floor building maps"),
   "直接支持楼层地图与室内寻路的资源应通过"
+);
+assert(
+  !isCapabilityEvidenceSufficient("ble-indoor-positioning", "Indoor wayfinding prototype; BLE positioning was experimental and has been omitted"),
+  "已明确移除的 BLE 实验功能不能作为室内定位证据"
+);
+assert(
+  !isCapabilityEvidenceSufficient("indoor-path-routing", "Skill that audits indoor wayfinding accessibility guidelines and quality gates"),
+  "室内导航审计 Skill 不能冒充路径规划实现"
 );
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");

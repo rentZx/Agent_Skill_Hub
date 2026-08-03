@@ -75,11 +75,17 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
       && has(/export|convert|annotation format|label format|dataset format|导出|格式转换/i);
   }
   if (/(?:ble|beacon).*(?:position|locali[sz]|location|信标|定位)|indoor-positioning|信标.*定位|室内定位/i.test(capabilityId)) {
-    return has(/\bble\b|bluetooth low energy|ibeacon|beacon|蓝牙信标/i)
+    const explicitlyUnavailable = has(/(?:\bble\b|bluetooth|ibeacon|beacon).{0,120}(?:omitted|removed|not (?:included|supported|implemented)|experimental only|已移除|未实现|不支持)/i);
+    return !explicitlyUnavailable
+      && has(/\bble\b|bluetooth low energy|ibeacon|beacon|蓝牙信标/i)
       && has(/indoor (?:position|locali[sz]|location|navigation)|positioning system|indoor navigation|室内定位|室内导航/i);
   }
   if (/indoor.*(?:routing|path)|accessible.*route|wheelchair.*route/i.test(capabilityId)) {
-    return has(/indoor navigation|indoor routing|indoor path|wayfinding|floor plan|building map|室内导航|室内路径|楼层地图/i)
+    const implementedRouting = has(/pathfinding|routing (?:engine|algorithm|system)|shortest path|dijkstra|a[-* ]star|calculate.{0,30}(?:path|route)|wayfinding.{0,40}(?:map|application|app|system)|路径规划|最短路径|寻路算法/i);
+    const auditOnly = has(/audit(?:s|ing)?|guidelines?|checklist|quality gates?|合规审查|检查清单/i) && !implementedRouting;
+    return implementedRouting
+      && !auditOnly
+      && has(/indoor navigation|indoor routing|indoor path|wayfinding|floor plan|building map|室内导航|室内路径|楼层地图/i)
       && (!/accessible|wheelchair/i.test(capabilityId)
         || has(/accessible route|wheelchair routing|barrier.?free|无障碍/i));
   }

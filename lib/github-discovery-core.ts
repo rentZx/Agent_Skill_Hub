@@ -51,7 +51,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v13";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v15";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -397,6 +397,9 @@ function buildPlannedQueries(
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
   const profileQueries = profile?.queries.slice(0, queryLimit) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
+  const focusedAdaptiveQueries = adaptiveQueries.map((query, index) =>
+    index === 0 ? scopeQueryToRepositoryMetadata(query) : query
+  );
   const fallbackQueries = buildQueries(input, tags);
   if (profile) {
     return Array.from(new Set([
@@ -407,7 +410,7 @@ function buildPlannedQueries(
     ])).slice(0, queryLimit);
   }
   return Array.from(new Set([
-    ...interleaveQueries(adaptiveQueries, planned),
+    ...interleaveQueries(focusedAdaptiveQueries, planned),
     ...relaxedPlanned.slice(0, 1),
     ...fallbackQueries
   ])).slice(0, queryLimit);
@@ -415,6 +418,10 @@ function buildPlannedQueries(
 
 function interleaveQueries(primary: string[], secondary: string[]) {
   return roundRobin([primary, secondary]);
+}
+
+function scopeQueryToRepositoryMetadata(query: string) {
+  return query.replace("in:name,description,readme", "in:name,description");
 }
 
 async function mapWithConcurrency<T, R>(
@@ -580,7 +587,7 @@ async function inspectRepository(
   const hasSkillMd = normalizedPaths.some((path) => /(^|\/)skill\.md$/.test(path));
   const hasPackageJson = normalizedPaths.some((path) => /(^|\/)package\.json$/.test(path));
   const hasProjectManifest = normalizedPaths.some((path) =>
-    /(^|\/)(package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json)$/.test(path)
+    /(^|\/)(package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|gradlew|pubspec\.yaml|podfile|project\.pbxproj)$/.test(path)
   );
   const hasGitHubAction = normalizedPaths.some((path) =>
     /(^|\/)action\.ya?ml$/.test(path) || /^\.github\/actions\/[^/]+\/action\.ya?ml$/.test(path)
@@ -639,7 +646,7 @@ async function inspectRepository(
     && Boolean(item.license?.spdx_id)
     && metadataMatched.length > 0;
   const evidenceFiles = inspection.paths.filter((path) =>
-    /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
+    /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|gradlew|pubspec\.yaml|podfile|project\.pbxproj|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
   ).slice(0, 8);
   const signals = [
     hasSkillMd ? "检测到 SKILL.md" : "",
