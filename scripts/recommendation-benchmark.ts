@@ -476,6 +476,23 @@ const weatherGraph = buildCapabilityGraph("weather forecast and history", {
     )
   ]
 });
+
+const subtitleLocalizationGraph = buildCapabilityGraph(
+  "开发视频字幕本地化工具，翻译字幕并按时间轴对齐，导出 SRT 和 VTT"
+);
+assert(
+  !subtitleLocalizationGraph.capabilities.some((item) => item.id === "video-rendering"),
+  "A subtitle timeline must not imply video rendering or composition."
+);
+
+const pcbSubstitutionGraph = buildCapabilityGraph(
+  "开发 PCB 元器件管理系统，导入 KiCad BOM，发现缺货并推荐替代料"
+);
+assert(
+  !pcbSubstitutionGraph.capabilities.some((item) => item.id === "personalized-recommendation"),
+  "A component substitute suggestion must not imply user personalization."
+);
+
 const staleWeatherCapability: Resource = {
   ...resource(
     "HortusFox",

@@ -863,13 +863,16 @@ function hasGroundedCapabilityEvidence(
 ) {
   if (hasSpecializedCapabilityEvidenceRule(capability.id)) return true;
 
-  const metadataMatches = capability.keywords.filter((keyword) =>
-    matchesCapabilityKeyword(metadataSource, keyword)
+  const idAnchors = specificEvidenceTokens(capability.id)
+    .filter((token) => !broadEvidenceTokens.has(token));
+  const exactMatches = capability.keywords.filter((keyword) =>
+    matchesEvidenceTerm(metadataSource, keyword)
+    || matchesEvidenceTerm(primarySource, keyword)
   );
-  if (metadataMatches.some(hasAnchoredMetadataKeyword)) {
-    return true;
-  }
-  if (metadataMatches.length >= 2) return true;
+  if (exactMatches.some((keyword) =>
+    isSpecificEvidencePhrase(keyword)
+    && sharesCapabilityAnchor(keyword, idAnchors)
+  )) return true;
 
   const readmeMatches = capability.keywords.filter((keyword) =>
     matchesCapabilityKeyword(primarySource, keyword)
@@ -877,22 +880,23 @@ function hasGroundedCapabilityEvidence(
   if (readmeMatches.length < 2) return false;
 
   const idTokens = specificEvidenceTokens(capability.id);
-  if (idTokens.length === 0) return false;
+  if (idTokens.length < 2 || idAnchors.length === 0) return false;
   const sourceTokens = new Set(primarySource.split(/[^a-z0-9]+/).filter(Boolean));
   const idHits = idTokens.filter((token) => sourceTokens.has(token)).length;
-  const anchorHits = idTokens.filter((token) =>
-    !broadEvidenceTokens.has(token) && sourceTokens.has(token)
-  ).length;
+  const anchorHits = idAnchors.filter((token) => sourceTokens.has(token)).length;
   return anchorHits > 0 && idHits >= Math.min(2, idTokens.length);
 }
 
-function hasAnchoredMetadataKeyword(keyword: string) {
-  const rawTokens = keyword.toLowerCase().split(/[^a-z0-9]+/).filter((token) =>
-    token.length >= 3 && !["and", "for", "from", "with", "into", "using"].includes(token)
-  );
-  if (rawTokens.length < 2) return false;
-  const anchors = specificEvidenceTokens(keyword).filter((token) => !broadEvidenceTokens.has(token));
-  return anchors.length > 0;
+function isSpecificEvidencePhrase(keyword: string) {
+  return specificEvidenceTokens(keyword)
+    .filter((token) => !broadEvidenceTokens.has(token))
+    .length >= 1;
+}
+
+function sharesCapabilityAnchor(keyword: string, anchors: string[]) {
+  if (anchors.length === 0) return false;
+  const keywordTokens = new Set(specificEvidenceTokens(keyword));
+  return anchors.some((anchor) => keywordTokens.has(anchor));
 }
 
 function specificEvidenceTokens(value: string) {

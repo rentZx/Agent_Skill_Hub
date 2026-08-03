@@ -52,8 +52,14 @@ export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): 
 
     const existing = mapped.get(row.artifact.id);
     if (existing) {
-      if (row.evidenceKind) existing.evidenceKinds.add(row.evidenceKind);
-      if (row.evidenceSummary && !existing.evidence.includes(row.evidenceSummary)) {
+      if (row.evidenceKind && row.evidenceKind !== "manual_review") {
+        existing.evidenceKinds.add(row.evidenceKind);
+      }
+      if (
+        row.evidenceKind !== "manual_review"
+        && row.evidenceSummary
+        && !existing.evidence.includes(row.evidenceSummary)
+      ) {
         existing.evidence.push(row.evidenceSummary);
       }
       continue;
@@ -63,10 +69,12 @@ export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): 
     const evidenceKinds = new Set<EvidenceKind>();
     const capabilityEvidence = capabilityMap.get(row.artifact.id);
     const evidence = [
-      ...(row.evidenceSummary ? [row.evidenceSummary] : []),
+      ...(row.evidenceKind !== "manual_review" && row.evidenceSummary ? [row.evidenceSummary] : []),
       ...(capabilityEvidence?.summaries ?? [])
     ];
-    if (row.evidenceKind) evidenceKinds.add(row.evidenceKind);
+    if (row.evidenceKind && row.evidenceKind !== "manual_review") {
+      evidenceKinds.add(row.evidenceKind);
+    }
 
     mapped.set(row.artifact.id, {
       id: row.artifact.id,
@@ -107,7 +115,6 @@ export async function listVerifiedResourceArtifacts(db: ResourceModelDatabase): 
     has_package_json: evidenceKinds.has("package_manifest"),
     has_project_manifest: evidenceKinds.has("project_manifest"),
     has_github_action: evidenceKinds.has("github_action"),
-    is_curated: evidenceKinds.has("manual_review"),
     evidence_summary: evidence.join("；")
   }));
 }
