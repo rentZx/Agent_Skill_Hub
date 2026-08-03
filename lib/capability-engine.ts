@@ -62,6 +62,33 @@ export function isGenericCapabilityId(id: string) {
     || /^(?:role-based-access|access-control|login-system)$/.test(id);
 }
 
+/** Require direct, two-part evidence for capabilities that are easy to overmatch. */
+export function isCapabilityEvidenceSufficient(capabilityId: string, source: string) {
+  const text = source.toLowerCase();
+  const has = (pattern: RegExp) => pattern.test(text);
+  if (capabilityId === "library-circulation") {
+    return has(/integrated[- ]library[- ]system|library[- ]circulation|isbn|bibliographic|patron[- ]management|cataloging.{0,40}(circulation|loan|checkout)|circulation.{0,40}(library|loan|patron)/i);
+  }
+  if (capabilityId === "invoice-ocr") {
+    return has(/invoice|receipt|发票|收据/i)
+      && has(/ocr|optical character|document extraction|structured extraction|line item|tax amount|supplier extraction|invoice parser/i);
+  }
+  if (capabilityId === "document-ocr-engine") return has(/ocr|optical character|document layout|table recognition|text recognition/i);
+  if (capabilityId === "visual-product-search") {
+    return has(/product catalog|product image|e-commerce|ecommerce|商品|商用目录/i)
+      && has(/visual search|image search|image retrieval|similar product|search by image|以图搜图/i)
+      && !has(/osint|browser extension|google lens|tineye|stock photo downloader/i);
+  }
+  if (capabilityId === "multimodal-image-embeddings") {
+    return has(/clip|image.?text embeddings?|vision.?language model|multimodal embeddings?|image embeddings?/i)
+      && !has(/image generation only|caption only|browser extension|google lens|tineye/i);
+  }
+  if (capabilityId === "vector-similarity-index") return has(/vector database|vector similarity|nearest neighbor|qdrant|milvus|weaviate|faiss|embedding index/i);
+  if (capabilityId === "speaker-diarization") return has(/speaker diarization|speaker separation|speaker segmentation|who spoke|speaker labels?/i);
+  if (capabilityId === "meeting-summarization") return has(/meeting|会议/i) && has(/summar|minutes|action item|meeting notes|会议纪要|行动项/i);
+  return true;
+}
+
 type CapabilityGraphInput = {
   projectType?: string;
   coreFeatures?: string[];

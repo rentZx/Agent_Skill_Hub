@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildCapabilityGraph,
+  isCapabilityEvidenceSufficient,
   isGenericCapabilityId,
   type CapabilityPriority,
   type CapabilitySeed,
@@ -419,6 +420,26 @@ assert(
 assert(
   visualSearchGraph.searchQueries.some((query) => /visual product search|reverse image search/i.test(query)),
   "陌生领域：以图搜图需求应生成 CLIP / 向量检索方向的检索词"
+);
+assert(
+  !isCapabilityEvidenceSufficient("library-circulation", "Open source framework for large-scale digital repositories"),
+  "图书馆：数字资源库框架不能冒充图书借还系统"
+);
+assert(
+  !isCapabilityEvidenceSufficient("invoice-ocr", "Procurement assistant extracts supplier quotes, pricing and lead time"),
+  "发票：供应商报价抽取不能冒充发票 OCR"
+);
+assert(
+  !isCapabilityEvidenceSufficient("visual-product-search", "OSINT browser extension for reverse image search"),
+  "以图搜图：OSINT 浏览器扩展不能冒充商品相似检索"
+);
+assert(
+  isCapabilityEvidenceSufficient("invoice-ocr", "Invoice OCR extracts supplier, tax amount, total and line items"),
+  "发票：具备发票和 OCR 字段抽取证据的项目应通过"
+);
+assert(
+  isCapabilityEvidenceSufficient("visual-product-search", "E-commerce product catalog with search by image and similar product retrieval"),
+  "以图搜图：具备商品目录和图片检索证据的项目应通过"
 );
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");

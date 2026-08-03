@@ -4,7 +4,10 @@ import type {
   CapabilityPriority,
   ResourceRole
 } from "@/lib/capability-engine";
-import { isGenericCapabilityId } from "@/lib/capability-engine";
+import {
+  isCapabilityEvidenceSufficient,
+  isGenericCapabilityId
+} from "@/lib/capability-engine";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import {
@@ -702,6 +705,7 @@ function matchesCapabilityEvidence(
 ) {
   if (capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
   if (!capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
+  if (!isCapabilityEvidenceSufficient(capability.id, haystack)) return false;
   if (requiresKnownDomainAnchor(capability.id) && !hasKnownDomainAnchor(haystack, capabilityGraph)) {
     return false;
   }

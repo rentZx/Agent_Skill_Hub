@@ -1,5 +1,6 @@
 import { assessRiskLevel } from "./github-import";
 import {
+  isCapabilityEvidenceSufficient,
   isGenericCapabilityId,
   type CapabilityRequirement
 } from "./capability-engine";
@@ -519,6 +520,7 @@ async function inspectRepository(
     capability.keywords.some((keyword) => matchesCapabilityKeyword(evidenceSource, keyword))
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
     && !hasCapabilityConflict(evidenceSource, capability)
+    && isCapabilityEvidenceSufficient(capability.id, evidenceSource)
   );
   const evidenceFiles = inspection.paths.filter((path) =>
     /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
