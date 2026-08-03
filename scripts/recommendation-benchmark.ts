@@ -404,6 +404,12 @@ assert(
   meetingGraph.capabilities.some((item) => item.id === "meeting-summarization"),
   "陌生领域：会议需求应生成会议摘要与行动项能力"
 );
+const realChineseMeetingGraph = buildCapabilityGraph("\u5f00\u53d1\u4f1a\u8bae\u5f55\u97f3\u8f6c\u5199\u5de5\u5177\uff0c\u533a\u5206\u4e0d\u540c\u8bf4\u8bdd\u4eba\u5e76\u751f\u6210\u6458\u8981\u548c\u884c\u52a8\u9879");
+assert(
+  realChineseMeetingGraph.capabilities.some((item) => item.id === "speaker-diarization")
+    && realChineseMeetingGraph.capabilities.some((item) => item.id === "meeting-summarization"),
+  "真实中文会议需求不能被模型输出的无关领域覆盖"
+);
 const visualSearchGraph = buildCapabilityGraph("开发电商以图搜图，根据商品图片查找相似商品");
 assert(
   visualSearchGraph.capabilities.some((item) => item.id === "visual-product-search"),

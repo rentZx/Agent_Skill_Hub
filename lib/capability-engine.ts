@@ -777,7 +777,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()));
 
   const patterned = capabilityPatterns
-    .filter((pattern) => pattern.terms.some((term) => source.includes(term.toLowerCase())))
+    .filter((pattern) => pattern.terms.some((term) => source.includes(term.toLowerCase())) || matchesDeterministicIntent(pattern.id, input))
     .map((pattern) => ({
       ...pattern,
       required: pattern.priority !== "optional",
@@ -816,6 +816,36 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     constraints: cleanStrings(details.constraints ?? [], 10),
     searchQueries
   };
+}
+
+function matchesDeterministicIntent(capabilityId: string, input: string) {
+  const source = input.toLowerCase();
+  if (capabilityId === "library-circulation") {
+    return /\u56fe\u4e66\u9986/.test(source)
+      && /isbn|\u7f16\u76ee|\u501f\u8fd8|\u501f\u9605|\u8bfb\u8005|\u6761\u7801|rfid/.test(source);
+  }
+  if (capabilityId === "speaker-diarization") {
+    return /\u4f1a\u8bae/.test(source)
+      && /\u5f55\u97f3|\u8f6c\u5199|\u8bf4\u8bdd\u4eba|\u5206\u8fa8/.test(source);
+  }
+  if (capabilityId === "meeting-summarization") {
+    return /\u4f1a\u8bae/.test(source)
+      && /\u6458\u8981|\u7eaa\u8981|\u884c\u52a8\u9879|\u5f55\u97f3|\u8f6c\u5199/.test(source);
+  }
+  if (capabilityId === "invoice-ocr") {
+    return /\u53d1\u7968|\u6536\u636e|\u8d39\u7528\u5ba1\u6838/.test(source)
+      && /ocr|\u8bc6\u522b|\u62bd\u53d6|\u7a0e\u989d|\u91d1\u989d|\u660e\u7ec6/.test(source);
+  }
+  if (capabilityId === "document-ocr-engine") {
+    return /ocr|\u53d1\u7968|\u6536\u636e|\u6587\u6863\u8bc6\u522b/.test(source);
+  }
+  if (capabilityId === "visual-product-search") {
+    return /\u4ee5\u56fe\u641c\u56fe|\u5546\u54c1\u56fe\u7247|\u76f8\u4f3c\u5546\u54c1|\u89c6\u89c9\u641c\u7d22/.test(source);
+  }
+  if (capabilityId === "multimodal-image-embeddings" || capabilityId === "vector-similarity-index") {
+    return /\u4ee5\u56fe\u641c\u56fe|\u5546\u54c1\u56fe\u7247|\u76f8\u4f3c\u5546\u54c1|\u89c6\u89c9\u641c\u7d22/.test(source);
+  }
+  return false;
 }
 
 function isSeededCapabilityCompatible(capability: CapabilityRequirement, source: string) {
