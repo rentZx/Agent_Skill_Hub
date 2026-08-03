@@ -588,6 +588,7 @@ function scoreResources(
         && Array.from(inspectedCapabilityHits).some((id) => !isGenericCapabilityId(id));
       const exactEvidenceMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         inspectedCapabilityHits.has(capability.id)
+        && isCapabilityEvidenceSufficient(capability.id, haystack)
       );
       const matchedCapabilities = resource.source === "resource_model_v2"
         ? Array.from(new Map([
@@ -597,7 +598,10 @@ function scoreResources(
             )
           ].map((capability) => [capability.id, capability])).values())
         : resource.source === "github_live" && inspectedCapabilityHits.size > 0
-          ? (capabilityGraph?.capabilities ?? []).filter((capability) => inspectedCapabilityHits.has(capability.id))
+          ? (capabilityGraph?.capabilities ?? []).filter((capability) =>
+              inspectedCapabilityHits.has(capability.id)
+              && isCapabilityEvidenceSufficient(capability.id, haystack)
+            )
           : textualCapabilityMatches;
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
       const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];

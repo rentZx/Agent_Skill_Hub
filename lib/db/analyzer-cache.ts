@@ -23,7 +23,7 @@ import { DISCOVERY_CLASSIFIER_VERSION } from "@/lib/github-discovery-core";
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v18";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v19";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,

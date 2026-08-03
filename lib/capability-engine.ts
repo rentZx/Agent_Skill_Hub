@@ -76,7 +76,7 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
   if (capabilityId === "document-ocr-engine") return has(/ocr|optical character|document layout|table recognition|text recognition/i);
   if (capabilityId === "visual-product-search") {
     return has(/product catalog|product image|e-commerce|ecommerce|商品|商用目录/i)
-      && has(/visual search|image search|image retrieval|similar product|search by image|以图搜图/i)
+      && has(/visual search|image search|image retrieval|similar product|search[_ -]?by[_ -]?image|以图搜图/i)
       && !has(/osint|browser extension|google lens|tineye|stock photo downloader/i);
   }
   if (capabilityId === "multimodal-image-embeddings") {
