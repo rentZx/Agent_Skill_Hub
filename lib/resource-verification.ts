@@ -2,7 +2,6 @@ import type { Resource } from "@/lib/types";
 
 export type ResourceVerificationStatus =
   | "verified"
-  | "curated"
   | "package_verified"
   | "unverified";
 
@@ -88,10 +87,36 @@ export function mergeCanonicalResources(resources: Resource[]) {
   resources.forEach((resource) => {
     const key = getCanonicalResourceKey(resource);
     const existing = merged.get(key);
-    merged.set(key, existing ? selectPreferredResource(existing, resource) : resource);
+    merged.set(key, existing ? mergeResourceEvidence(existing, resource) : resource);
   });
 
   return Array.from(merged.values());
+}
+
+function mergeResourceEvidence(left: Resource, right: Resource): Resource {
+  const preferred = selectPreferredResource(left, right);
+  return {
+    ...preferred,
+    tags: Array.from(new Set([...left.tags, ...right.tags])),
+    use_cases: Array.from(new Set([...left.use_cases, ...right.use_cases])),
+    matched_capabilities: Array.from(new Set([
+      ...(left.matched_capabilities ?? []),
+      ...(right.matched_capabilities ?? [])
+    ])),
+    evidence_summary: [left.evidence_summary, right.evidence_summary]
+      .filter((value): value is string => Boolean(value))
+      .sort((a, b) => b.length - a.length)[0],
+    discovery_classifier_version: right.discovery_classifier_version
+      ?? left.discovery_classifier_version,
+    has_skill_md: Boolean(left.has_skill_md || right.has_skill_md),
+    has_mcp_manifest: Boolean(left.has_mcp_manifest || right.has_mcp_manifest),
+    has_package_json: Boolean(left.has_package_json || right.has_package_json),
+    has_project_manifest: Boolean(left.has_project_manifest || right.has_project_manifest),
+    has_repository_metadata_evidence: Boolean(
+      left.has_repository_metadata_evidence || right.has_repository_metadata_evidence
+    ),
+    has_github_action: Boolean(left.has_github_action || right.has_github_action)
+  };
 }
 
 export function getCanonicalResourceKey(resource: Resource) {
@@ -144,7 +169,6 @@ function verification(
 
 function verificationWeight(status: ResourceVerificationStatus) {
   if (status === "verified") return 4;
-  if (status === "curated") return 3;
   if (status === "package_verified") return 2;
   return 0;
 }

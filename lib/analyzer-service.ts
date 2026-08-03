@@ -5,7 +5,8 @@ import {
   analyzeWithLlm,
   isTimeoutError,
   LlmProviderRequestError,
-  rerankWithLlm
+  rerankWithLlm,
+  suggestRepositoriesWithLlm
 } from "@/lib/llm";
 import { buildCapabilityGraph } from "@/lib/capability-engine";
 import type { LlmProvider, LlmRuntimeConfig } from "@/lib/llm-config";
@@ -123,7 +124,8 @@ async function analyzeProjectUncached(
       input,
       discoveryTags,
       resources,
-      capabilityGraph
+      capabilityGraph,
+      ai?.repositoryHints ?? []
     );
     discovered = mergeCanonicalResources([...discovered, ...liveDiscovered]);
     if (liveDiscovered.length > 0) {
@@ -298,12 +300,24 @@ function getSelectedResourceKeys(recommendation: AnalyzerResult["recommendation"
 }
 
 async function analyzeSafely(input: string, llm: LlmRuntimeConfig) {
+  const timeoutMs = positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 12000);
   try {
-    return await analyzeWithLlm(
-      input,
-      llm,
-      positiveInteger(process.env.ANALYZE_LLM_TIMEOUT_MS, 12000)
-    );
+    const [analysisResult, repositoryResult] = await Promise.allSettled([
+      analyzeWithLlm(input, llm, timeoutMs),
+      suggestRepositoriesWithLlm(input, llm, Math.min(timeoutMs, 10000))
+    ]);
+    if (analysisResult.status === "rejected") throw analysisResult.reason;
+    if (repositoryResult.status === "rejected") {
+      console.warn("Repository hint recall unavailable, continuing with capability search.", repositoryResult.reason);
+      return analysisResult.value;
+    }
+    return {
+      ...analysisResult.value,
+      repositoryHints: Array.from(new Set([
+        ...repositoryResult.value,
+        ...(analysisResult.value.repositoryHints ?? [])
+      ])).slice(0, 8)
+    };
   } catch (error) {
     if (
       isTimeoutError(error)
@@ -336,28 +350,58 @@ function alignAiAnalysisWithKnownDomain(
   ai: Awaited<ReturnType<typeof analyzeWithLlm>> | null,
   ruleAnalysis: AnalyzerResult["analysis"]
 ) {
-  if (!ai || !hasKnownProjectRule(input)) return ai;
+  if (!ai) return ai;
+  const groundedAi = {
+    ...ai,
+    capabilities: filterGroundedLlmCapabilities(input, ai.capabilities ?? [])
+  };
+  if (!hasKnownProjectRule(input)) return groundedAi;
   const shortVideoIntent = isShortVideoIntent(input);
   const searchQueries = shortVideoIntent
-    ? (ai.searchQueries ?? []).filter((query) =>
+    ? (groundedAi.searchQueries ?? []).filter((query) =>
         /(video|script|footage|voiceover|text.to.speech|subtitle|caption|ffmpeg|moviepy|remotion)/i.test(query)
       )
-    : ai.searchQueries;
+    : groundedAi.searchQueries;
 
   return {
-    ...ai,
+    ...groundedAi,
     industry: ruleAnalysis.industry,
     projectType: ruleAnalysis.projectType,
     targetUsers: ruleAnalysis.targetUsers,
     coreFeatures: ruleAnalysis.coreFeatures,
     capabilities: shortVideoIntent
-      ? (ai.capabilities ?? []).filter((capability) => {
+      ? (groundedAi.capabilities ?? []).filter((capability) => {
           const source = `${capability.id ?? ""} ${capability.label ?? ""} ${(capability.keywords ?? []).join(" ")}`.toLowerCase();
           return !/(conversational|chat|message.storage|real.time.communication|user.authentication|natural.language.query|tool.calling|function.calling)/i.test(source);
         })
-      : ai.capabilities,
+      : groundedAi.capabilities,
     searchQueries
   };
+}
+
+function filterGroundedLlmCapabilities(
+  input: string,
+  capabilities: NonNullable<Awaited<ReturnType<typeof analyzeWithLlm>>["capabilities"]>
+) {
+  const normalizedInput = normalizeEvidenceText(input);
+  return capabilities.filter((capability) =>
+    (capability.inputEvidence ?? []).some((evidence) => {
+      const normalized = normalizeEvidenceText(evidence);
+      return isSpecificInputEvidence(normalized)
+        && normalizedInput.includes(normalized);
+    })
+  );
+}
+
+function normalizeEvidenceText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+}
+
+function isSpecificInputEvidence(value: string) {
+  if (value.length < 2 || value.length > 40) return false;
+  return !new Set([
+    "ai", "web", "开发", "功能", "工具", "平台", "软件", "系统", "项目", "用户"
+  ]).has(value);
 }
 
 function isShortVideoIntent(input: string) {
@@ -368,7 +412,8 @@ async function discoverSafely(
   input: string,
   tags: string[],
   resources: Resource[],
-  capabilityGraph: ReturnType<typeof buildCapabilityGraph>
+  capabilityGraph: ReturnType<typeof buildCapabilityGraph>,
+  repositoryHints: string[]
 ) {
   const timeoutMs = positiveInteger(
     process.env.ANALYZE_GITHUB_TIMEOUT_MS,
@@ -380,9 +425,14 @@ async function discoverSafely(
     return await discoverGitHubResources(input, tags, resources, {
       capabilities: capabilityGraph.capabilities,
       searchQueries: capabilityGraph.searchQueries,
+      repositoryHints,
+      searchQueryLimit: positiveInteger(
+        process.env.ANALYZE_GITHUB_QUERY_LIMIT,
+        6
+      ),
       inspectionLimit: positiveInteger(
         process.env.ANALYZE_GITHUB_INSPECTION_LIMIT,
-        10
+        15
       ),
       signal: controller.signal
     });
@@ -443,7 +493,7 @@ async function rerankRecommendation(
           priority: module.priority ?? "optional",
           resourceRoles: module.resourceRoles ?? []
         })),
-        positiveInteger(process.env.ANALYZE_RERANK_TIMEOUT_MS, 1200)
+        positiveInteger(process.env.ANALYZE_RERANK_TIMEOUT_MS, 3000)
       ))
     );
     results.forEach((result, index) => {
@@ -455,6 +505,7 @@ async function rerankRecommendation(
     if (scores.length === 0) return applyEvidenceFallback(recommendation);
 
     const scoreMap = new Map(scores.map((item) => [item.id, item]));
+    const scoredIds = new Set(scores.map((item) => item.id));
     const originalGroupGaps = new Set(
       recommendation.groups.map((group) => group.gap).filter((gap): gap is string => Boolean(gap))
     );
@@ -497,7 +548,8 @@ async function rerankRecommendation(
     });
     const evidencePreservedGroups = preserveEvidenceBackedCoreItems(
       rerankedGroups,
-      recommendation
+      recommendation,
+      scoredIds
     );
     const groups = recommendation.clarity.confidence === "low"
       ? evidencePreservedGroups
@@ -516,13 +568,16 @@ async function rerankRecommendation(
 
 function preserveEvidenceBackedCoreItems(
   rerankedGroups: AnalyzerResult["recommendation"]["groups"],
-  original: AnalyzerResult["recommendation"]
+  original: AnalyzerResult["recommendation"],
+  scoredIds: Set<string>
 ) {
   return rerankedGroups.map((group) => {
     const originalGroup = original.groups.find((candidate) => candidate.id === group.id);
     if (!originalGroup) return group;
 
     const evidenceBacked = originalGroup.items.filter((item) =>
+      !scoredIds.has(item.resource.id)
+      &&
       hasStrongRepositoryEvidence(
         item,
         original.modules,
@@ -636,7 +691,7 @@ function hasStrongRepositoryEvidence(
   const specificDeterministicCoverage = item.matchedCapabilityIds.some((id) =>
     coreIds.has(id) && !broadCapabilityIds.has(id)
   );
-  const curatedLiveEvidence = verification.recommendationEligible
+  const evidenceBackedCoverage = verification.recommendationEligible
     && item.matchKind === "domain"
     && item.score >= 65
     && deterministicCoverage
@@ -650,7 +705,7 @@ function hasStrongRepositoryEvidence(
     && (item.resource.matched_capabilities?.length ?? 0) > 0
     && hasDirectDomainSignal(item, projectKeywords, true, modules);
 
-  return curatedLiveEvidence || inspectedLiveEvidence;
+  return evidenceBackedCoverage || inspectedLiveEvidence;
 }
 
 function addFoundationalUiFallback(

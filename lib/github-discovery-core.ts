@@ -1,5 +1,7 @@
 import { assessRiskLevel } from "./github-import";
+import { DISCOVERY_CLASSIFIER_VERSION } from "./discovery-version";
 import {
+  hasSpecializedCapabilityEvidenceRule,
   isCapabilityEvidenceSufficient,
   isGenericCapabilityId,
   type CapabilityRequirement
@@ -25,6 +27,7 @@ type GitHubSearchItem = {
 type DiscoveryContext = {
   capabilities?: CapabilityRequirement[];
   searchQueries?: string[];
+  repositoryHints?: string[];
   inspectionLimit?: number;
   searchQueryLimit?: number;
   signal?: AbortSignal;
@@ -50,8 +53,6 @@ type DiscoveryProfile = {
   queries: string[];
   relevanceTerms: string[];
 };
-
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v15";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -238,11 +239,11 @@ const visualProductSearchDiscoveryProfile: DiscoveryProfile = {
 export async function discoverGitHubResources(
   input: string,
   tags: string[],
-  existing: Resource[],
+  _existing: Resource[],
   context: DiscoveryContext = {}
 ): Promise<Resource[]> {
   const profile = getDiscoveryProfile(input, tags);
-  const searchQueryLimit = Math.max(1, Math.min(context.searchQueryLimit ?? 4, 4));
+  const searchQueryLimit = Math.max(1, Math.min(context.searchQueryLimit ?? 4, 6));
   const queries = buildPlannedQueries(
     input,
     tags,
@@ -267,11 +268,16 @@ export async function discoverGitHubResources(
       }
     }
   }
-  const existingUrls = new Set(existing.map((resource) => resource.repo_url).filter(Boolean));
   const unique = new Map<string, GitHubSearchItem>();
 
+  const hintedItems = await mapWithConcurrency(
+    Array.from(new Set(context.repositoryHints ?? [])).slice(0, 4),
+    4,
+    (fullName) => fetchRepository(fullName, context.signal)
+  );
+
   results.flat().forEach((item) => {
-    if (!existingUrls.has(item.html_url)) {
+    if (!isLikelyCollectionSearchItem(item)) {
       unique.set(item.full_name.toLowerCase(), item);
     }
   });
@@ -289,12 +295,18 @@ export async function discoverGitHubResources(
     )
     .slice(0, 24);
   const queryLeaders = roundRobin(
-    initialResults.map((items) => items.slice(0, 3))
+    initialResults.map((items) => items.filter((item) => !isLikelyCollectionSearchItem(item)).slice(0, 3))
   );
   const candidates = Array.from(new Map(
-    [...queryLeaders, ...ranked].map((item) => [item.full_name.toLowerCase(), item])
+    [...roundRobin([
+      hintedItems.filter((item): item is GitHubSearchItem => item !== null),
+      queryLeaders
+    ]), ...ranked]
+      .filter((item): item is GitHubSearchItem => item !== null)
+      .filter((item) => !isLikelyCollectionSearchItem(item))
+      .map((item) => [item.full_name.toLowerCase(), item])
   ).values()).slice(0, 24);
-  const defaultInspectionLimit = profile ? 10 : 12;
+  const defaultInspectionLimit = profile ? 10 : 15;
   const inspectionLimit = Math.max(
     1,
     Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
@@ -335,6 +347,11 @@ function dedupeRepositoriesByProjectName(items: GitHubSearchItem[]) {
   return Array.from(bestByName.values());
 }
 
+function isLikelyCollectionSearchItem(item: GitHubSearchItem) {
+  const source = `${item.name} ${item.description ?? ""} ${(item.topics ?? []).join(" ")}`;
+  return /(?:^|[\s_-])awesome(?:[\s_-]|$)|curated (?:list|collection|directory)|collaborative list|(?:paper|project|tool|resource|dataset|prompt)s? (?:list|collection)|list of (?:free |open source )?|collection of (?:free |open source )?|papers with code|reading list|self.hosting guide|open.source alternatives/i.test(source);
+}
+
 export async function verifyGitHubRepository(
   fullName: string,
   projectTags: string[],
@@ -356,7 +373,7 @@ export async function discoverTopAiResources(limit = 30): Promise<Resource[]> {
     "agent skill AI in:name,description,readme archived:false fork:false",
     "LLM extension in:name,description,readme archived:false fork:false"
   ];
-  const results = await Promise.all(queries.map((query) => searchRepositories(query, 100)));
+  const results = await Promise.all(queries.map((query) => searchRepositories(query, 100, undefined, true)));
   const unique = new Map<string, GitHubSearchItem>();
   results.flat().filter(isAiPluginLike).forEach((item) => unique.set(item.full_name, item));
   return Array.from(unique.values())
@@ -397,9 +414,10 @@ function buildPlannedQueries(
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
   const profileQueries = profile?.queries.slice(0, queryLimit) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
-  const focusedAdaptiveQueries = adaptiveQueries.map((query, index) =>
-    index === 0 ? scopeQueryToRepositoryMetadata(query) : query
-  );
+  const intersectionQuery = !profile && queryLimit >= 5
+    ? buildCapabilityIntersectionQuery(capabilities)
+    : "";
+  const focusedAdaptiveQueries = adaptiveQueries;
   const fallbackQueries = buildQueries(input, tags);
   if (profile) {
     return Array.from(new Set([
@@ -410,18 +428,27 @@ function buildPlannedQueries(
     ])).slice(0, queryLimit);
   }
   return Array.from(new Set([
-    ...interleaveQueries(focusedAdaptiveQueries, planned),
+    intersectionQuery,
+    ...focusedAdaptiveQueries,
+    ...planned,
     ...relaxedPlanned.slice(0, 1),
     ...fallbackQueries
-  ])).slice(0, queryLimit);
+  ])).filter(Boolean).slice(0, queryLimit);
 }
 
-function interleaveQueries(primary: string[], secondary: string[]) {
-  return roundRobin([primary, secondary]);
-}
-
-function scopeQueryToRepositoryMetadata(query: string) {
-  return query.replace("in:name,description,readme", "in:name,description");
+function buildCapabilityIntersectionQuery(capabilities: CapabilityRequirement[]) {
+  const tokens = capabilities
+    .filter((capability) => capability.priority !== "optional")
+    .filter((capability) => !isGenericCapabilityId(capability.id))
+    .flatMap((capability) => {
+      const idTokens = specificEvidenceTokens(capability.id);
+      if (idTokens.length > 0) return idTokens.slice(0, 1);
+      return capability.keywords.flatMap(specificEvidenceTokens).slice(0, 1);
+    });
+  const terms = Array.from(new Set(tokens)).slice(0, 4);
+  return terms.length >= 3
+    ? `${terms.join(" ")} in:name,description,readme archived:false fork:false`
+    : "";
 }
 
 async function mapWithConcurrency<T, R>(
@@ -476,30 +503,27 @@ function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
       return { priority: capability.priority, keywords: orderedKeywords };
     })
     .filter((entry) => entry.keywords.length > 0);
-  const coreTerms = roundRobin(
+  const importantTerms = roundRobin(
     ranked
-      .filter((entry) => entry.priority === "core")
-      .map((entry) => entry.keywords)
-  );
-  const requiredTerms = roundRobin(
-    ranked
-      .filter((entry) => entry.priority === "required")
+      .filter((entry) => entry.priority !== "optional")
       .map((entry) => entry.keywords)
   );
   const optionalTerms = ranked
     .filter((entry) => entry.priority === "optional")
     .flatMap((entry) => entry.keywords.slice(0, 1));
   const terms = [
-    ...coreTerms.slice(0, 2),
-    ...requiredTerms,
-    ...coreTerms.slice(2),
+    ...importantTerms,
     ...optionalTerms,
-    ...coreTerms.map(buildRelaxedSearchTerm)
+    ...importantTerms.map(buildRelaxedSearchTerm)
   ];
   return Array.from(new Set(terms))
     .filter(Boolean)
     .slice(0, 6)
-    .map((query) => `${quoteSearchTerm(query)} in:name,description,readme archived:false fork:false`);
+    .map((query) => `${formatCapabilitySearchTerm(query)} in:name,description,readme archived:false fork:false`);
+}
+
+function formatCapabilitySearchTerm(term: string) {
+  return buildRelaxedSearchTerm(term) || quoteSearchTerm(term);
 }
 
 function buildRelaxedSearchTerm(keyword: string) {
@@ -530,12 +554,14 @@ function buildFallbackQuery(input: string, tags: string[]) {
 async function searchRepositories(
   query: string,
   perPage = 15,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sortByStars = false
 ): Promise<GitHubSearchItem[]> {
   const headers: HeadersInit = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   try {
-    const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`, {
+    const sort = sortByStars ? "&sort=stars&order=desc" : "";
+    const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}${sort}&per_page=${perPage}`, {
       headers,
       cache: "no-store",
       signal: requestSignal(signal, 8000)
@@ -609,7 +635,7 @@ async function inspectRepository(
     item.name,
     item.description ?? "",
     ...(item.topics ?? []),
-    capabilityReadme.slice(0, 2500)
+    capabilityReadme.slice(0, 8000)
   ].join(" ").toLowerCase();
   const evidenceSource = [
     item.name,
@@ -631,12 +657,14 @@ async function inspectRepository(
   const isCollectionOnly = /(?:^|[\s_-])awesome(?:[\s_-]|$)|curated list|collection of (?:free |open source )?(?:resources|projects|tools|apis|servers)|list of (?:free |open source )?(?:resources|projects|tools|apis|servers)/i.test(collectionSource);
   const matched = capabilities.filter((capability) =>
     capability.keywords.some((keyword) => matchesCapabilityKeyword(primaryEvidenceSource, keyword))
+    && hasGroundedCapabilityEvidence(capability, metadataEvidenceSource, primaryEvidenceSource)
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(primaryEvidenceSource, keyword))
     && !hasCapabilityConflict(primaryEvidenceSource, capability)
     && isCapabilityEvidenceSufficient(capability.id, primaryEvidenceSource)
   );
   const metadataMatched = capabilities.filter((capability) =>
     capability.keywords.some((keyword) => matchesCapabilityKeyword(metadataEvidenceSource, keyword))
+    && hasGroundedCapabilityEvidence(capability, metadataEvidenceSource, metadataEvidenceSource)
     && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(metadataEvidenceSource, keyword))
     && !hasCapabilityConflict(metadataEvidenceSource, capability)
     && isCapabilityEvidenceSufficient(capability.id, metadataEvidenceSource)
@@ -648,6 +676,13 @@ async function inspectRepository(
   const evidenceFiles = inspection.paths.filter((path) =>
     /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|gradlew|pubspec\.yaml|podfile|project\.pbxproj|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
   ).slice(0, 8);
+  const capabilityExcerpts = matched
+    .map((capability) => {
+      const excerpt = extractCapabilityEvidenceExcerpt(capabilityReadme, capability.keywords);
+      return excerpt ? `${capability.label}：“${excerpt}”` : "";
+    })
+    .filter(Boolean)
+    .slice(0, 4);
   const signals = [
     hasSkillMd ? "检测到 SKILL.md" : "",
     hasMcpManifest ? "检测到 MCP Server 或配置清单" : "",
@@ -657,7 +692,8 @@ async function inspectRepository(
     hasDatasetEvidence ? "检测到数据集说明和数据文件" : "",
     hasReusableUi ? "检测到可复用 UI 组件" : "",
     hasReadmeUsage ? "README 包含安装或使用说明" : "",
-    matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : ""
+    matched.length > 0 ? `README/文件命中能力：${matched.map((capability) => capability.label).join("、")}` : "",
+    capabilityExcerpts.length > 0 ? `证据摘录：${capabilityExcerpts.join("；")}` : ""
   ].filter(Boolean);
 
   return {
@@ -793,6 +829,13 @@ const genericCapabilityTokens = new Set([
   "recognition", "service", "software", "source", "system", "tool"
 ]);
 
+const broadEvidenceTokens = new Set([
+  "alert", "alerting", "analysis", "based", "check", "checking", "control",
+  "export", "extraction", "generation", "import", "integration", "logging",
+  "management", "mapping", "monitoring", "parser", "parsing", "processing",
+  "recommendation", "search", "statistics", "suggestion", "threshold", "tracking", "trend"
+]);
+
 function matchesCapabilityKeyword(source: string, keyword: string) {
   if (matchesEvidenceTerm(source, keyword)) return true;
 
@@ -811,6 +854,68 @@ function matchesCapabilityKeyword(source: string, keyword: string) {
     )
   );
   return matchedTokens.length >= 2;
+}
+
+function hasGroundedCapabilityEvidence(
+  capability: CapabilityRequirement,
+  metadataSource: string,
+  primarySource: string
+) {
+  if (hasSpecializedCapabilityEvidenceRule(capability.id)) return true;
+
+  const metadataMatches = capability.keywords.filter((keyword) =>
+    matchesCapabilityKeyword(metadataSource, keyword)
+  );
+  if (metadataMatches.some(hasAnchoredMetadataKeyword)) {
+    return true;
+  }
+  if (metadataMatches.length >= 2) return true;
+
+  const readmeMatches = capability.keywords.filter((keyword) =>
+    matchesCapabilityKeyword(primarySource, keyword)
+  );
+  if (readmeMatches.length < 2) return false;
+
+  const idTokens = specificEvidenceTokens(capability.id);
+  if (idTokens.length === 0) return false;
+  const sourceTokens = new Set(primarySource.split(/[^a-z0-9]+/).filter(Boolean));
+  const idHits = idTokens.filter((token) => sourceTokens.has(token)).length;
+  const anchorHits = idTokens.filter((token) =>
+    !broadEvidenceTokens.has(token) && sourceTokens.has(token)
+  ).length;
+  return anchorHits > 0 && idHits >= Math.min(2, idTokens.length);
+}
+
+function hasAnchoredMetadataKeyword(keyword: string) {
+  const rawTokens = keyword.toLowerCase().split(/[^a-z0-9]+/).filter((token) =>
+    token.length >= 3 && !["and", "for", "from", "with", "into", "using"].includes(token)
+  );
+  if (rawTokens.length < 2) return false;
+  const anchors = specificEvidenceTokens(keyword).filter((token) => !broadEvidenceTokens.has(token));
+  return anchors.length > 0;
+}
+
+function specificEvidenceTokens(value: string) {
+  return Array.from(new Set(
+    value.toLowerCase().split(/[^a-z0-9]+/).filter((token) =>
+      token.length >= 3
+      && !genericCapabilityTokens.has(token)
+      && !["and", "auto", "for", "from", "with", "into", "using"].includes(token)
+    )
+  ));
+}
+
+function extractCapabilityEvidenceExcerpt(readme: string, keywords: string[]) {
+  const compact = readme.replace(/\s+/g, " ").trim();
+  const lower = compact.toLowerCase();
+  for (const keyword of keywords) {
+    const normalized = keyword.toLowerCase().replace(/[-_]+/g, " ").trim();
+    const index = lower.indexOf(normalized);
+    if (index < 0) continue;
+    const start = Math.max(0, index - 50);
+    return compact.slice(start, Math.min(compact.length, index + normalized.length + 110)).trim();
+  }
+  return "";
 }
 
 function hasCapabilityConflict(source: string, capability: CapabilityRequirement) {

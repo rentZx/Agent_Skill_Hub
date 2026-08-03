@@ -8,6 +8,7 @@ import {
   isCapabilityEvidenceSufficient,
   isGenericCapabilityId
 } from "@/lib/capability-engine";
+import { DISCOVERY_CLASSIFIER_VERSION } from "@/lib/discovery-version";
 import { typeLabels } from "@/lib/resource-types";
 import { getRiskReason } from "@/lib/risk";
 import {
@@ -586,9 +587,13 @@ function scoreResources(
       const hasVerifiedV2DomainEvidence = resource.source === "resource_model_v2"
         && resource.verification_status === "verified"
         && Array.from(inspectedCapabilityHits).some((id) => !isGenericCapabilityId(id));
+      const hasCurrentGitHubEvidence = resource.source === "github_live"
+        && resource.discovery_classifier_version === DISCOVERY_CLASSIFIER_VERSION
+        && Boolean(resource.evidence_summary);
+      const hasVerifiedCapabilityEvidence = hasVerifiedV2DomainEvidence || hasCurrentGitHubEvidence;
       const exactEvidenceMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         inspectedCapabilityHits.has(capability.id)
-        && isCapabilityEvidenceSufficient(capability.id, haystack)
+        && (hasVerifiedCapabilityEvidence || isCapabilityEvidenceSufficient(capability.id, haystack))
         && isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)
       );
       const matchedCapabilities = resource.source === "resource_model_v2"
@@ -599,11 +604,7 @@ function scoreResources(
             )
           ].map((capability) => [capability.id, capability])).values())
         : resource.source === "github_live" && inspectedCapabilityHits.size > 0
-          ? (capabilityGraph?.capabilities ?? []).filter((capability) =>
-              inspectedCapabilityHits.has(capability.id)
-              && isCapabilityEvidenceSufficient(capability.id, haystack)
-              && isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)
-            )
+          ? exactEvidenceMatches
           : textualCapabilityMatches;
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
       const requiredCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "required") ?? [];
@@ -796,8 +797,8 @@ function hasKnownDomainAnchor(haystack: string, capabilityGraph?: CapabilityGrap
   if (/(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(graph)) {
     return /(inventory|stock control|warehouse|item pricing|product catalog|erp|库存|仓库|货架|speech-to-text|speech recognition|chinese asr|voice transcription|postgres|database|sql)/i.test(haystack);
   }
-  if (/(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(graph)) {
-    return /(stock[- ]market|stock[- ]analysis|stock[- ]trading|market[- ]data|a-share|financial|finance|trading|quant|backtesting|candlestick|股票|行情|量化)/i.test(haystack);
+  if (hasStockDomainSignal(graph)) {
+    return /(stock[- ]market|stock[- ]analysis|stock[- ]trading|market[- ]data|a-share|financial|finance|trading|quant|backtesting|candlestick|股票|股市|证券|行情|量化(?:交易|投资|策略|回测)|(?:交易|投资|股票).{0,8}量化)/i.test(haystack);
   }
   if (isShortVideoGraph(capabilityGraph)) {
     return hasShortVideoEvidence(haystack);
@@ -859,10 +860,14 @@ function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
   return /(education-management|student-records|course-scheduling|attendance-enrollment|tuition-billing|school management|student information|class scheduling|timetabling|画室|教务|排课|学生档案)/i.test(source)
     || /(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(source)
     || /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
-    || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
+    || hasStockDomainSignal(source)
     || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)
     || /(three\.js|webgl|mesh generation|image.to.3d|single.image.3d|glb|stl|图像转三维|2d.?转.?3d)/i.test(source)
     || /(plant.species|plant.identification|species.classification|plantnet|植物识别|拍照识花|物种识别|plant.disease|leaf.disease|crop.disease|植物病害|叶片疾病)/i.test(source);
+}
+
+function hasStockDomainSignal(source: string) {
+  return /(stock[-. ]market|stock[-. ]analysis|stock[-. ]trading|market[-. ]data|a-share|technical[-. ]analysis|macd|股票|股市|证券|行情|量化(?:交易|投资|策略|回测)|(?:交易|投资|股票).{0,8}量化)/i.test(source);
 }
 
 function isShortVideoGraph(capabilityGraph?: CapabilityGraph) {

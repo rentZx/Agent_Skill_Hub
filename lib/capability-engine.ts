@@ -35,11 +35,13 @@ export type CapabilityGraph = {
 
 export type CapabilitySeed = Partial<Omit<CapabilityRequirement, "preferredTypes">> & {
   preferredTypes?: string[];
+  inputEvidence?: string[];
 };
 
 const genericCapabilityIds = new Set([
   "audio-preprocessing",
   "audio-upload",
+  "document-processing",
   "domain-data",
   "domain-rules",
   "feature-extraction",
@@ -60,6 +62,36 @@ export function isGenericCapabilityId(id: string) {
   return genericCapabilityIds.has(id)
     || /^(?:user-)?auth(?:entication|orization)?$/.test(id)
     || /^(?:role-based-access|access-control|login-system)$/.test(id);
+}
+
+export function hasSpecializedCapabilityEvidenceRule(capabilityId: string) {
+  return /(?:3d|three-dimensional).*(?:bbox|bounding-box|bounding.box|annotation)|(?:point-cloud|lidar).*(?:annotation|labeling)|三维框|点云.*(?:标注|三维框)/i.test(capabilityId)
+    || /kitti.*(?:export|导出|格式)|export.*kitti/i.test(capabilityId)
+    || /(?:ble|beacon).*(?:position|locali[sz]|location|信标|定位)|indoor-positioning|信标.*定位|室内定位/i.test(capabilityId)
+    || /indoor.*(?:routing|path)|accessible.*route|wheelchair.*route/i.test(capabilityId)
+    || new Set([
+      "library-circulation",
+      "invoice-ocr",
+      "document-ocr-engine",
+      "weather-forecast-data",
+      "historical-weather",
+      "visual-product-search",
+      "multimodal-image-embeddings",
+      "vector-similarity-index",
+      "speaker-diarization",
+      "meeting-summarization",
+      "pedestrian-routing",
+      "interactive-map",
+      "gpx-processing",
+      "medical-image-segmentation",
+      "dicom-viewer",
+      "medical-image-labeling",
+      "home-energy-monitoring",
+      "mqtt-sensor-ingestion",
+      "video-nvr-detection",
+      "multi-object-tracking",
+      "version-comparison"
+    ]).has(capabilityId);
 }
 
 /** Require direct, two-part evidence for capabilities that are easy to overmatch. */
@@ -136,9 +168,18 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
       && !has(/openstreetmap|map tiles?|geojson|maplibre|leaflet|geospatial|gis/i);
     return geospatialMap && !svgRegionOnly;
   }
+  if (capabilityId === "gpx-processing") {
+    return has(/\bgpx\b|gps exchange format/i)
+      && has(/parse|import|export|track|route|waypoint|convert|processing/i);
+  }
   if (capabilityId === "medical-image-segmentation") {
-    return has(/medical|clinical|healthcare|dicom|ct scan|mri|radiology|pathology|医学|医疗|影像/i)
-      && has(/segment(?:ation|ing)|mask generation|分割/i);
+    const medicalContext = has(/medical|clinical|healthcare|dicom|ct scan|mri|radiology|pathology|医学|医疗|影像/i);
+    const segmentationImplementation = has(
+      /segmentation (?:model|network|algorithm|framework|toolkit|pipeline|inference|training|editor)|automatic segmentation|interactive segmentation|segment anything|mask generation|medical image segmentation|医学影像分割|自动分割|交互式分割/i
+    );
+    const viewerOnly = has(/dicom viewer|medical image viewer|segmentation overlay|segmentation rendering/i)
+      && !segmentationImplementation;
+    return medicalContext && segmentationImplementation && !viewerOnly;
   }
   if (capabilityId === "dicom-viewer") {
     return has(/dicom|pacs|medical imaging|radiology/i)
@@ -146,7 +187,7 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
   }
   if (capabilityId === "medical-image-labeling") {
     return has(/medical|clinical|healthcare|dicom|ct scan|mri|radiology|pathology|医学|医疗|影像/i)
-      && has(/annotat(?:e|ion)|label(?:ing|led)|manual correction|segmentation editor|标注|修正/i);
+      && has(/medical image annotation|ai assisted label|segmentation annotation|segmentation editor|manual (?:mask )?correction|labelmap.{0,30}(?:edit|annotation)|影像标注|分割标注|人工修正/i);
   }
   if (capabilityId === "home-energy-monitoring") {
     return has(/home energy|smart meter|electricity consumption|power usage|energy monitoring|用电|智能电表/i)
@@ -466,7 +507,7 @@ const capabilityPatterns: Array<{
     id: "technical-analysis",
     label: "股票走势与技术分析",
     description: "计算 K 线、均线、MACD、RSI、布林带等指标，并支持因子研究、回测或走势分析。",
-    terms: ["走势分析", "技术分析", "K线", "均线", "MACD", "RSI", "量化", "technical analysis", "backtesting"],
+    terms: ["走势分析", "技术分析", "K线", "均线", "MACD", "RSI", "量化交易", "量化策略", "technical analysis", "backtesting"],
     keywords: ["technical analysis", "candlestick indicator", "macd rsi", "quantitative backtesting"],
     negativeKeywords: ["generic chart only", "inventory analytics"],
     preferredTypes: ["github_plugin", "template_repo", "agent_skill"],
@@ -760,6 +801,17 @@ const capabilityPatterns: Array<{
     resourceRoles: ["domain_data", "domain_algorithm"]
   },
   {
+    id: "mqtt-sensor-ingestion",
+    label: "MQTT 传感器与遥测数据接入",
+    description: "通过 MQTT 发布订阅接收传感器或设备遥测数据，并保留主题与设备标识。",
+    terms: ["mqtt"],
+    keywords: ["mqtt sensor", "mqtt telemetry", "mqtt broker", "mqtt client", "mqtt publish subscribe"],
+    negativeKeywords: ["mqtt tutorial only", "chat application"],
+    preferredTypes: ["github_plugin", "mcp_server", "template_repo"],
+    priority: "required",
+    resourceRoles: ["domain_data", "mcp_integration"]
+  },
+  {
     id: "domain-data",
     label: "领域数据与数据源",
     description: "获取、整理和查询项目核心业务数据，并保留数据来源与更新方式。",
@@ -843,12 +895,7 @@ const capabilityPatterns: Array<{
 ];
 
 export function buildCapabilityGraph(input: string, details: CapabilityGraphInput = {}): CapabilityGraph {
-  const source = [
-    input,
-    details.projectType ?? "",
-    ...(details.coreFeatures ?? []),
-    ...(details.tags ?? [])
-  ].join(" ").toLowerCase();
+  const source = input.toLowerCase();
 
   const seeded = (details.capabilities ?? [])
     .map(normalizeCapabilitySeed)
@@ -864,7 +911,7 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     }))
     .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()));
 
-  const featureCapabilities = (details.coreFeatures ?? [])
+  const featureCapabilities = (seeded.length > 0 ? [] : details.coreFeatures ?? [])
     .filter((feature) => !isGenericFeatureCapability(feature))
     .filter((feature) => !patterned.some((pattern) =>
       pattern.terms.some((term) => {
@@ -881,12 +928,12 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
     .filter((capability) => isSeededCapabilityCompatible(capability, input.toLowerCase()))
     .filter((capability) => ![...seeded, ...patterned].some((existing) => capabilitiesOverlap(existing, capability)));
 
-  const capabilities = filterCapabilitiesForDomain(
+  const capabilities = enforceCoreCapabilityLimit(filterCapabilitiesForDomain(
     removeCompositeCapabilities(
       dedupeCapabilities([...patterned, ...seeded, ...featureCapabilities])
     ),
     input
-  ).slice(0, 10);
+  )).slice(0, 10);
   const searchQueries = buildSearchQueries(capabilities, details.searchQueries ?? []);
 
   return {
@@ -897,8 +944,29 @@ export function buildCapabilityGraph(input: string, details: CapabilityGraphInpu
   };
 }
 
+function enforceCoreCapabilityLimit(capabilities: CapabilityRequirement[]) {
+  let coreCount = 0;
+  return capabilities.map((capability) => {
+    if (capability.priority !== "core") return capability;
+    coreCount += 1;
+    if (coreCount <= 3) return capability;
+    return {
+      ...capability,
+      priority: "required" as const,
+      required: true
+    };
+  });
+}
+
 function matchesDeterministicIntent(capabilityId: string, input: string) {
   const source = input.toLowerCase();
+  if (capabilityId === "stock-market-data") {
+    return /炒股|股票|股市|证券行情|a\s*股|stock.market|stock.trading|market.data/.test(source);
+  }
+  if (capabilityId === "technical-analysis") {
+    return /炒股|股票|股市|证券行情|a\s*股|stock.market|stock.trading/.test(source)
+      && /走势|技术分析|k\s*线|均线|macd|rsi|量化|backtest|technical.analysis/.test(source);
+  }
   if (capabilityId === "library-circulation") {
     return /\u56fe\u4e66\u9986/.test(source)
       && /isbn|\u7f16\u76ee|\u501f\u8fd8|\u501f\u9605|\u8bfb\u8005|\u6761\u7801|rfid/.test(source);
@@ -971,6 +1039,10 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
   const label = seed.label?.trim();
   const keywords = cleanStrings(seed.keywords ?? [], 12).filter(isSpecificCapabilityKeyword);
   if (!label || keywords.length === 0) return null;
+  const rawId = seed.id?.trim() ?? "";
+  const normalizedIdSource = /[a-z]/i.test(rawId)
+    ? rawId
+    : keywords.find((keyword) => /[a-z]/i.test(keyword)) ?? (rawId || label);
 
   const preferredTypes = (seed.preferredTypes ?? [])
     .filter((type): type is ResourceType => resourceTypes.includes(type as ResourceType));
@@ -993,7 +1065,7 @@ function normalizeCapabilitySeed(seed: CapabilitySeed): CapabilityRequirement | 
   if (inferredRoles.includes("text_to_speech")) priority = "optional";
 
   return normalizeKnownCapabilityAlias({
-    id: slugify(seed.id || label),
+    id: slugify(normalizedIdSource),
     label,
     description: seed.description?.trim() || `实现${label}并验证其能力边界。`,
     required: priority !== "optional",

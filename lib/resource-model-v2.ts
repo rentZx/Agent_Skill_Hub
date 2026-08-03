@@ -229,9 +229,6 @@ function collectSignals(input: LegacyResourceModelInput, metadata: Record<string
     hasGithubAction: input.hasGithubAction ?? getBoolean(metadata, "has_github_action") ?? false,
     hasGithubApp: input.hasGithubApp ?? getBoolean(metadata, "has_github_app") ?? false,
     hasDatasetManifest: input.hasDatasetManifest ?? getBoolean(metadata, "has_dataset_manifest") ?? false,
-    isCurated: input.isCurated
-      ?? getBoolean(metadata, "is_curated_anchor")
-      ?? (input.source === "curated_seed"),
     text: [
       input.name,
       input.description,
@@ -357,9 +354,6 @@ function buildEvidence(
   }
   if (signals.hasGithubApp) {
     add("github-app", "github_app", "已检测到 GitHub App 配置。", 96);
-  }
-  if (signals.isCurated) {
-    add("manual-review", "manual_review", "该资源属于人工精选或领域锚点。", 95);
   }
   const license = normalizeLicense(input.license);
   if (license) {

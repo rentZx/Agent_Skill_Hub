@@ -19,11 +19,11 @@ import {
   analysisResultCache,
   discoveryCandidateCache
 } from "@/lib/db/schema";
-import { DISCOVERY_CLASSIFIER_VERSION } from "@/lib/github-discovery-core";
+import { DISCOVERY_CLASSIFIER_VERSION } from "@/lib/discovery-version";
 import { isResourceRecommendationEligible } from "@/lib/resource-verification";
 import type { Resource } from "@/lib/types";
 
-export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v27";
+export const ANALYSIS_CACHE_VERSION = "analyzer-cache-v42";
 
 const analysisTtlMs = positiveInteger(
   process.env.ANALYSIS_CACHE_TTL_MS,
@@ -138,7 +138,6 @@ export async function readDiscoveryCandidateCache(
   const specificCapabilityIds = new Set(
     capabilityIds.filter((id) => !isGenericCapabilityId(id))
   );
-  const specificTags = new Set(tags.filter(isSpecificCacheTag));
 
   return rows
     .map((row) => row.resource as Resource)
@@ -146,13 +145,8 @@ export async function readDiscoveryCandidateCache(
       resource.discovery_classifier_version === DISCOVERY_CLASSIFIER_VERSION
     )
     .filter((resource) => {
-      const capabilityHits = (resource.matched_capabilities ?? [])
-        .filter((id) => specificCapabilityIds.has(id)).length;
-      if (capabilityHits > 0) return true;
-      const tagHits = resource.tags
-        .map((tag) => tag.toLowerCase())
-        .filter((tag) => specificTags.has(tag)).length;
-      return tagHits >= 2;
+      return (resource.matched_capabilities ?? [])
+        .some((id) => specificCapabilityIds.has(id));
     })
     .filter(isCachedResource)
     .filter(isResourceRecommendationEligible);
@@ -241,15 +235,6 @@ function normalizeTerms(values: string[]) {
       .map((value) => value.normalize("NFKC").trim().toLowerCase())
       .filter((value) => value.length >= 2 && value.length <= 120)
   )).slice(0, 80);
-}
-
-function isSpecificCacheTag(value: string) {
-  return value.length >= 4
-    && ![
-      "ai", "agent", "api", "app", "application", "backend", "database",
-      "frontend", "github", "management", "platform", "react", "saas",
-      "system", "tool", "tools", "web", "web-app"
-    ].includes(value);
 }
 
 function parseGitHubFullName(repoUrl: string) {

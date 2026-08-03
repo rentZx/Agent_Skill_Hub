@@ -8,9 +8,11 @@ import {
   type ResourceRole
 } from "../lib/capability-engine";
 import { buildProjectRecommendation } from "../lib/recommendation";
+import { DISCOVERY_CLASSIFIER_VERSION } from "../lib/discovery-version";
 import { hasKnownProjectRule } from "../lib/project-analyzer";
 import { assessRequirementClarity } from "../lib/requirement-clarity";
 import { getLocalizedRecommendationReason } from "../lib/resource-localization";
+import { getResourceVerification } from "../lib/resource-verification";
 import type { Resource, ResourceType } from "../lib/types";
 
 type BenchmarkCase = {
@@ -170,7 +172,7 @@ for (const benchmark of cases) {
   });
   assert(
     graph.searchQueries.some((query) => query.toLowerCase().includes(benchmark.expectedQuery)),
-    `${benchmark.name}: 动态查询未包含 ${benchmark.expectedQuery}`
+    `${benchmark.name}: 动态查询未包含 ${benchmark.expectedQuery}; queries=${JSON.stringify(graph.searchQueries)}; capabilities=${JSON.stringify(graph.capabilities.map((item) => item.id))}`
   );
 
   const recommendation = buildProjectRecommendation(
@@ -326,6 +328,65 @@ assert(
     group.items.some((item) => item.resource.name === "birdnet-go")
   ),
   "陌生领域：GitHub README/SKILL.md 已验证的能力必须进入评分结果"
+);
+
+const seededCapabilityGraph = buildCapabilityGraph("开发野生动物相机陷阱平台", {
+  projectType: "野生动物监测平台",
+  coreFeatures: ["自动识别照片中的物种", "去除同一动物重复记录"],
+  capabilities: [
+    capability("species-classifier", "物种识别", ["camera trap species classification"]),
+    capability("individual-reid", "动物个体重识别", ["wildlife individual re-identification"])
+  ]
+});
+assert.equal(
+  seededCapabilityGraph.capabilities.filter((item) =>
+    ["自动识别照片中的物种", "去除同一动物重复记录"].includes(item.id)
+  ).length,
+  0,
+  "陌生领域：模型已提供原子能力时不应再从 coreFeatures 生成中英文重复能力"
+);
+
+const verifiedVisualSearchGraph = buildCapabilityGraph("visual product search", {
+  projectType: "商品视觉检索系统",
+  capabilities: [
+    capability(
+      "visual-product-search",
+      "商品视觉检索",
+      ["visual product search", "search by image", "similar product retrieval"]
+    )
+  ]
+});
+const verifiedVisualSearchResource: Resource = {
+  ...resource(
+    "Verified image retrieval backend",
+    "github_plugin",
+    "E-commerce product image vector retrieval backend",
+    ["ecommerce", "product-catalog", "image-embeddings"]
+  ),
+  source: "github_live",
+  trust_score: 95,
+  fit_score: 92,
+  discovery_classifier_version: DISCOVERY_CLASSIFIER_VERSION,
+  matched_capabilities: ["visual-product-search"],
+  evidence_summary: "GitHub README 已通过当前分类器验证商品视觉检索能力。"
+};
+assert(
+  getResourceVerification(verifiedVisualSearchResource).recommendationEligible,
+  "陌生领域：当前分类器证据夹具必须先通过资源类型验证"
+);
+const verifiedVisualSearchRecommendation = buildProjectRecommendation(
+  "开发电商以图搜图系统，上传商品图片后查找视觉相似商品",
+  [verifiedVisualSearchResource],
+  { capabilityGraph: verifiedVisualSearchGraph }
+);
+assert(
+  verifiedVisualSearchRecommendation.groups.some((group) =>
+    group.items.some((item) =>
+      item.resource.name === verifiedVisualSearchResource.name
+      && item.matchedCapabilityIds.includes("visual-product-search")
+    )
+  ),
+  `陌生领域：当前分类器已验证的能力不能因摘要缺少 README 原文而被评分器丢失；能力=${JSON.stringify(verifiedVisualSearchGraph.capabilities)}；结果=${JSON.stringify(verifiedVisualSearchRecommendation.groups)}`
 );
 
 const pointCloudGraph = buildCapabilityGraph("开发自动驾驶点云标注平台，支持 3D 框、语义分割和 KITTI 导出", {

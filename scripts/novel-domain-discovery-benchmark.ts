@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import dotenv from "dotenv";
-import type { CapabilityRequirement } from "../lib/capability-engine";
+import type { CapabilityGraph, CapabilityRequirement } from "../lib/capability-engine";
 import { discoverGitHubResources } from "../lib/github-discovery-core";
+import { buildProjectRecommendation } from "../lib/recommendation";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
@@ -128,6 +129,7 @@ const cases: NovelCase[] = [
     ],
     forbiddenClaims: {
       "idea-research/grounded-segment-anything": ["medical-image-segmentation", "medical-image-labeling"],
+      "ohif/viewers": ["medical-image-segmentation"],
       "nroduit/weasis": ["medical-image-segmentation", "medical-image-labeling"]
     }
   },
@@ -185,6 +187,10 @@ async function main() {
   let selected = 0;
   let knownReferenceMatches = 0;
   let coveredCases = 0;
+  let expectedCapabilities = 0;
+  let coveredCapabilities = 0;
+  let recommendedCoveredCapabilities = 0;
+  let defaultCoveredCapabilities = 0;
   const claimViolations: Array<{ repository: string; capability: string }> = [];
 
   for (const testCase of cases) {
@@ -192,14 +198,45 @@ async function main() {
       capabilities: testCase.capabilities,
       searchQueries: [],
       inspectionLimit: 10,
-      searchQueryLimit: 2
+      searchQueryLimit: 3
     });
     const references = new Set(testCase.references);
     const names = resources.map((resource) => repositoryKey(resource.repo_url));
     const matches = names.filter((name) => references.has(name));
+    const expectedCapabilityIds = testCase.capabilities
+      .filter((capability) => capability.priority !== "optional")
+      .map((capability) => capability.id);
+    const matchedCapabilityIds = new Set(
+      resources.flatMap((resource) => resource.matched_capabilities ?? [])
+    );
+    const coveredCapabilityIds = expectedCapabilityIds.filter((id) => matchedCapabilityIds.has(id));
+    const missingCapabilityIds = expectedCapabilityIds.filter((id) => !matchedCapabilityIds.has(id));
+    const capabilityGraph: CapabilityGraph = {
+      domain: testCase.tags[0] ?? "unknown",
+      capabilities: testCase.capabilities,
+      constraints: [],
+      searchQueries: []
+    };
+    const recommendation = buildProjectRecommendation(testCase.prompt, resources, { capabilityGraph });
+    const recommendedCapabilityIds = new Set(
+      recommendation.groups.flatMap((group) =>
+        group.items.flatMap((item) => item.matchedCapabilityIds)
+      )
+    );
+    const defaultCapabilityIds = new Set(
+      recommendation.groups
+        .filter((group) => group.id !== "risk-alerts")
+        .flatMap((group) => group.items.flatMap((item) => item.matchedCapabilityIds))
+    );
+    const recommendedCoveredCapabilityIds = expectedCapabilityIds.filter((id) => recommendedCapabilityIds.has(id));
+    const defaultCoveredCapabilityIds = expectedCapabilityIds.filter((id) => defaultCapabilityIds.has(id));
     selected += names.length;
     knownReferenceMatches += matches.length;
-    if (matches.length > 0) coveredCases += 1;
+    expectedCapabilities += expectedCapabilityIds.length;
+    coveredCapabilities += coveredCapabilityIds.length;
+    recommendedCoveredCapabilities += recommendedCoveredCapabilityIds.length;
+    defaultCoveredCapabilities += defaultCoveredCapabilityIds.length;
+    if (coveredCapabilityIds.length > 0) coveredCases += 1;
     resources.forEach((resource) => {
       const repository = repositoryKey(resource.repo_url);
       const forbidden = new Set(testCase.forbiddenClaims?.[repository] ?? []);
@@ -212,6 +249,17 @@ async function main() {
       selected: names,
       knownReferenceMatches: matches,
       additionalEvidenceCandidates: names.filter((name) => !references.has(name)),
+      coveredCapabilityIds,
+      missingCapabilityIds,
+      recommendedCoveredCapabilityIds,
+      defaultCoveredCapabilityIds,
+      recommendedResources: recommendation.groups.flatMap((group) =>
+        group.items.map((item) => ({
+          group: group.id,
+          repository: repositoryKey(item.resource.repo_url),
+          capabilities: item.matchedCapabilityIds
+        }))
+      ),
       matchedCapabilities: resources.map((resource) => ({
         repository: repositoryKey(resource.repo_url),
         capabilities: resource.matched_capabilities ?? []
@@ -221,16 +269,34 @@ async function main() {
 
   const knownReferenceShare = selected === 0 ? 0 : knownReferenceMatches / selected;
   const scenarioCoverage = coveredCases / cases.length;
+  const capabilityCoverage = expectedCapabilities === 0
+    ? 0
+    : coveredCapabilities / expectedCapabilities;
+  const recommendationCapabilityCoverage = expectedCapabilities === 0
+    ? 0
+    : recommendedCoveredCapabilities / expectedCapabilities;
+  const defaultCapabilityCoverage = expectedCapabilities === 0
+    ? 0
+    : defaultCoveredCapabilities / expectedCapabilities;
   console.log(JSON.stringify({
     selected,
     knownReferenceMatches,
     knownReferenceShare: round(knownReferenceShare),
     scenarioCoverage: round(scenarioCoverage),
+    expectedCapabilities,
+    coveredCapabilities,
+    capabilityCoverage: round(capabilityCoverage),
+    recommendedCoveredCapabilities,
+    recommendationCapabilityCoverage: round(recommendationCapabilityCoverage),
+    defaultCoveredCapabilities,
+    defaultCapabilityCoverage: round(defaultCapabilityCoverage),
     claimViolations,
     reports
   }));
 
   assert(scenarioCoverage >= 0.85, `Novel-domain scenario coverage ${round(scenarioCoverage)} is below 0.85.`);
+  assert(capabilityCoverage >= 0.85, `Novel-domain capability coverage ${round(capabilityCoverage)} is below 0.85.`);
+  assert(recommendationCapabilityCoverage >= 0.85, `Novel-domain recommendation coverage ${round(recommendationCapabilityCoverage)} is below 0.85.`);
   assert.equal(claimViolations.length, 0, `Unsupported capability claims: ${JSON.stringify(claimViolations)}`);
 }
 

@@ -83,6 +83,16 @@ assert.notEqual(
   "dataset",
   "A dataset topic alone must not classify a repository as a dataset artifact."
 );
+assert.equal(
+  libraryWithDatasetTopic.artifact.verificationStatus,
+  "pending",
+  "A curated marker must not bypass structural artifact verification."
+);
+assert.equal(
+  libraryWithDatasetTopic.evidence.some((item) => item.kind === "manual_review"),
+  false,
+  "A curated marker must not create recommendation evidence."
+);
 
 const githubAppQueryResult = buildResourceModelV2(resource({
   name: "Repository found by GitHub App query",
