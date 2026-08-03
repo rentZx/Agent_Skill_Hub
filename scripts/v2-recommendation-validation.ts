@@ -85,7 +85,7 @@ const cases = [
     targetPool: [],
     minTargetMatches: 0,
     mustCover: ["weather-forecast-data", "historical-weather"],
-    forbidden: ["HowToCook", "MoneyPrinterTurbo", "FunASR"]
+    forbidden: ["HowToCook", "MoneyPrinterTurbo", "FunASR", "HortusFox 植物管理系统"]
   },
   {
     name: "饮食与营养记录",
@@ -179,6 +179,19 @@ async function main() {
     );
     if (unrelatedAlternatives.length > 0) {
       failures.push(`${testCase.name}: 替代项不在同组候选中 ${unrelatedAlternatives
+        .map((item) => `${item.name}->${item.alternative}`)
+        .join(", ")}`);
+    }
+    const capabilityUnrelatedAlternatives = defaultItems.filter((item) => {
+      if (item.alternative === "暂无同类低风险替代项。") return false;
+      const alternative = defaultItems.find((candidate) =>
+        candidate.group === item.group
+        && candidate.name.toLowerCase() === item.alternative.toLowerCase()
+      );
+      return !alternative || !item.matchedCapabilities.some((id) => alternative.matchedCapabilities.includes(id));
+    });
+    if (capabilityUnrelatedAlternatives.length > 0) {
+      failures.push(`${testCase.name}: 替代项未共享能力 ${capabilityUnrelatedAlternatives
         .map((item) => `${item.name}->${item.alternative}`)
         .join(", ")}`);
     }

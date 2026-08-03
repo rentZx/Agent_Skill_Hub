@@ -463,6 +463,14 @@ assert(
   isCapabilityEvidenceSufficient("interactive-map", "Offline OpenStreetMap tiles rendered with Leaflet and GeoJSON"),
   "离线地理地图组件应通过"
 );
+assert(
+  !isCapabilityEvidenceSufficient("weather-forecast-data", "Plant management system with gardening tasks and calendar reminders"),
+  "附带日历的植物管理系统不能冒充天气预报数据源"
+);
+assert(
+  isCapabilityEvidenceSufficient("weather-forecast-data", "Weather API with current weather, hourly forecast and daily forecast data"),
+  "直接提供预报数据的天气 API 应通过"
+);
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
 assert(isGenericCapabilityId("model-training-pipeline"), "陌生领域：模型训练流水线不能独立证明领域适配");

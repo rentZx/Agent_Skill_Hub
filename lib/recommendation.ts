@@ -412,8 +412,8 @@ export function buildProjectRecommendation(input: string, resources: Resource[],
       install: item.resource.install_command,
       risk: item.resource.risk_level,
       alternative: buildAlternative(
-        item.resource,
-        candidates.map((candidate) => candidate.resource)
+        item,
+        candidates
       ),
       matchKind: (group.riskOnly ? "risk" : item.hasProjectSignal ? "domain" : "baseline") as RecommendedResource["matchKind"]
     }));
@@ -1023,13 +1023,23 @@ function buildStage(resource: Resource, modules: CapabilityModule[]) {
   return matchedModule?.projectStage ?? "项目搭建、工程增强和交付质量控制";
 }
 
-function buildAlternative(resource: Resource, resources: Resource[]) {
-  const sameType = resources
-    .filter((item) => item.id !== resource.id && item.type === resource.type && item.risk_level !== "high")
-    .sort((a, b) => b.trust_score + b.fit_score - (a.trust_score + a.fit_score))[0];
+function buildAlternative(
+  item: { resource: Resource; matchedCapabilityIds: string[] },
+  candidates: Array<{ resource: Resource; matchedCapabilityIds: string[] }>
+) {
+  const matchedIds = new Set(item.matchedCapabilityIds);
+  const sameCapability = candidates
+    .filter((candidate) => candidate.resource.id !== item.resource.id)
+    .filter((candidate) => candidate.resource.type === item.resource.type)
+    .filter((candidate) => candidate.resource.risk_level !== "high")
+    .filter((candidate) => candidate.matchedCapabilityIds.some((id) => matchedIds.has(id)))
+    .sort((left, right) =>
+      right.resource.trust_score + right.resource.fit_score
+      - (left.resource.trust_score + left.resource.fit_score)
+    )[0];
 
-  if (sameType) {
-    return sameType.name;
+  if (sameCapability) {
+    return sameCapability.resource.name;
   }
 
   return "暂无同类低风险替代项。";

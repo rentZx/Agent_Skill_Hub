@@ -74,6 +74,14 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
       && has(/ocr|optical character|document extraction|structured extraction|line item|tax amount|supplier extraction|invoice parser/i);
   }
   if (capabilityId === "document-ocr-engine") return has(/ocr|optical character|document layout|table recognition|text recognition/i);
+  if (capabilityId === "weather-forecast-data") {
+    return has(/weather|meteorolog|forecast|天气|气象/i)
+      && has(/weather api|forecast (?:api|data|service)|hourly forecast|daily forecast|current weather|meteorological data|weather model|天气接口|预报数据|实时天气/i);
+  }
+  if (capabilityId === "historical-weather") {
+    return has(/weather|climate|meteorolog|天气|气候|气象/i)
+      && has(/historical|archive|time series|past weather|历史|归档/i);
+  }
   if (capabilityId === "visual-product-search") {
     return has(/product catalog|product image|e-commerce|ecommerce|商品|商用目录/i)
       && has(/visual search|image search|image retrieval|similar product|search[_ -]?by[_ -]?image|以图搜图/i)
