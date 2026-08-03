@@ -465,6 +465,41 @@ const podcastNames = podcastRecommendation.groups.flatMap((group) =>
 assert(podcastNames.includes("WhisperX"), "播客后期：应召回具备音频转写和说话人分离证据的仓库");
 assert(!podcastNames.includes("MoneyPrinterTurbo"), "播客后期：短视频字幕工具不能冒充音频后期工具");
 
+const weatherGraph = buildCapabilityGraph("weather forecast and history", {
+  projectType: "Weather data application",
+  coreFeatures: ["current weather", "hourly forecast", "historical weather"],
+  capabilities: [
+    capability(
+      "weather-forecast-data",
+      "Weather forecast data",
+      ["weather api", "weather forecast", "current weather", "hourly forecast"]
+    )
+  ]
+});
+const staleWeatherCapability: Resource = {
+  ...resource(
+    "HortusFox",
+    "github_plugin",
+    "Self-hosted plant management, plant identification, tasks and care reminders",
+    ["plant-management", "plant-identification", "gardening"]
+  ),
+  source: "resource_model_v2",
+  verification_status: "verified",
+  has_project_manifest: true,
+  matched_capabilities: ["weather-forecast-data"]
+};
+const staleWeatherRecommendation = buildProjectRecommendation(
+  "Build a weather forecast and historical weather application",
+  [staleWeatherCapability],
+  { capabilityGraph: weatherGraph }
+);
+assert(
+  !staleWeatherRecommendation.groups.some((group) =>
+    group.items.some((item) => item.resource.name === "HortusFox")
+  ),
+  "A stale V2 capability id must not bypass specialized evidence checks."
+);
+
 const conciseWeatherReason = getLocalizedRecommendationReason(
   resource(
     "Weather API",

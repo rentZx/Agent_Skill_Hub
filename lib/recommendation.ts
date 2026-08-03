@@ -590,10 +590,12 @@ function scoreResources(
       const hasCurrentGitHubEvidence = resource.source === "github_live"
         && resource.discovery_classifier_version === DISCOVERY_CLASSIFIER_VERSION
         && Boolean(resource.evidence_summary);
-      const hasVerifiedCapabilityEvidence = hasVerifiedV2DomainEvidence || hasCurrentGitHubEvidence;
       const exactEvidenceMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         inspectedCapabilityHits.has(capability.id)
-        && (hasVerifiedCapabilityEvidence || isCapabilityEvidenceSufficient(capability.id, haystack))
+        && (
+          hasCurrentGitHubEvidence
+          || isCapabilityEvidenceSufficient(capability.id, haystack)
+        )
         && isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)
       );
       const matchedCapabilities = resource.source === "resource_model_v2"
