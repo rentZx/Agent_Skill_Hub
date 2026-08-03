@@ -31,6 +31,16 @@ const verifiedLiveDataset = resource("Bird Audio Dataset", "github_plugin", "htt
   artifact_kind: "dataset",
   matched_capabilities: ["bird-sound-recognition"]
 });
+const metadataVerifiedTemplate = resource("Routing Engine", "template_repo", "https://github.com/example/routing", {
+  source: "github_live",
+  has_repository_metadata_evidence: true,
+  matched_capabilities: ["pedestrian-routing"]
+});
+const metadataOnlySkill = resource("Claimed Skill", "agent_skill", "https://github.com/example/claimed-skill", {
+  source: "github_live",
+  has_repository_metadata_evidence: true,
+  matched_capabilities: ["pedestrian-routing"]
+});
 
 assert.equal(getResourceVerification(verifiedSkill).status, "verified");
 assert(isResourceRecommendationEligible(verifiedSkill), "检测到 SKILL.md 的 Skill 应允许推荐");
@@ -40,6 +50,8 @@ assert(isResourceRecommendationEligible(npmMcp), "具有 npm 包和 MCP 标识�
 assert(!isResourceRecommendationEligible(curatedTemplate), "人工精选标记不能绕过结构证据门槛");
 assert(isResourceRecommendationEligible(evidencedTemplate), "具有项目清单的资源应允许推荐");
 assert(isResourceRecommendationEligible(verifiedLiveDataset), "具有数据文件和领域能力证据的联网数据集应允许推荐");
+assert(isResourceRecommendationEligible(metadataVerifiedTemplate), "成熟仓库的直接元数据能力证据应允许推荐");
+assert(!isResourceRecommendationEligible(metadataOnlySkill), "仓库元数据不能绕过 Skill 的 SKILL.md 证据门槛");
 
 const verifiedRootSkill = resource("Root Skill", "agent_skill", "https://github.com/example/conflict", {
   has_skill_md: true,

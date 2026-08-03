@@ -38,6 +38,8 @@ type RepositoryEvidence = {
   hasDatasetEvidence: boolean;
   hasReusableUi: boolean;
   hasReadmeUsage: boolean;
+  hasStrongMetadataEvidence: boolean;
+  isCollectionOnly: boolean;
   matchedCapabilities: string[];
   evidenceFiles: string[];
   summary: string;
@@ -48,7 +50,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v9";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v10";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -182,14 +184,53 @@ const imageTo3dDiscoveryProfile: DiscoveryProfile = {
 
 const libraryDiscoveryProfile: DiscoveryProfile = {
   queries: [
-    "\"integrated library system\" circulation in:name,description,readme archived:false fork:false",
+    "\"free software integrated library system\" in:name,description,readme archived:false fork:false",
     "\"library management system\" ISBN cataloging in:name,description,readme archived:false fork:false",
-    "Koha library circulation in:name,description,readme archived:false fork:false",
+    "library circulation cataloging patron OPAC in:name,description,readme archived:false fork:false",
     "open source ILS patron management in:name,description,readme archived:false fork:false"
   ],
   relevanceTerms: [
     "integrated library system", "library circulation", "ISBN cataloging", "patron management",
     "bibliographic records", "library management system", "Koha", "ILS"
+  ]
+};
+
+const meetingDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"speaker diarization\" meeting transcription in:name,description,readme archived:false fork:false",
+    "\"meeting transcription\" \"action items\" in:name,description,readme archived:false fork:false",
+    "\"speaker diarization\" \"word timestamps\" in:name,description,readme archived:false fork:false",
+    "\"meeting minutes\" transcription summarization in:name,description,readme archived:false fork:false"
+  ],
+  relevanceTerms: [
+    "speaker diarization", "meeting transcription", "word timestamps", "meeting summary",
+    "meeting minutes", "action items", "speaker labels"
+  ]
+};
+
+const invoiceDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"extract structured data\" invoices OCR in:name,description,readme archived:false fork:false",
+    "\"invoice data extraction\" OCR in:name,description,readme archived:false fork:false",
+    "\"receipt OCR\" \"structured data\" in:name,description,readme archived:false fork:false",
+    "\"document OCR\" \"table recognition\" in:name,description,readme archived:false fork:false"
+  ],
+  relevanceTerms: [
+    "invoice data extraction", "invoice OCR", "receipt OCR", "invoice parser",
+    "line item extraction", "tax amount", "structured data", "table recognition"
+  ]
+};
+
+const visualProductSearchDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"visual product search\" \"search by image\" in:name,description,readme archived:false fork:false",
+    "\"image text embeddings\" similarity search in:name,description,readme archived:false fork:false",
+    "\"vector similarity search\" images in:name,description,readme archived:false fork:false",
+    "\"product image retrieval\" embeddings in:name,description,readme archived:false fork:false"
+  ],
+  relevanceTerms: [
+    "visual product search", "search by image", "product image retrieval", "image embeddings",
+    "image text embeddings", "vector similarity search", "nearest neighbor search"
   ]
 };
 
@@ -250,7 +291,7 @@ export async function discoverGitHubResources(
   const candidates = Array.from(new Map(
     [...queryLeaders, ...ranked].map((item) => [item.full_name.toLowerCase(), item])
   ).values()).slice(0, 24);
-  const defaultInspectionLimit = profile ? 6 : 12;
+  const defaultInspectionLimit = profile ? 10 : 12;
   const inspectionLimit = Math.max(
     1,
     Math.min(context.inspectionLimit ?? defaultInspectionLimit, defaultInspectionLimit)
@@ -265,11 +306,13 @@ export async function discoverGitHubResources(
   );
   const evidenceByRepository = new Map(evidenceEntries);
 
-  return candidates
+  const evidencedCandidates = candidates
     .filter((item) => {
       const evidence = evidenceByRepository.get(item.full_name.toLowerCase());
       return evidence ? hasColdStartEvidence(evidence) : false;
-    })
+    });
+
+  return dedupeRepositoriesByProjectName(evidencedCandidates)
     .map((item) => {
       const key = item.full_name.toLowerCase();
       return toResource(item, tags, {
@@ -277,6 +320,16 @@ export async function discoverGitHubResources(
       });
     })
     .filter(isResourceRecommendationEligible);
+}
+
+function dedupeRepositoriesByProjectName(items: GitHubSearchItem[]) {
+  const bestByName = new Map<string, GitHubSearchItem>();
+  items.forEach((item) => {
+    const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const current = bestByName.get(key);
+    if (!current || item.stargazers_count > current.stargazers_count) bestByName.set(key, item);
+  });
+  return Array.from(bestByName.values());
 }
 
 export async function verifyGitHubRepository(
@@ -338,22 +391,23 @@ function buildPlannedQueries(
     .map(buildRelaxedSearchTerm)
     .filter(Boolean)
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
-  const profileQueries = profile?.queries.slice(0, 2) ?? [];
+  const profileQueries = profile?.queries.slice(0, 3) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
   const fallbackQueries = buildQueries(input, tags);
   if (profile) {
     return Array.from(new Set([
-      ...planned,
       ...profileQueries,
+      ...planned.slice(0, 1),
+      ...relaxedPlanned.slice(0, 1),
       ...fallbackQueries
-    ])).slice(0, 4);
+    ])).slice(0, 3);
   }
   return Array.from(new Set([
     ...adaptiveQueries.slice(0, 3),
     ...planned.slice(0, 1),
     ...relaxedPlanned.slice(0, 1),
     ...fallbackQueries
-  ])).slice(0, 4);
+  ])).slice(0, 3);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -401,19 +455,37 @@ function buildColdStartQueries(capabilities: CapabilityRequirement[]) {
       const keywords = capability.keywords
         .map((keyword) => keyword.toLowerCase().trim())
         .filter(isSpecificDiscoveryKeyword)
-        .slice(0, 2);
-      return { primary: keywords[0] ?? "", secondary: keywords[1] ?? "" };
+        .slice(0, 3);
+      const orderedKeywords = keywords.length === 3
+        ? [keywords[0], keywords[2], keywords[1]]
+        : keywords;
+      return { priority: capability.priority, keywords: orderedKeywords };
     })
-    .filter((entry) => entry.primary);
+    .filter((entry) => entry.keywords.length > 0);
+  const coreTerms = roundRobin(
+    ranked
+      .filter((entry) => entry.priority === "core")
+      .map((entry) => entry.keywords)
+  );
+  const requiredTerms = roundRobin(
+    ranked
+      .filter((entry) => entry.priority === "required")
+      .map((entry) => entry.keywords)
+  );
+  const optionalTerms = ranked
+    .filter((entry) => entry.priority === "optional")
+    .flatMap((entry) => entry.keywords.slice(0, 1));
   const terms = [
-    ...ranked.map((entry) => quoteSearchTerm(entry.primary)),
-    ...ranked.map((entry) => entry.secondary ? quoteSearchTerm(entry.secondary) : ""),
-    ...ranked.map((entry) => buildRelaxedSearchTerm(entry.primary))
+    ...coreTerms.slice(0, 2),
+    ...requiredTerms,
+    ...coreTerms.slice(2),
+    ...optionalTerms,
+    ...coreTerms.map(buildRelaxedSearchTerm)
   ];
   return Array.from(new Set(terms))
     .filter(Boolean)
     .slice(0, 6)
-    .map((query) => `${query} in:name,description,readme archived:false fork:false`);
+    .map((query) => `${quoteSearchTerm(query)} in:name,description,readme archived:false fork:false`);
 }
 
 function buildRelaxedSearchTerm(keyword: string) {
@@ -513,12 +585,24 @@ async function inspectRepository(
     /\b(model context protocol|mcp server)\b/i.test(mcpReadme)
     && /\b(mcpservers|stdio|tools\/list|npx|uvx|server transport)\b/i.test(mcpReadme)
   );
+  const capabilityReadme = stripNonImplementedReadmeSections(inspection.readme);
+  const metadataEvidenceSource = [
+    item.name,
+    item.description ?? "",
+    ...(item.topics ?? [])
+  ].join(" ").toLowerCase();
+  const primaryEvidenceSource = [
+    item.name,
+    item.description ?? "",
+    ...(item.topics ?? []),
+    capabilityReadme.slice(0, 2500)
+  ].join(" ").toLowerCase();
   const evidenceSource = [
     item.name,
     item.description ?? "",
     ...(item.topics ?? []),
     ...inspection.paths.slice(0, 500),
-    inspection.readme.slice(0, 24000)
+    capabilityReadme.slice(0, 24000)
   ].join(" ").toLowerCase();
   const hasDatasetEvidence = /\b(dataset|training data|benchmark dataset|annotated images?|annotations?)\b/i.test(evidenceSource)
     && normalizedPaths.some((path) =>
@@ -529,12 +613,24 @@ async function inspectRepository(
     && /\b(component library|web[- ]?component|ui library|design system|react components?|vue components?|svelte components?)\b/i.test(evidenceSource);
   const hasReadmeUsage = inspection.readme.length >= 300
     && /\b(installation|installing|getting started|quick start|quickstart|usage|docker compose|npm install|pip install|developer handbook)\b/i.test(inspection.readme);
+  const collectionSource = `${item.name} ${item.description ?? ""} ${inspection.readme.slice(0, 1200)}`;
+  const isCollectionOnly = /(?:^|[\s_-])awesome(?:[\s_-]|$)|curated list|collection of (?:free |open source )?(?:resources|projects|tools|apis|servers)|list of (?:free |open source )?(?:resources|projects|tools|apis|servers)/i.test(collectionSource);
   const matched = capabilities.filter((capability) =>
-    capability.keywords.some((keyword) => matchesCapabilityKeyword(evidenceSource, keyword))
-    && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(evidenceSource, keyword))
-    && !hasCapabilityConflict(evidenceSource, capability)
-    && isCapabilityEvidenceSufficient(capability.id, evidenceSource)
+    capability.keywords.some((keyword) => matchesCapabilityKeyword(primaryEvidenceSource, keyword))
+    && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(primaryEvidenceSource, keyword))
+    && !hasCapabilityConflict(primaryEvidenceSource, capability)
+    && isCapabilityEvidenceSufficient(capability.id, primaryEvidenceSource)
   );
+  const metadataMatched = capabilities.filter((capability) =>
+    capability.keywords.some((keyword) => matchesCapabilityKeyword(metadataEvidenceSource, keyword))
+    && !capability.negativeKeywords.some((keyword) => matchesEvidenceTerm(metadataEvidenceSource, keyword))
+    && !hasCapabilityConflict(metadataEvidenceSource, capability)
+    && isCapabilityEvidenceSufficient(capability.id, metadataEvidenceSource)
+  );
+  const hasStrongMetadataEvidence = Boolean(item.description)
+    && item.stargazers_count >= 50
+    && Boolean(item.license?.spdx_id)
+    && metadataMatched.length > 0;
   const evidenceFiles = inspection.paths.filter((path) =>
     /(^|\/)(skill\.md|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|pom\.xml|composer\.json|action\.ya?ml|mcp\.json|\.mcp\.json|readme\.md)$/i.test(path)
   ).slice(0, 8);
@@ -559,13 +655,33 @@ async function inspectRepository(
     hasDatasetEvidence,
     hasReusableUi,
     hasReadmeUsage,
+    hasStrongMetadataEvidence,
+    isCollectionOnly,
     matchedCapabilities: matched.map((capability) => capability.id),
     evidenceFiles,
     summary: signals.length > 0 ? `仓库证据：${signals.join("；")}。` : "仓库证据：未检测到明确的 Skill、MCP 或核心能力文件信号。"
   };
 }
 
+function stripNonImplementedReadmeSections(readme: string) {
+  const excludedHeading = /\b(?:community integrations?|related projects?|similar projects?|alternatives?|roadmap|planned features?|coming soon|acknowledg(?:e)?ments?|references?|further reading)\b/i;
+  let excludedLevel = 0;
+  return readme
+    .split(/\r?\n/)
+    .filter((line) => {
+      const heading = /^(#{1,6})\s+(.+)$/.exec(line.trim());
+      if (heading) {
+        const level = heading[1].length;
+        if (excludedLevel > 0 && level <= excludedLevel) excludedLevel = 0;
+        if (excludedHeading.test(heading[2])) excludedLevel = level;
+      }
+      return excludedLevel === 0;
+    })
+    .join("\n");
+}
+
 function hasColdStartEvidence(evidence: RepositoryEvidence) {
+  if (evidence.isCollectionOnly) return false;
   if (!evidence.matchedCapabilities.some((id) => !isGenericCapabilityId(id))) return false;
   return evidence.hasSkillMd
     || evidence.hasMcpManifest
@@ -574,7 +690,8 @@ function hasColdStartEvidence(evidence: RepositoryEvidence) {
     || evidence.hasGitHubAction
     || evidence.hasDatasetEvidence
     || evidence.hasReusableUi
-    || evidence.hasReadmeUsage;
+    || evidence.hasReadmeUsage
+    || evidence.hasStrongMetadataEvidence;
 }
 
 async function getRepositoryInspection(item: GitHubSearchItem, signal?: AbortSignal) {
@@ -659,7 +776,7 @@ function matchesEvidenceTerm(source: string, term: string) {
 const genericCapabilityTokens = new Set([
   "api", "app", "application", "classification", "data", "dataset", "detection",
   "framework", "identification", "library", "management", "model", "open", "platform",
-  "recognition", "service", "software", "system", "tool"
+  "recognition", "service", "software", "source", "system", "tool"
 ]);
 
 function matchesCapabilityKeyword(source: string, keyword: string) {
@@ -756,6 +873,7 @@ function toResource(
     has_mcp_manifest: overrides.evidence?.hasMcpManifest,
     has_package_json: overrides.evidence?.hasPackageJson,
     has_project_manifest: overrides.evidence?.hasProjectManifest,
+    has_repository_metadata_evidence: overrides.evidence?.hasStrongMetadataEvidence,
     has_github_action: overrides.evidence?.hasGitHubAction,
     artifact_kind: overrides.evidence?.hasDatasetEvidence ? "dataset" : undefined,
     matched_capabilities: overrides.evidence?.matchedCapabilities,
@@ -831,6 +949,15 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   if (/(图书馆|图书管理|编目|借还|借阅|读者管理|isbn|library.circulation|integrated.library.system|patron.management)/i.test(source)) {
     return libraryDiscoveryProfile;
   }
+  if (/(会议录音|会议转写|说话人|会议摘要|会议纪要|行动项|speaker.diarization|meeting.transcription|meeting.summarization)/i.test(source)) {
+    return meetingDiscoveryProfile;
+  }
+  if (/(发票|收据|票据|费用审核|invoice.ocr|invoice.extraction|receipt.ocr)/i.test(source)) {
+    return invoiceDiscoveryProfile;
+  }
+  if (/(以图搜图|商品图片|相似商品|视觉搜索|visual.product.search|product.image.retrieval|image.similarity.search)/i.test(source)) {
+    return visualProductSearchDiscoveryProfile;
+  }
   if (/(植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病|病斑|植物健康诊断|plant.disease|leaf.disease|crop.disease|plant.pathology)/i.test(source)) {
     return plantDiseaseDiscoveryProfile;
   }
@@ -849,7 +976,10 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   if (/(美食|餐饮|做饭|菜谱|食谱|烹饪|饭菜|料理|吃什么|food.discovery|food.content|recipe|meal.planning|ingredient.recommendation|personalized.nutrition)/i.test(source)) {
     return recipeDiscoveryProfile;
   }
-  if (/(配送|调度|车辆容量|时间窗|路线规划|路径优化|vehicle.routing|route.optimization|vrptw|fleet.routing)/i.test(source)) {
+  if (
+    /(配送|车辆容量|车队调度|物流调度|配送调度|vehicle.routing|route.optimization|vrptw|fleet.routing)/i.test(source)
+    || /(?:物流|车辆|车队|配送).{0,12}(?:路线规划|路径优化|调度|时间窗)/i.test(source)
+  ) {
     return vehicleRoutingDiscoveryProfile;
   }
   return null;

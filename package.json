@@ -17,7 +17,8 @@
     "test:resources": "tsx scripts/resource-verification-benchmark.ts",
     "test:resource-model": "tsx scripts/resource-model-v2-benchmark.ts",
     "test:resource-capabilities": "tsx scripts/resource-capability-benchmark.ts",
-    "test:recommendation:v2": "tsx scripts/v2-recommendation-validation.ts"
+    "test:recommendation:v2": "tsx scripts/v2-recommendation-validation.ts",
+    "test:recommendation:novel": "tsx scripts/novel-domain-discovery-benchmark.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",

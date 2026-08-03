@@ -63,6 +63,18 @@ export function getResourceVerification(resource: Resource): ResourceVerificatio
     return verification("package_verified", "项目结构已验证", "已发现可运行项目或包清单。", true);
   }
 
+  if (
+    resource.has_repository_metadata_evidence
+    && (resource.matched_capabilities?.length ?? 0) > 0
+  ) {
+    return verification(
+      "verified",
+      "仓库元数据已验证",
+      "GitHub 描述、许可证、社区信号与当前能力均有直接证据。",
+      true
+    );
+  }
+
   return verification("unverified", "模板类型待验证", "未发现项目清单或人工确认信息。", false);
 }
 

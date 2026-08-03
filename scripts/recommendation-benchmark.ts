@@ -447,6 +447,22 @@ assert(
   isCapabilityEvidenceSufficient("visual-product-search", "E-commerce product catalog with search by image and similar product retrieval"),
   "以图搜图：具备商品目录和图片检索证据的项目应通过"
 );
+assert(
+  !isCapabilityEvidenceSufficient("medical-image-segmentation", "Grounded SAM detects and segments anything in generic images"),
+  "通用图像分割不能冒充医学影像分割"
+);
+assert(
+  isCapabilityEvidenceSufficient("medical-image-segmentation", "DICOM CT and MRI medical image segmentation with editable masks"),
+  "具有医学影像与分割双重证据的资源应通过"
+);
+assert(
+  !isCapabilityEvidenceSufficient("interactive-map", "SVG-based province selection map for SwiftUI"),
+  "SVG 区域选择器不能冒充地理路线地图"
+);
+assert(
+  isCapabilityEvidenceSufficient("interactive-map", "Offline OpenStreetMap tiles rendered with Leaflet and GeoJSON"),
+  "离线地理地图组件应通过"
+);
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
 assert(isGenericCapabilityId("model-training-pipeline"), "陌生领域：模型训练流水线不能独立证明领域适配");

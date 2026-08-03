@@ -80,12 +80,56 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
       && !has(/osint|browser extension|google lens|tineye|stock photo downloader/i);
   }
   if (capabilityId === "multimodal-image-embeddings") {
-    return has(/clip|image.?text embeddings?|vision.?language model|multimodal embeddings?|image embeddings?/i)
+    return has(/\bclip\b|vision.?language model|multimodal embedding model|image embedding (?:model|encoder|inference|generation|server)|encod(?:e|er|ing).{0,40}(?:image|multimodal).{0,40}embedding/i)
       && !has(/image generation only|caption only|browser extension|google lens|tineye/i);
   }
-  if (capabilityId === "vector-similarity-index") return has(/vector database|vector similarity|nearest neighbor|qdrant|milvus|weaviate|faiss|embedding index/i);
-  if (capabilityId === "speaker-diarization") return has(/speaker diarization|speaker separation|speaker segmentation|who spoke|speaker labels?/i);
+  if (capabilityId === "vector-similarity-index") return has(/^(?:qdrant|milvus|weaviate|faiss)\b|vector (?:database|query engine|search engine|index)|vector similarity search|nearest neighbor search|\bhnsw\b|embedding index/i);
+  if (capabilityId === "speaker-diarization") {
+    const futureOnly = has(/speaker diarization.{0,80}(?:planned|coming soon|roadmap)|(?:planned|coming soon|roadmap).{0,80}speaker diarization|speaker identification.{0,80}coming soon/i);
+    const implemented = has(/speaker[- ]attributed transcripts?|speaker labels?|diariz(?:e|ation).{0,60}(?:output|transcript|pipeline|model|support)/i);
+    return !futureOnly && (implemented || has(/speaker separation|speaker segmentation|who spoke/i));
+  }
   if (capabilityId === "meeting-summarization") return has(/meeting|会议/i) && has(/summar|minutes|action item|meeting notes|会议纪要|行动项/i);
+  if (capabilityId === "pedestrian-routing") {
+    const explicitWalking = has(/pedestrian|walking|hiking|foot route|徒步|步行/i)
+      && has(/routing|route planning|directions|路径|路线/i);
+    const generalRoutingEngine = has(/routing engine/i)
+      && has(/openstreetmap|\bosm\b|open source/i)
+      && !has(/vehicle routing problem|\bvrpt?w?\b|delivery routes?|logistics optimization/i);
+    return explicitWalking || generalRoutingEngine;
+  }
+  if (capabilityId === "interactive-map") {
+    const geospatialMap = has(/openstreetmap|\bosm\b|map tiles?|geojson|maplibre|leaflet|geospatial|gis|offline (?:shelter )?maps?|route map|地图瓦片|离线地图/i);
+    const svgRegionOnly = has(/svg[- ]based maps?|province selection|district selection/i)
+      && !has(/openstreetmap|map tiles?|geojson|maplibre|leaflet|geospatial|gis/i);
+    return geospatialMap && !svgRegionOnly;
+  }
+  if (capabilityId === "medical-image-segmentation") {
+    return has(/medical|clinical|healthcare|dicom|ct scan|mri|radiology|pathology|医学|医疗|影像/i)
+      && has(/segment(?:ation|ing)|mask generation|分割/i);
+  }
+  if (capabilityId === "dicom-viewer") {
+    return has(/dicom|pacs|medical imaging|radiology/i)
+      && has(/viewer|visualization|workstation|浏览|阅片/i);
+  }
+  if (capabilityId === "medical-image-labeling") {
+    return has(/medical|clinical|healthcare|dicom|ct scan|mri|radiology|pathology|医学|医疗|影像/i)
+      && has(/annotat(?:e|ion)|label(?:ing|led)|manual correction|segmentation editor|标注|修正/i);
+  }
+  if (capabilityId === "home-energy-monitoring") {
+    return has(/home energy|smart meter|electricity consumption|power usage|energy monitoring|用电|智能电表/i)
+      && has(/monitor|dashboard|visuali[sz]|historical|usage|consumption|监测|统计/i);
+  }
+  if (capabilityId === "mqtt-sensor-ingestion") {
+    return has(/\bmqtt\b/i) && has(/sensor|meter|energy|electricity|power|telemetry|传感器|电表|功率/i);
+  }
+  if (capabilityId === "video-nvr-detection") {
+    return has(/rtsp|nvr|security camera|video surveillance|camera stream|视频监控|摄像头/i)
+      && has(/object detection|person detection|vehicle detection|yolo|detect and track|目标检测|人车识别/i);
+  }
+  if (capabilityId === "multi-object-tracking") {
+    return has(/multi[- ]object tracking|object tracking|bytetrack|deep\s*sort|mot tracker|person.{0,40}tracking|vehicle.{0,40}tracking|多目标跟踪|目标跟踪/i);
+  }
   return true;
 }
 

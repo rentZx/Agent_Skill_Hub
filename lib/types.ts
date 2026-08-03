@@ -43,6 +43,7 @@ export type SeedResource = {
   has_mcp_manifest?: boolean;
   has_package_json?: boolean;
   has_project_manifest?: boolean;
+  has_repository_metadata_evidence?: boolean;
   has_github_action?: boolean;
   artifact_path?: string;
   is_curated?: boolean;
