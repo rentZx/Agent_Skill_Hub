@@ -138,6 +138,9 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
   if (capabilityId === "multi-object-tracking") {
     return has(/multi[- ]object tracking|object tracking|bytetrack|deep\s*sort|mot tracker|person.{0,40}tracking|vehicle.{0,40}tracking|多目标跟踪|目标跟踪/i);
   }
+  if (capabilityId === "version-comparison") {
+    return has(/document version comparison|compare (?:document|contract) versions?|version diff|redline|track changes|合同版本对比|文档版本对比|修订对比/i);
+  }
   return true;
 }
 

@@ -589,6 +589,7 @@ function scoreResources(
       const exactEvidenceMatches = (capabilityGraph?.capabilities ?? []).filter((capability) =>
         inspectedCapabilityHits.has(capability.id)
         && isCapabilityEvidenceSufficient(capability.id, haystack)
+        && isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)
       );
       const matchedCapabilities = resource.source === "resource_model_v2"
         ? Array.from(new Map([
@@ -601,6 +602,7 @@ function scoreResources(
           ? (capabilityGraph?.capabilities ?? []).filter((capability) =>
               inspectedCapabilityHits.has(capability.id)
               && isCapabilityEvidenceSufficient(capability.id, haystack)
+              && isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)
             )
           : textualCapabilityMatches;
       const coreCapabilities = capabilityGraph?.capabilities.filter((capability) => capability.priority === "core") ?? [];
@@ -710,6 +712,7 @@ function matchesCapabilityEvidence(
   if (capability.negativeKeywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
   if (!capability.keywords.some((keyword) => matchesScoringTerm(haystack, keyword))) return false;
   if (!isCapabilityEvidenceSufficient(capability.id, haystack)) return false;
+  if (!isCapabilityContextCompatible(capability.id, haystack, capabilityGraph)) return false;
   if (requiresKnownDomainAnchor(capability.id) && !hasKnownDomainAnchor(haystack, capabilityGraph)) {
     return false;
   }
@@ -736,6 +739,23 @@ function matchesCapabilityEvidence(
   }
 
   return true;
+}
+
+function isCapabilityContextCompatible(
+  capabilityId: string,
+  haystack: string,
+  capabilityGraph?: CapabilityGraph
+) {
+  if (!capabilityGraph) return true;
+  const graph = `${capabilityGraph.domain} ${capabilityGraph.capabilities
+    .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
+    .join(" ")}`.toLowerCase();
+  const pointCloudProject = /point.?cloud|lidar|\bpcd\b|\blas\b|3d.?bbox|点云|激光雷达/i.test(graph);
+  if (!pointCloudProject) return true;
+
+  const needsPointCloudContext = /segment|annotat|label|bbox|visualization|workflow|file.upload|点云文件/i.test(capabilityId);
+  if (!needsPointCloudContext) return true;
+  return /point.?cloud|lidar|\bpcd\b|\blas\b|\bkitti\b|3d.?bbox|3d bounding box|点云|激光雷达/i.test(haystack);
 }
 
 function requiresKnownDomainAnchor(capabilityId: string) {
@@ -796,6 +816,9 @@ function hasCapabilityDomainConflict(resource: Resource, capabilityGraph?: Capab
   const graph = `${capabilityGraph.domain} ${capabilityGraph.capabilities
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
+  const shortVideoResource = /(moneyprinter|short[- ]video|text[- ]to[- ]video|ai[- ]video[- ]generator|vertical video|stock footage|youtube shorts|tiktok video)/i.test(source);
+  const podcastOrAudioEditingProject = /(podcast|audio editing|silence removal|speaker diarization|播客|音频后期|多人录音|口头禅)/i.test(graph);
+  if (shortVideoResource && podcastOrAudioEditingProject && !isShortVideoGraph(capabilityGraph)) return true;
   if (/(library.circulation|integrated.library.system|isbn.cataloging|patron.management|图书馆|借阅|读者管理)/i.test(graph)) {
     const hasLibraryEvidence = /(integrated[- ]library[- ]system|library[- ]circulation|isbn|bibliographic|patron[- ]management|图书馆|图书管理|借阅)/i.test(source)
       || (/\blibrary\b/i.test(source) && /\b(cataloging|circulation|patron|holdings)\b/i.test(source));
@@ -830,7 +853,7 @@ function isStrictKnownDomainGraph(capabilityGraph: CapabilityGraph) {
     || /(recipe-data|ingredient-matching|recipe|ingredients|cooking steps|菜谱|食材|烹饪)/i.test(source)
     || /(stock.market|stock.analysis|stock.trading|market.data|a-share|technical.analysis|macd|股票|行情|量化)/i.test(source)
     || /(inventory-management|stock control|warehouse location|item pricing|库存|仓库|货架)/i.test(source)
-    || /(three\.js|webgl|mesh generation|image.to.3d|glb|stl|三维|3d)/i.test(source)
+    || /(three\.js|webgl|mesh generation|image.to.3d|single.image.3d|glb|stl|图像转三维|2d.?转.?3d)/i.test(source)
     || /(plant.species|plant.identification|species.classification|plantnet|植物识别|拍照识花|物种识别|plant.disease|leaf.disease|crop.disease|植物病害|叶片疾病)/i.test(source);
 }
 

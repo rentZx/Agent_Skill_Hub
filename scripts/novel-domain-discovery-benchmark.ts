@@ -156,7 +156,8 @@ async function main() {
     const resources = await discoverGitHubResources(testCase.prompt, testCase.tags, [], {
       capabilities: testCase.capabilities,
       searchQueries: [],
-      inspectionLimit: 10
+      inspectionLimit: 10,
+      searchQueryLimit: 3
     });
     const references = new Set(testCase.references);
     const names = resources.map((resource) => repositoryKey(resource.repo_url));

@@ -26,6 +26,7 @@ type DiscoveryContext = {
   capabilities?: CapabilityRequirement[];
   searchQueries?: string[];
   inspectionLimit?: number;
+  searchQueryLimit?: number;
   signal?: AbortSignal;
 };
 
@@ -50,7 +51,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v11";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v12";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -241,12 +242,14 @@ export async function discoverGitHubResources(
   context: DiscoveryContext = {}
 ): Promise<Resource[]> {
   const profile = getDiscoveryProfile(input, tags);
+  const searchQueryLimit = Math.max(1, Math.min(context.searchQueryLimit ?? 4, 4));
   const queries = buildPlannedQueries(
     input,
     tags,
     context.searchQueries ?? [],
     context.capabilities ?? [],
-    profile
+    profile,
+    searchQueryLimit
   );
   const initialResults = await mapWithConcurrency(
     queries,
@@ -380,7 +383,8 @@ function buildPlannedQueries(
   tags: string[],
   searchQueries: string[],
   capabilities: CapabilityRequirement[],
-  profile: DiscoveryProfile | null
+  profile: DiscoveryProfile | null,
+  queryLimit: number
 ) {
   const normalizedPlanned = searchQueries
     .map((query) => query.replace(/\s+/g, " ").trim())
@@ -391,7 +395,7 @@ function buildPlannedQueries(
     .map(buildRelaxedSearchTerm)
     .filter(Boolean)
     .map((query) => `${query} in:name,description,readme archived:false fork:false`);
-  const profileQueries = profile?.queries.slice(0, 3) ?? [];
+  const profileQueries = profile?.queries.slice(0, queryLimit) ?? [];
   const adaptiveQueries = profile ? [] : buildColdStartQueries(capabilities);
   const fallbackQueries = buildQueries(input, tags);
   if (profile) {
@@ -400,14 +404,14 @@ function buildPlannedQueries(
       ...planned.slice(0, 1),
       ...relaxedPlanned.slice(0, 1),
       ...fallbackQueries
-    ])).slice(0, 3);
+    ])).slice(0, queryLimit);
   }
   return Array.from(new Set([
-    ...adaptiveQueries.slice(0, 3),
+    ...adaptiveQueries.slice(0, queryLimit),
     ...planned.slice(0, 1),
     ...relaxedPlanned.slice(0, 1),
     ...fallbackQueries
-  ])).slice(0, 3);
+  ])).slice(0, queryLimit);
 }
 
 async function mapWithConcurrency<T, R>(

@@ -328,6 +328,82 @@ assert(
   "陌生领域：GitHub README/SKILL.md 已验证的能力必须进入评分结果"
 );
 
+const pointCloudGraph = buildCapabilityGraph("开发自动驾驶点云标注平台，支持 3D 框、语义分割和 KITTI 导出", {
+  projectType: "自动驾驶点云标注平台",
+  coreFeatures: ["标注激光雷达点云中的三维目标框", "点云语义分割", "导出 KITTI 数据"],
+  capabilities: [
+    capability("3d-bbox-annotation", "三维框标注", ["point cloud 3d bounding box", "lidar annotation"]),
+    capability("semantic-segmentation", "点云语义分割", ["point cloud semantic segmentation", "semantic segmentation"])
+  ]
+});
+const pointCloudRecommendation = buildProjectRecommendation(
+  "开发自动驾驶点云标注平台，支持 3D 框、语义分割和 KITTI 导出",
+  [
+    resource(
+      "labelCloud",
+      "template_repo",
+      "Point cloud 3D bounding box and LiDAR annotation with PCD input and KITTI export",
+      ["point-cloud", "lidar-annotation", "kitti"]
+    ),
+    resource(
+      "ultralytics",
+      "template_repo",
+      "2D image object detection and semantic segmentation",
+      ["computer-vision", "semantic-segmentation", "image-annotation"]
+    )
+  ],
+  {
+    projectType: "自动驾驶点云标注平台",
+    coreFeatures: ["三维框标注", "点云语义分割", "KITTI 导出"],
+    capabilityGraph: pointCloudGraph
+  }
+);
+const pointCloudNames = pointCloudRecommendation.groups.flatMap((group) =>
+  group.items.map((item) => item.resource.name)
+);
+assert(
+  pointCloudNames.includes("labelCloud"),
+  `点云标注：应召回具备点云与 KITTI 证据的仓库；结果=${JSON.stringify(pointCloudRecommendation.groups)}`
+);
+assert(!pointCloudNames.includes("ultralytics"), "点云标注：不能把仅支持 2D 图像分割的仓库作为点云方案");
+
+const podcastGraph = buildCapabilityGraph("开发播客后期工具，自动转写、区分说话人并删除静音", {
+  projectType: "播客音频后期工具",
+  coreFeatures: ["自动转写", "说话人分离", "删除静音"],
+  capabilities: [
+    capability("automatic-transcription", "自动转写", ["audio transcription", "speech to text"]),
+    capability("speaker-diarization", "说话人分离", ["speaker diarization", "speaker labels"]),
+    capability("silence-removal", "删除静音", ["audio silence removal", "remove silence"], "required")
+  ]
+});
+const podcastRecommendation = buildProjectRecommendation(
+  "开发播客后期工具，自动转写、区分说话人并删除静音",
+  [
+    resource(
+      "WhisperX",
+      "template_repo",
+      "Audio transcription with word timestamps and speaker diarization",
+      ["audio-transcription", "speaker-diarization", "word-timestamps"]
+    ),
+    resource(
+      "MoneyPrinterTurbo",
+      "template_repo",
+      "AI short video generator with stock footage, voiceover and automatic captions",
+      ["short-video", "vertical-video", "automatic-subtitles"]
+    )
+  ],
+  {
+    projectType: "播客音频后期工具",
+    coreFeatures: ["自动转写", "说话人分离", "删除静音"],
+    capabilityGraph: podcastGraph
+  }
+);
+const podcastNames = podcastRecommendation.groups.flatMap((group) =>
+  group.items.map((item) => item.resource.name)
+);
+assert(podcastNames.includes("WhisperX"), "播客后期：应召回具备音频转写和说话人分离证据的仓库");
+assert(!podcastNames.includes("MoneyPrinterTurbo"), "播客后期：短视频字幕工具不能冒充音频后期工具");
+
 const conciseWeatherReason = getLocalizedRecommendationReason(
   resource(
     "Weather API",
@@ -470,6 +546,14 @@ assert(
 assert(
   isCapabilityEvidenceSufficient("weather-forecast-data", "Weather API with current weather, hourly forecast and daily forecast data"),
   "直接提供预报数据的天气 API 应通过"
+);
+assert(
+  !isCapabilityEvidenceSufficient("version-comparison", "OCR benchmark comparison for PDF extraction accuracy"),
+  "OCR 基准比较不能冒充合同版本对比"
+);
+assert(
+  isCapabilityEvidenceSufficient("version-comparison", "Compare contract versions and generate a document redline"),
+  "直接提供合同版本对比与 redline 的资源应通过"
 );
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
