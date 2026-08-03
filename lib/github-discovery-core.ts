@@ -48,7 +48,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v5";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v6";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
