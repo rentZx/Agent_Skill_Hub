@@ -555,6 +555,26 @@ assert(
   isCapabilityEvidenceSufficient("version-comparison", "Compare contract versions and generate a document redline"),
   "直接提供合同版本对比与 redline 的资源应通过"
 );
+assert(
+  !isCapabilityEvidenceSufficient("speaker-diarization", "支持中文转写，但不负责说话人分离；tag: speaker-diarization"),
+  "明确声明不支持说话人分离的资源不能被旧标签重新选中"
+);
+assert(
+  isCapabilityEvidenceSufficient("3d-bbox-annotation", "LiDAR point cloud annotation with 3D bounding boxes and KITTI export"),
+  "点云三维框标注需要同时具备点云和标注证据"
+);
+assert(
+  !isCapabilityEvidenceSufficient("3d-bbox-annotation", "2D image object detection and bounding boxes"),
+  "二维目标框不能冒充点云三维框标注"
+);
+assert(
+  !isCapabilityEvidenceSufficient("indoor-path-routing", "General JavaScript graph and pathfinding algorithms"),
+  "通用寻路算法不能冒充室内导航引擎"
+);
+assert(
+  isCapabilityEvidenceSufficient("indoor-path-routing", "Indoor navigation and wayfinding over multi-floor building maps"),
+  "直接支持楼层地图与室内寻路的资源应通过"
+);
 assert(isGenericCapabilityId("audio-upload"), "陌生领域：上传能力不能独立证明领域适配");
 assert(isGenericCapabilityId("audio-preprocessing"), "陌生领域：音频预处理不能独立证明领域适配");
 assert(isGenericCapabilityId("model-training-pipeline"), "陌生领域：模型训练流水线不能独立证明领域适配");

@@ -66,6 +66,23 @@ export function isGenericCapabilityId(id: string) {
 export function isCapabilityEvidenceSufficient(capabilityId: string, source: string) {
   const text = source.toLowerCase();
   const has = (pattern: RegExp) => pattern.test(text);
+  if (/(?:3d|three-dimensional).*(?:bbox|bounding-box|bounding.box|annotation)|(?:point-cloud|lidar).*(?:annotation|labeling)|三维框|点云.*(?:标注|三维框)/i.test(capabilityId)) {
+    return has(/point.?cloud|lidar|\bpcd\b|\bkitti\b|点云|激光雷达/i)
+      && has(/3d bounding box|cuboid|point.?cloud.{0,40}(?:annotat|label)|lidar.{0,40}(?:annotat|label)|三维框|点云标注/i);
+  }
+  if (/kitti.*(?:export|导出|格式)|export.*kitti/i.test(capabilityId)) {
+    return has(/\bkitti\b/i)
+      && has(/export|convert|annotation format|label format|dataset format|导出|格式转换/i);
+  }
+  if (/(?:ble|beacon).*(?:position|locali[sz]|location|信标|定位)|indoor-positioning|信标.*定位|室内定位/i.test(capabilityId)) {
+    return has(/\bble\b|bluetooth low energy|ibeacon|beacon|蓝牙信标/i)
+      && has(/indoor (?:position|locali[sz]|location|navigation)|positioning system|indoor navigation|室内定位|室内导航/i);
+  }
+  if (/indoor.*(?:routing|path)|accessible.*route|wheelchair.*route/i.test(capabilityId)) {
+    return has(/indoor navigation|indoor routing|indoor path|wayfinding|floor plan|building map|室内导航|室内路径|楼层地图/i)
+      && (!/accessible|wheelchair/i.test(capabilityId)
+        || has(/accessible route|wheelchair routing|barrier.?free|无障碍/i));
+  }
   if (capabilityId === "library-circulation") {
     return has(/integrated[- ]library[- ]system|library[- ]circulation|isbn|bibliographic|patron[- ]management|cataloging.{0,40}(circulation|loan|checkout)|circulation.{0,40}(library|loan|patron)/i);
   }
@@ -93,9 +110,10 @@ export function isCapabilityEvidenceSufficient(capabilityId: string, source: str
   }
   if (capabilityId === "vector-similarity-index") return has(/^(?:qdrant|milvus|weaviate|faiss)\b|vector (?:database|query engine|search engine|index)|vector similarity search|nearest neighbor search|\bhnsw\b|embedding index/i);
   if (capabilityId === "speaker-diarization") {
+    const explicitlyUnsupported = has(/(?:does not|doesn't|not).{0,40}(?:support|provide).{0,30}speaker diarization|不(?:负责|支持|提供|包含).{0,16}(?:说话人分离|说话人识别|说话人区分)/i);
     const futureOnly = has(/speaker diarization.{0,80}(?:planned|coming soon|roadmap)|(?:planned|coming soon|roadmap).{0,80}speaker diarization|speaker identification.{0,80}coming soon/i);
     const implemented = has(/speaker[- ]attributed transcripts?|speaker labels?|diariz(?:e|ation).{0,60}(?:output|transcript|pipeline|model|support)/i);
-    return !futureOnly && (implemented || has(/speaker separation|speaker segmentation|who spoke/i));
+    return !explicitlyUnsupported && !futureOnly && (implemented || has(/speaker separation|speaker segmentation|who spoke/i));
   }
   if (capabilityId === "meeting-summarization") return has(/meeting|会议/i) && has(/summar|minutes|action item|meeting notes|会议纪要|行动项/i);
   if (capabilityId === "pedestrian-routing") {

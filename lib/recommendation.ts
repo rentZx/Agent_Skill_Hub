@@ -751,11 +751,19 @@ function isCapabilityContextCompatible(
     .flatMap((capability) => [capability.id, capability.label, ...capability.keywords])
     .join(" ")}`.toLowerCase();
   const pointCloudProject = /point.?cloud|lidar|\bpcd\b|\blas\b|3d.?bbox|点云|激光雷达/i.test(graph);
-  if (!pointCloudProject) return true;
+  if (pointCloudProject) {
+    const needsPointCloudContext = /segment|annotat|label|bbox|visualization|workflow|file.upload|点云文件/i.test(capabilityId);
+    if (needsPointCloudContext && !/point.?cloud|lidar|\bpcd\b|\blas\b|\bkitti\b|3d.?bbox|3d bounding box|点云|激光雷达/i.test(haystack)) {
+      return false;
+    }
+  }
 
-  const needsPointCloudContext = /segment|annotat|label|bbox|visualization|workflow|file.upload|点云文件/i.test(capabilityId);
-  if (!needsPointCloudContext) return true;
-  return /point.?cloud|lidar|\bpcd\b|\blas\b|\bkitti\b|3d.?bbox|3d bounding box|点云|激光雷达/i.test(haystack);
+  const indoorNavigationProject = /indoor navigation|indoor positioning|ble beacon|floor map|wayfinding|室内导航|室内定位|楼层地图|蓝牙信标/i.test(graph);
+  if (indoorNavigationProject && /path|routing|route|navigation|map|定位|路径|地图/i.test(capabilityId)) {
+    return /indoor navigation|indoor routing|indoor positioning|wayfinding|floor plan|building map|ble beacon|ibeacon|室内导航|室内定位|室内路径|楼层地图|蓝牙信标/i.test(haystack);
+  }
+
+  return true;
 }
 
 function requiresKnownDomainAnchor(capabilityId: string) {

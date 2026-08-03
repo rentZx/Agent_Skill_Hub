@@ -51,7 +51,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v12";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v13";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -407,11 +407,14 @@ function buildPlannedQueries(
     ])).slice(0, queryLimit);
   }
   return Array.from(new Set([
-    ...adaptiveQueries.slice(0, queryLimit),
-    ...planned.slice(0, 1),
+    ...interleaveQueries(adaptiveQueries, planned),
     ...relaxedPlanned.slice(0, 1),
     ...fallbackQueries
   ])).slice(0, queryLimit);
+}
+
+function interleaveQueries(primary: string[], secondary: string[]) {
+  return roundRobin([primary, secondary]);
 }
 
 async function mapWithConcurrency<T, R>(
