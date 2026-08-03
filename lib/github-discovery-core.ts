@@ -48,7 +48,7 @@ type DiscoveryProfile = {
   relevanceTerms: string[];
 };
 
-export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v8";
+export const DISCOVERY_CLASSIFIER_VERSION = "github-evidence-v9";
 
 const shortVideoDiscoveryProfile: DiscoveryProfile = {
   queries: [
@@ -177,6 +177,19 @@ const imageTo3dDiscoveryProfile: DiscoveryProfile = {
   relevanceTerms: [
     "image to 3d", "single image 3d", "threejs", "depth estimation", "mesh generation",
     "3d reconstruction", "model viewer"
+  ]
+};
+
+const libraryDiscoveryProfile: DiscoveryProfile = {
+  queries: [
+    "\"integrated library system\" circulation in:name,description,readme archived:false fork:false",
+    "\"library management system\" ISBN cataloging in:name,description,readme archived:false fork:false",
+    "Koha library circulation in:name,description,readme archived:false fork:false",
+    "open source ILS patron management in:name,description,readme archived:false fork:false"
+  ],
+  relevanceTerms: [
+    "integrated library system", "library circulation", "ISBN cataloging", "patron management",
+    "bibliographic records", "library management system", "Koha", "ILS"
   ]
 };
 
@@ -814,6 +827,9 @@ function getDiscoveryProfile(input: string, tags: string[]) {
   }
   if (/(2d.?转.?3d|二维.+三维|image.to.3d|single.image.3d|img2threejs)/i.test(source)) {
     return imageTo3dDiscoveryProfile;
+  }
+  if (/(图书馆|图书管理|编目|借还|借阅|读者管理|isbn|library.circulation|integrated.library.system|patron.management)/i.test(source)) {
+    return libraryDiscoveryProfile;
   }
   if (/(植物病害|病害识别|作物病害|叶片病害|病虫害|叶片疾病|病斑|植物健康诊断|plant.disease|leaf.disease|crop.disease|plant.pathology)/i.test(source)) {
     return plantDiseaseDiscoveryProfile;
